@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../components/logo_widget.dart';
+import '../../data/india_states_districts.dart';
 import 'population_form_screen.dart';
 
 class VillageFormScreen extends StatefulWidget {
@@ -21,16 +22,7 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
   String _tehsil = '';
   String _ldgCode = '';
   
-  // State data for cascading dropdowns
-  final Map<String, List<String>> _stateDistrictData = {
-    'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Thane', 'Nashik'],
-    'Uttar Pradesh': ['Lucknow', 'Varanasi', 'Agra', 'Kanpur', 'Prayagraj'],
-    'Delhi': ['New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi'],
-    'Rajasthan': ['Jaipur', 'Jodhpur', 'Udaipur', 'Kota', 'Ajmer'],
-    'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar'],
-    'Karnataka': ['Bangalore', 'Mysore', 'Hubli', 'Mangalore', 'Belgaum'],
-    'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Trichy', 'Salem'],
-  };
+  // State data for cascading dropdowns (using imported data)
 
   List<String> _availableDistricts = [];
 
@@ -46,7 +38,7 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
       _selectedDistrict = '';
       
       if (_selectedState.isNotEmpty) {
-        _availableDistricts = _stateDistrictData[_selectedState] ?? [];
+        _availableDistricts = indiaStatesDistricts[_selectedState] ?? [];
       } else {
         _availableDistricts = [];
       }
@@ -242,7 +234,7 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
                         label: 'Select State',
                         icon: Icons.flag,
                         value: _selectedState,
-                        items: _stateDistrictData.keys.toList(),
+                        items: indiaStatesDistricts.keys.toList(),
                         validator: (value) {
                           return null;
                         },
@@ -307,9 +299,6 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
                         label: 'Enter tehsil name',
                         icon: Icons.terrain,
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter tehsil name';
-                          }
                           return null;
                         },
                         onSaved: (value) => _tehsil = value ?? '',
@@ -325,12 +314,6 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
                         label: 'Enter LDG code',
                         icon: Icons.code,
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter LDG code';
-                          }
-                          if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
-                            return 'Please enter numbers only';
-                          }
                           return null;
                         },
                         onSaved: (value) => _ldgCode = value ?? '',

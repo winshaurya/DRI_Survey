@@ -341,15 +341,9 @@ class _PopulationFormScreenState extends State<PopulationFormScreen> {
                                   _calculatePopulation();
                                 });
                               },
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter number of families';
-                                }
-                                if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
-                                  return 'Numbers only';
-                                }
-                                return null;
-                              },
+                        validator: (value) {
+                          return null;
+                        },
                             ),
                           ),
                         ),
