@@ -16,125 +16,135 @@ class SideNavigation extends ConsumerWidget {
     return Drawer(
       child: Container(
         color: Colors.white,
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.green, Color(0xFF66BB6A)],
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Header - Compact and clean
+              InkWell(
+                onTap: () => _navigateHome(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.green, Color(0xFF66BB6A)],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => const Icon(
+                            Icons.image_not_supported,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'DRI Survey',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'Deendayal Research Institute',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white.withOpacity(0.9),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              child: Column(
-                children: [
-                  const CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.white,
-                    child: Icon(
-                      Icons.person,
-                      size: 40,
-                      color: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    l10n.familySurvey,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Text(
-                    l10n.deendayalResearchInstitute,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
 
-            // Menu Items
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.person,
-                    title: l10n.profile,
-                    onTap: () => _showProfileDialog(context, l10n),
+              // Menu Items - Simple and clean
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildMenuItem(
+                        context,
+                        icon: Icons.person,
+                        title: l10n.profile,
+                        onTap: () => _showProfileDialog(context, l10n),
+                      ),
+
+                      _buildMenuItem(
+                        context,
+                        icon: Icons.history,
+                        title: 'History',
+                        onTap: () => _showHistoryDialog(context, l10n),
+                      ),
+
+                      _buildLanguageDropdown(context, l10n, ref),
+
+                      _buildSettingsDropdown(context, l10n, ref),
+
+                      const Divider(height: 1),
+
+                      _buildHelpDropdown(context, l10n),
+
+                      _buildMenuItem(
+                        context,
+                        icon: Icons.info,
+                        title: l10n.about,
+                        onTap: () => _showAboutDialog(context, l10n),
+                      ),
+
+                      const Divider(height: 1),
+
+                      _buildMenuItem(
+                        context,
+                        icon: Icons.logout,
+                        title: l10n.logout,
+                        onTap: () => _showLogoutDialog(context, l10n),
+                        color: Colors.red,
+                      ),
+
+                      // Footer
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          l10n.version,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
                   ),
-
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.history,
-                    title: 'History',
-                    onTap: () => _showHistoryDialog(context, l10n),
-                  ),
-
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.language,
-                    title: l10n.selectLanguage,
-                    onTap: () => _showLanguageDialog(context, l10n, ref),
-                  ),
-
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.settings,
-                    title: l10n.settings,
-                    onTap: () => _showSettingsDialog(context, l10n, ref),
-                  ),
-
-                  const Divider(),
-
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.help,
-                    title: l10n.helpAndSupport,
-                    onTap: () => _showHelpDialog(context, l10n),
-                  ),
-
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.info,
-                    title: l10n.about,
-                    onTap: () => _showAboutDialog(context, l10n),
-                  ),
-
-                  const Divider(),
-
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.logout,
-                    title: l10n.logout,
-                    onTap: () => _showLogoutDialog(context, l10n),
-                    color: Colors.red,
-                  ),
-                ],
-              ),
-            ),
-
-            // Footer
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                l10n.version,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
                 ),
-                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -167,6 +177,11 @@ class SideNavigation extends ConsumerWidget {
         borderRadius: BorderRadius.circular(8),
       ),
     );
+  }
+
+  void _navigateHome(BuildContext context) {
+    Navigator.pop(context);
+    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
   }
 
   void _showProfileDialog(BuildContext context, AppLocalizations l10n) {
@@ -427,8 +442,8 @@ class SideNavigation extends ConsumerWidget {
                                     style: TextStyle(fontSize: 14),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: currentFontSize == 0.7 ? Colors.green : Colors.grey[300],
-                                    foregroundColor: currentFontSize == 0.7 ? Colors.white : Colors.black,
+                                    backgroundColor: currentFontSize == 1.0 ? Colors.green : Colors.grey[300],
+                                    foregroundColor: currentFontSize == 1.0 ? Colors.white : Colors.black,
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -496,36 +511,6 @@ class SideNavigation extends ConsumerWidget {
                     elevation: 2,
                     child: Column(
                       children: [
-                        ListTile(
-                          leading: const Icon(Icons.notifications, color: Colors.orange),
-                          title: Text(
-                            l10n.notifications,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                          ),
-                          trailing: Switch(
-                            value: true,
-                            activeColor: Colors.green,
-                            onChanged: (value) {
-                              // TODO: Implement notification settings
-                            },
-                          ),
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.dark_mode, color: Colors.purple),
-                          title: Text(
-                            l10n.darkMode,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                          ),
-                          trailing: Switch(
-                            value: false,
-                            activeColor: Colors.green,
-                            onChanged: (value) {
-                              // TODO: Implement dark mode
-                            },
-                          ),
-                        ),
-                        const Divider(height: 1),
                         ListTile(
                           leading: const Icon(Icons.storage, color: Colors.teal),
                           title: Text(
@@ -689,16 +674,16 @@ class SideNavigation extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final session = sessions[index];
                   return ListTile(
-                    title: Text(session['village_name'] ?? 'Unknown Village'),
+                    title: Text(session['phone_number'] ?? 'Unknown Phone'),
                     subtitle: Text(
-                      'Date: ${session['survey_date'] ?? 'N/A'}\nStatus: ${session['status'] ?? 'Unknown'}',
+                      'Village: ${session['village_name'] ?? 'N/A'}\nDate: ${session['survey_date'] ?? 'N/A'}\nStatus: ${session['status'] ?? 'Unknown'}',
                     ),
                     trailing: IconButton(
                       icon: const Icon(Icons.download),
                     onPressed: () {
                       Navigator.pop(context); // Close dialog
                       // Navigate to final page (preview) with this session data
-                      _navigateToSurveyPreview(context, session['session_id']);
+                      _navigateToSurveyPreview(context, session['phone_number']);
                     },
                     ),
                   );
@@ -740,6 +725,154 @@ class SideNavigation extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLanguageDropdown(BuildContext context, AppLocalizations l10n, WidgetRef ref) {
+    final localeNotifier = ref.read(localeProvider.notifier);
+    final currentLanguage = ref.watch(localeProvider).languageCode;
+
+    return ExpansionTile(
+      leading: const Icon(Icons.language, color: Colors.green),
+      title: Text(l10n.selectLanguage),
+      children: [
+        ListTile(
+          title: const Text('English'),
+          leading: Radio<String>(
+            value: 'en',
+            groupValue: currentLanguage,
+            onChanged: (value) async {
+              if (value != null) {
+                await localeNotifier.setLocale(Locale(value));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l10n.languageChangedToEnglish)),
+                );
+              }
+            },
+            activeColor: Colors.green,
+          ),
+        ),
+        ListTile(
+          title: const Text('हिंदी'),
+          leading: Radio<String>(
+            value: 'hi',
+            groupValue: currentLanguage,
+            onChanged: (value) async {
+              if (value != null) {
+                await localeNotifier.setLocale(Locale(value));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l10n.languageChangedToHindi)),
+                );
+              }
+            },
+            activeColor: Colors.green,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsDropdown(BuildContext context, AppLocalizations l10n, WidgetRef ref) {
+    final fontSizeNotifier = ref.read(fontSizeProvider.notifier);
+    final currentFontSize = ref.watch(fontSizeProvider);
+
+    return ExpansionTile(
+      leading: const Icon(Icons.settings, color: Colors.green),
+      title: Text(l10n.settings),
+      children: [
+        // Font Size Section
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.fontSize,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Current: ${(currentFontSize * 100).round()}%',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Slider(
+                value: currentFontSize,
+                min: 0.5,
+                max: 1.5,
+                divisions: 10,
+                label: '${(currentFontSize * 100).round()}%',
+                activeColor: Colors.green,
+                onChanged: (value) {
+                  fontSizeNotifier.setFontSize(value);
+                },
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => fontSizeNotifier.setFontSize(0.7),
+                      child: const Text('Small'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => fontSizeNotifier.resetToDefault(),
+                      child: const Text('Default'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => fontSizeNotifier.setFontSize(1.3),
+                      child: const Text('Large'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+      ],
+    );
+  }
+
+  Widget _buildHelpDropdown(BuildContext context, AppLocalizations l10n) {
+    return ExpansionTile(
+      leading: const Icon(Icons.help, color: Colors.green),
+      title: Text(l10n.helpAndSupport),
+      children: [
+        ListTile(
+          leading: const Icon(Icons.help),
+          title: Text(l10n.userGuide),
+          onTap: () {
+            // TODO: Open user guide
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.contact_support),
+          title: Text(l10n.contactSupport),
+          onTap: () {
+            // TODO: Contact support
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.bug_report),
+          title: Text(l10n.reportIssue),
+          onTap: () {
+            // TODO: Report issue
+          },
+        ),
+      ],
     );
   }
 

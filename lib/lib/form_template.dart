@@ -124,7 +124,6 @@ class _FormTemplateScreenState extends State<FormTemplateScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            if (widget.showHeader) _buildHeader(),
             Container(
               padding: EdgeInsets.all(16),
               child: Form(
@@ -162,22 +161,7 @@ class _FormTemplateScreenState extends State<FormTemplateScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      height: 100,
-      color: Colors.white,
-      padding: EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('Government of India', 
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF003366))),
-          Text('Digital India', 
-            style: TextStyle(fontSize: 16, color: Colors.orange)),
-        ],
-      ),
-    );
-  }
+  // Header removed per requirement
 
   Widget _buildTitleCard() {
     return Card(

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'social_map_screen.dart';
 import 'detailed_map_screen.dart';
 
 class SurveyDetailsScreen extends StatefulWidget {
+  const SurveyDetailsScreen({super.key});
+
   @override
   _SurveyDetailsScreenState createState() => _SurveyDetailsScreenState();
 }
@@ -9,146 +12,94 @@ class SurveyDetailsScreen extends StatefulWidget {
 class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
   
-  // Survey details categories
-  final Map<String, TextEditingController> surveyDetails = {
-    'Forest': TextEditingController(),
-    'Wasteland': TextEditingController(),
-    'Garden/Orchard': TextEditingController(),
-    'Burial Ground/ Crematory': TextEditingController(),
-    'Crop Plants': TextEditingController(),
-    'Vegetables': TextEditingController(),
-    'Fruit Trees': TextEditingController(),
-    'Trees': TextEditingController(),
-    'Plants': TextEditingController(),
-    'Medicinal Plants': TextEditingController(),
-    'Herbs': TextEditingController(),
-    'Animals': TextEditingController(),
-    'Birds': TextEditingController(),
-    'Insects': TextEditingController(),
-    'Micro Flora': TextEditingController(),
-    'Micro Fauna': TextEditingController(),
-    'Traditional Collection Areas for MFPs': TextEditingController(),
-    'TK on above': TextEditingController(),
-    'Local Biodiversity Hotspots': TextEditingController(),
-    'Other biological significant areas': TextEditingController(),
-    'Local Endemic and Endangered Species': TextEditingController(),
-    'Lifescape diversity': TextEditingController(),
-    'Knowledge': TextEditingController(),
-    'Special features like local rituals': TextEditingController(),
-    'Ecological History of Area': TextEditingController(),
-  };
+  // Categories with remarks controllers
+  final List<Map<String, dynamic>> surveyCategories = [
+    {'category': 'Forest', 'controller': TextEditingController(), 'icon': Icons.park},
+    {'category': 'Wasteland', 'controller': TextEditingController(), 'icon': Icons.landscape},
+    {'category': 'Garden/Orchard', 'controller': TextEditingController(), 'icon': Icons.nature},
+    {'category': 'Burial Ground', 'controller': TextEditingController(), 'icon': Icons.terrain},
+    {'category': 'Crop Plants', 'controller': TextEditingController(), 'icon': Icons.grass},
+    {'category': 'Vegetables', 'controller': TextEditingController(), 'icon': Icons.eco},
+    {'category': 'Fruit Trees', 'controller': TextEditingController(), 'icon': Icons.apple},
+    {'category': 'Animals', 'controller': TextEditingController(), 'icon': Icons.pets},
+    {'category': 'Birds', 'controller': TextEditingController(), 'icon': Icons.emoji_nature},
+    {'category': 'Local Biodiversity', 'controller': TextEditingController(), 'icon': Icons.biotech},
+    {'category': 'Traditional Knowledge', 'controller': TextEditingController(), 'icon': Icons.history_edu},
+    {'category': 'Special Features', 'controller': TextEditingController(), 'icon': Icons.star},
+  ];
 
   void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      int detailsWithData = 0;
-      
-      surveyDetails.forEach((category, controller) {
-        if (controller.text.isNotEmpty) {
-          detailsWithData++;
-        }
-      });
-      
-      // Show success dialog
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Color(0xFF800080)),
-              SizedBox(width: 10),
-              Text('Survey Details Saved'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+    // Navigate directly to next screen without showing dialog
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => DetailedMapScreen()),
+    );
+  }
+
+  void _goToPreviousScreen() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => SocialMapScreen()),
+    );
+  }
+
+  Widget _buildCategoryItem(Map<String, dynamic> item) {
+    TextEditingController controller = item['controller'];
+    IconData icon = item['icon'];
+    String category = item['category'];
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Category Header
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Color(0xFF800080).withOpacity(0.1),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(6),
+                topRight: Radius.circular(6),
+              ),
+            ),
+            child: Row(
               children: [
-                Text('Survey details have been saved. Continue to Detailed Map?'),
-                SizedBox(height: 15),
-                
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Color(0xFFE6E6FA),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('📋 Survey Details Summary:', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080))),
-                      SizedBox(height: 8),
-                      _buildSummaryItem('Categories documented:', '$detailsWithData out of 25'),
-                      
-                      if (detailsWithData > 0)
-                        Container(
-                          margin: EdgeInsets.only(top: 8),
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.check, color: Colors.green, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Comprehensive survey documentation',
-                                style: TextStyle(color: Colors.green.shade800),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
+                Icon(icon, size: 16, color: Color(0xFF800080)),
+                SizedBox(width: 8),
+                Text(
+                  category,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF800080),
                   ),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Edit', style: TextStyle(color: Color(0xFF800080))),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => DetailedMapScreen()),
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Survey details saved! Moving to Detailed Map'),
-                    backgroundColor: Color(0xFF800080),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800080)),
-              child: Text('Continue to Detailed Map'),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  Widget _buildSummaryItem(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 200,
-            child: Text(label, style: TextStyle(fontWeight: FontWeight.w500)),
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080)),
+          
+          // Remarks Input
+          Padding(
+            padding: EdgeInsets.all(8),
+            child: TextFormField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'Remarks',
+                hintText: 'Enter remarks (optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                isDense: true,
+              ),
+              style: TextStyle(fontSize: 12),
+              maxLines: 2,
             ),
           ),
         ],
@@ -156,315 +107,132 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
     );
   }
 
-  void _resetForm() {
-    _formKey.currentState?.reset();
-    setState(() {
-      surveyDetails.forEach((_, controller) => controller.clear());
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color(0xFFF5F5F5),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Government of India Header
-            Container(
-              width: double.infinity,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
-                    blurRadius: 5,
-                    offset: Offset(0, 2),
+      body: Column(children: [
+        // Compact Header
+        Container(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          color: Colors.white,
+          child: Column(children: [
+            Text('Government of India', style: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF003366)
+            )),
+            SizedBox(height: 4),
+            Text('Digital India', style: TextStyle(
+              fontSize: 12, color: Color(0xFFFF9933), fontWeight: FontWeight.w600
+            )),
+          ]),
+        ),
+
+        // Main Content
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(12),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  // Form Header
+                  Card(
+                    elevation: 2,
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            Icon(Icons.assignment, color: Color(0xFF800080), size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text('Survey Details', style: TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF800080)
+                              )),
+                            ),
+                          ]),
+                          SizedBox(height: 4),
+                          Text('Step 28: Survey information and remarks'),
+                        ],
+                      ),
+                    ),
                   ),
+
+                  SizedBox(height: 12),
+
+                  // Instructions
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.blue.shade100),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue.shade800, size: 14),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Add optional remarks for each category. Leave blank if no remarks.',
+                            style: TextStyle(fontSize: 11, color: Colors.blue.shade800),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 15),
+
+                  // Category List
+                  ...surveyCategories.map((item) => _buildCategoryItem(item)),
+
+                  SizedBox(height: 20),
+
+                  // Buttons - Previous and Continue
+                  Row(children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _goToPreviousScreen,
+                        icon: Icon(Icons.arrow_back, size: 16),
+                        label: Text('Previous'),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(color: Color(0xFF800080)),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _submitForm,
+                        icon: Icon(Icons.arrow_forward, size: 16),
+                        label: Text('Save & Continue'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF800080),
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ]),
+
+                  // Removed: Navigation Info Container
+                  
                 ],
               ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Government of India',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF003366),
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Digital India',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFF9933),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        Text(
-                          'Power To Empower',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF138808),
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
             ),
-            
-            Container(
-              padding: EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      color: Colors.white,
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.assignment, color: Color(0xFF800080), size: 32),
-                                SizedBox(width: 12),
-                                Text(
-                                  'Detailed Survey Information',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF800080),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              'Step 28: Details to be included in survey (where applicable)',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 15,
-                              ),
-                            ),
-                            SizedBox(height: 5),
-                            Container(
-                              height: 4,
-                              width: 100,
-                              decoration: BoxDecoration(
-                                color: Color(0xFF800080),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    
-                    SizedBox(height: 25),
-                    
-                    // Survey Categories
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Survey Categories',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF800080),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          
-                          // Categories Grid
-                          GridView.builder(
-                            shrinkWrap: true,
-                            physics: NeverScrollableScrollPhysics(),
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                              childAspectRatio: 3,
-                            ),
-                            itemCount: surveyDetails.length,
-                            itemBuilder: (context, index) {
-                              String category = surveyDetails.keys.elementAt(index);
-                              TextEditingController controller = surveyDetails[category]!;
-                              
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.grey.shade300),
-                                ),
-                                padding: EdgeInsets.all(10),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      category,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.grey.shade800,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    SizedBox(height: 5),
-                                    TextFormField(
-                                      controller: controller,
-                                      decoration: InputDecoration(
-                                        hintText: 'Enter details',
-                                        border: OutlineInputBorder(),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                      ),
-                                      style: TextStyle(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 30),
-                    
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _resetForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.shade700,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            icon: Icon(Icons.refresh),
-                            label: Text('Reset Form'),
-                          ),
-                        ),
-                        SizedBox(width: 15),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _submitForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF800080),
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            icon: Icon(Icons.arrow_forward, size: 24),
-                            label: Text(
-                              'Save & Continue',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Progress Indicator
-                    Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.assignment, color: Color(0xFF800080), size: 24),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Step 28: Detailed survey information collection',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF800080),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.navigate_next, color: Colors.green.shade700, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Next: Detailed Map with GPS',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.green.shade800,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+      ]),
     );
   }
 
   @override
   void dispose() {
-    surveyDetails.forEach((_, controller) => controller.dispose());
+    for (var item in surveyCategories) {
+      item['controller'].dispose();
+    }
     super.dispose();
   }
 }

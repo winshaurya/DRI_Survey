@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'village_form_screen.dart';
 
 class CompletionScreen extends StatelessWidget {
+  const CompletionScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -1,498 +1,195 @@
 import 'package:flutter/material.dart';
+import 'panchavati_trees_screen.dart'; // Import the previous screen
 import 'seed_clubs_screen.dart';
 
 class OrganicManureScreen extends StatefulWidget {
+  const OrganicManureScreen({super.key});
+
   @override
   _OrganicManureScreenState createState() => _OrganicManureScreenState();
 }
 
 class _OrganicManureScreenState extends State<OrganicManureScreen> {
   final _formKey = GlobalKey<FormState>();
-  
-  TextEditingController fullyAreaController = TextEditingController();
-  TextEditingController partiallyAreaController = TextEditingController();
-  TextEditingController familiesCountController = TextEditingController();
+  final _familiesController = TextEditingController();
+  final _fullyController = TextEditingController();
+  final _partiallyController = TextEditingController();
 
   void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      double fullyArea = double.tryParse(fullyAreaController.text) ?? 0;
-      double partiallyArea = double.tryParse(partiallyAreaController.text) ?? 0;
-      int families = int.tryParse(familiesCountController.text) ?? 0;
-      
-      double totalArea = fullyArea + partiallyArea;
-      
-      // Show success dialog
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Color(0xFF800080)),
-              SizedBox(width: 10),
-              Text('Organic Manure Data Saved'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Organic manure usage data has been saved. Continue to Seed Clubs?'),
-                SizedBox(height: 15),
-                
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Color(0xFFE6E6FA),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('🌱 Organic Manure Summary:', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080))),
-                      SizedBox(height: 8),
-                      _buildSummaryItem('Families Using:', '$families families'),
-                      _buildSummaryItem('Fully Organic Area:', '${fullyArea.toStringAsFixed(1)} acres'),
-                      _buildSummaryItem('Partially Organic Area:', '${partiallyArea.toStringAsFixed(1)} acres'),
-                      _buildSummaryItem('Total Organic Area:', '${totalArea.toStringAsFixed(1)} acres'),
-                      
-                      if (totalArea > 0 && families > 0)
-                        Container(
-                          margin: EdgeInsets.only(top: 8),
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.check, color: Colors.green, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Good organic farming practices',
-                                style: TextStyle(color: Colors.green.shade800),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Edit', style: TextStyle(color: Color(0xFF800080))),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SeedClubsScreen()),
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Organic manure data saved! Moving to Seed Clubs'),
-                    backgroundColor: Color(0xFF800080),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800080)),
-              child: Text('Continue to Seed Clubs'),
-            ),
-          ],
-        ),
-      );
-    }
+    // Navigate directly to next screen without showing dialog
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => SeedClubsScreen()),
+    );
   }
 
-  Widget _buildSummaryItem(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 3),
-      child: Row(
+  void _goToPreviousScreen() {
+    // Navigate back to PanchavatiTreesScreen
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => PanchavatiTreesScreen()),
+    );
+  }
+
+  Widget _buildInputField(String label, TextEditingController controller, String hint, IconData icon) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: 15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 180,
-            child: Text(label, style: TextStyle(fontWeight: FontWeight.w500)),
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080)),
+          Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: hint,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              prefixIcon: Icon(icon, size: 20),
+              helperText: 'Leave empty for zero',
             ),
+            // REMOVED VALIDATOR - Field is now optional
+            style: TextStyle(fontSize: 14),
           ),
         ],
       ),
     );
   }
 
-  void _resetForm() {
-    _formKey.currentState?.reset();
-    setState(() {
-      fullyAreaController.clear();
-      partiallyAreaController.clear();
-      familiesCountController.clear();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color(0xFFF5F5F5),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Government of India Header
-            Container(
-              width: double.infinity,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
-                    blurRadius: 5,
-                    offset: Offset(0, 2),
+      body: Column(children: [
+        // Header
+        Container(
+          padding: EdgeInsets.symmetric(vertical: 15),
+          color: Colors.white,
+          child: Column(children: [
+            Text('Government of India', style: TextStyle(
+              fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF003366)
+            )),
+            SizedBox(height: 5),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Digital India', style: TextStyle(
+                  fontSize: 16, color: Color(0xFFFF9933), fontWeight: FontWeight.w600
+                )),
+                SizedBox(width: 8),
+                Text('Power To Empower', style: TextStyle(
+                  fontSize: 14, color: Color(0xFF138808), fontStyle: FontStyle.italic
+                )),
+              ],
+            ),
+          ]),
+        ),
+
+        // Main Content
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(15),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Form Header
+                  Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(15),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            Icon(Icons.eco, color: Color(0xFF800080)),
+                            SizedBox(width: 10),
+                            Text('Organic Manure', style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF800080)
+                            )),
+                          ]),
+                          SizedBox(height: 5),
+                          Text('Step 19: Organic manure usage data'),
+                        ],
+                      ),
+                    ),
                   ),
+
+                  SizedBox(height: 20),
+
+                  // Input Fields
+                  _buildInputField(
+                    'Families Using Organic Manure',
+                    _familiesController,
+                    'Number of families',
+                    Icons.family_restroom,
+                  ),
+
+                  _buildInputField(
+                    'Fully Organic Area (acres)',
+                    _fullyController,
+                    'Full organic cultivation area',
+                    Icons.grass,
+                  ),
+
+                  _buildInputField(
+                    'Partially Organic Area (acres)',
+                    _partiallyController,
+                    'Partial organic cultivation area',
+                    Icons.agriculture,
+                  ),
+
+                  SizedBox(height: 25),
+
+                  // Buttons - Previous and Continue
+                  Row(children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _goToPreviousScreen,
+                        icon: Icon(Icons.arrow_back),
+                        label: Text('Previous'),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: Color(0xFF800080)),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _submitForm,
+                        icon: Icon(Icons.arrow_forward),
+                        label: Text('Save & Continue'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF800080),
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ]),
+
+                  // FOOTER REMOVED FROM HERE
                 ],
               ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Government of India',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF003366),
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Digital India',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFF9933),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        Text(
-                          'Power To Empower',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF138808),
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
             ),
-            
-            Container(
-              padding: EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      color: Colors.white,
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.eco, color: Color(0xFF800080), size: 32),
-                                SizedBox(width: 12),
-                                Text(
-                                  'Organic Manure Usage',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF800080),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              'Step 19: Number of families using organic manure (area in acres)',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 15,
-                              ),
-                            ),
-                            SizedBox(height: 5),
-                            Container(
-                              height: 4,
-                              width: 100,
-                              decoration: BoxDecoration(
-                                color: Color(0xFF800080),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    
-                    SizedBox(height: 25),
-                    
-                    // Families Count
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Number of Families Using Organic Manure',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF800080),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          TextFormField(
-                            controller: familiesCountController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: 'Total families using organic manure',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.family_restroom),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Required (0 if none)';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Fully Organic Area
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'a) Fully Organic Area (Acres)',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green.shade800,
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          TextFormField(
-                            controller: fullyAreaController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: 'Area cultivated with full organic methods',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.grass, color: Colors.green),
-                              suffixText: 'acres',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Required (0 if none)';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Partially Organic Area
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'b) Partially Organic Area (Acres)',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.orange.shade800,
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          TextFormField(
-                            controller: partiallyAreaController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: 'Area with partial organic methods',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.agriculture, color: Colors.orange),
-                              suffixText: 'acres',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Required (0 if none)';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 30),
-                    
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _resetForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.shade700,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            icon: Icon(Icons.refresh),
-                            label: Text('Reset Form'),
-                          ),
-                        ),
-                        SizedBox(width: 15),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _submitForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF800080),
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            icon: Icon(Icons.arrow_forward, size: 24),
-                            label: Text(
-                              'Save & Continue',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Progress Indicator
-                    Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.eco, color: Color(0xFF800080), size: 24),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Step 19: Organic manure usage data collection',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF800080),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.navigate_next, color: Colors.green.shade700, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Next: Seed Clubs',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.green.shade800,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+      ]),
     );
   }
 
   @override
   void dispose() {
-    fullyAreaController.dispose();
-    partiallyAreaController.dispose();
-    familiesCountController.dispose();
+    _familiesController.dispose();
+    _fullyController.dispose();
+    _partiallyController.dispose();
     super.dispose();
   }
 }

@@ -6,14 +6,14 @@ class SurveyState {
   final int totalPages;
   final Map<String, dynamic> surveyData;
   final bool isLoading;
-  final String? sessionId;
+  final String? phoneNumber;
 
   const SurveyState({
     required this.currentPage,
     required this.totalPages,
     required this.surveyData,
     required this.isLoading,
-    this.sessionId,
+    this.phoneNumber,
   });
 
   SurveyState copyWith({
@@ -21,14 +21,14 @@ class SurveyState {
     int? totalPages,
     Map<String, dynamic>? surveyData,
     bool? isLoading,
-    String? sessionId,
+    String? phoneNumber,
   }) {
     return SurveyState(
       currentPage: currentPage ?? this.currentPage,
       totalPages: totalPages ?? this.totalPages,
       surveyData: surveyData ?? this.surveyData,
       isLoading: isLoading ?? this.isLoading,
-      sessionId: sessionId ?? this.sessionId,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
     );
   }
 }
@@ -40,7 +40,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   SurveyState build() {
     return const SurveyState(
       currentPage: 0,
-      totalPages: 23, // Based on questionnaire sections (added 2 pages for social consciousness 3b and 3c)
+      totalPages: 31, // Based on questionnaire sections (added 9 new pages for government schemes)
       surveyData: {},
       isLoading: false,
     );
@@ -72,7 +72,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         surveyorName: surveyorName,
         phoneNumber: phoneNumber,
       );
-      state = state.copyWith(sessionId: sessionId);
+      state = state.copyWith(phoneNumber: sessionId);
 
       // Load existing data for all pages if any
       await _loadAllSurveyData();
@@ -85,7 +85,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> _loadAllSurveyData() async {
-    if (state.sessionId == null) return;
+    if (state.phoneNumber == null) return;
 
     try {
       // Load data for all pages that might have data
@@ -101,7 +101,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> saveCurrentPageData() async {
-    if (state.sessionId == null) return;
+    if (state.phoneNumber == null) return;
 
     try {
       // Save data based on current page
@@ -112,7 +112,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> loadPageData(int page) async {
-    if (state.sessionId == null) return;
+    if (state.phoneNumber == null) return;
 
     try {
       // Load data for the specific page from database
@@ -126,7 +126,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<Map<String, dynamic>> _loadPageData(int page) async {
-    if (state.sessionId == null) return {};
+    if (state.phoneNumber == null) return {};
 
     final data = <String, dynamic>{};
 
@@ -134,7 +134,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
       // Load data based on page number
       switch (page) {
         case 0: // Location page
-          final sessionData = await _databaseService.getSurveySession(state.sessionId!);
+          final sessionData = await _databaseService.getSurveySession(state.phoneNumber!);
           if (sessionData != null) {
             data.addAll({
               'village_name': sessionData['village_name'],
@@ -150,104 +150,104 @@ class SurveyNotifier extends Notifier<SurveyState> {
           }
           break;
         case 1: // Family details page
-          final familyMembers = await _databaseService.getData('family_members', state.sessionId!);
+          final familyMembers = await _databaseService.getData('family_members', state.phoneNumber!);
           if (familyMembers.isNotEmpty) {
             data['family_members'] = familyMembers;
           }
           break;
         case 2: // Land holding
-          final landData = await _databaseService.getData('land_holding', state.sessionId!);
+          final landData = await _databaseService.getData('land_holding', state.phoneNumber!);
           if (landData.isNotEmpty) {
             data.addAll(landData.first);
           }
           break;
         case 3: // Irrigation
-          final irrigationData = await _databaseService.getData('irrigation_facilities', state.sessionId!);
+          final irrigationData = await _databaseService.getData('irrigation_facilities', state.phoneNumber!);
           if (irrigationData.isNotEmpty) {
             data.addAll(irrigationData.first);
           }
           break;
         case 4: // Crop productivity
-          final cropData = await _databaseService.getData('crop_productivity', state.sessionId!);
+          final cropData = await _databaseService.getData('crop_productivity', state.phoneNumber!);
           if (cropData.isNotEmpty) {
             data['crops'] = cropData;
           }
           break;
         case 5: // Fertilizer
-          final fertilizerData = await _databaseService.getData('fertilizer_usage', state.sessionId!);
+          final fertilizerData = await _databaseService.getData('fertilizer_usage', state.phoneNumber!);
           if (fertilizerData.isNotEmpty) {
             data.addAll(fertilizerData.first);
           }
           break;
         case 6: // Animals
-          final animalData = await _databaseService.getData('animals', state.sessionId!);
+          final animalData = await _databaseService.getData('animals', state.phoneNumber!);
           if (animalData.isNotEmpty) {
             data['animals'] = animalData;
           }
           break;
         case 7: // Equipment
-          final equipmentData = await _databaseService.getData('agricultural_equipment', state.sessionId!);
+          final equipmentData = await _databaseService.getData('agricultural_equipment', state.phoneNumber!);
           if (equipmentData.isNotEmpty) {
             data.addAll(equipmentData.first);
           }
           break;
         case 8: // Entertainment
-          final entertainmentData = await _databaseService.getData('entertainment_facilities', state.sessionId!);
+          final entertainmentData = await _databaseService.getData('entertainment_facilities', state.phoneNumber!);
           if (entertainmentData.isNotEmpty) {
             data.addAll(entertainmentData.first);
           }
           break;
         case 9: // Transport
-          final transportData = await _databaseService.getData('transport_facilities', state.sessionId!);
+          final transportData = await _databaseService.getData('transport_facilities', state.phoneNumber!);
           if (transportData.isNotEmpty) {
             data.addAll(transportData.first);
           }
           break;
         case 10: // Water sources
-          final waterData = await _databaseService.getData('drinking_water_sources', state.sessionId!);
+          final waterData = await _databaseService.getData('drinking_water_sources', state.phoneNumber!);
           if (waterData.isNotEmpty) {
             data.addAll(waterData.first);
           }
           break;
         case 11: // Medical
-          final medicalData = await _databaseService.getData('medical_treatment', state.sessionId!);
+          final medicalData = await _databaseService.getData('medical_treatment', state.phoneNumber!);
           if (medicalData.isNotEmpty) {
             data.addAll(medicalData.first);
           }
           break;
         case 12: // Disputes
-          final disputeData = await _databaseService.getData('disputes', state.sessionId!);
+          final disputeData = await _databaseService.getData('disputes', state.phoneNumber!);
           if (disputeData.isNotEmpty) {
             data.addAll(disputeData.first);
           }
           break;
         case 13: // House conditions
-          final houseConditionData = await _databaseService.getData('house_conditions', state.sessionId!);
+          final houseConditionData = await _databaseService.getData('house_conditions', state.phoneNumber!);
           if (houseConditionData.isNotEmpty) {
             data.addAll(houseConditionData.first);
           }
           break;
         case 14: // House facilities
-          final houseFacilityData = await _databaseService.getData('house_facilities', state.sessionId!);
+          final houseFacilityData = await _databaseService.getData('house_facilities', state.phoneNumber!);
           if (houseFacilityData.isNotEmpty) {
             data.addAll(houseFacilityData.first);
           }
           break;
         case 15: // Nutritional garden
-          final gardenData = await _databaseService.getData('nutritional_garden', state.sessionId!);
+          final gardenData = await _databaseService.getData('nutritional_garden', state.phoneNumber!);
           if (gardenData.isNotEmpty) {
             data.addAll(gardenData.first);
           }
           break;
         case 16: // Diseases
-          final diseaseData = await _databaseService.getData('diseases', state.sessionId!);
+          final diseaseData = await _databaseService.getData('diseases', state.phoneNumber!);
           if (diseaseData.isNotEmpty) {
             data['diseases'] = diseaseData;
           }
           break;
         // Add more cases for other pages...
         case 22: // Social consciousness
-          final socialData = await _databaseService.getData('social_consciousness', state.sessionId!);
+          final socialData = await _databaseService.getData('social_consciousness', state.phoneNumber!);
           if (socialData.isNotEmpty) {
             data.addAll(socialData.first);
           }
@@ -261,13 +261,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> _savePageData(int page, Map<String, dynamic> data) async {
-    if (state.sessionId == null) return;
+    if (state.phoneNumber == null) return;
 
     // Map page numbers to database tables and save accordingly
     switch (page) {
       case 0: // Location page
         await _databaseService.saveData('survey_sessions', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           'village_name': data['village_name'],
           'village_number': data['village_number'],
           'panchayat': data['panchayat'],
@@ -283,7 +283,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         if (data['family_members'] != null) {
           for (final member in data['family_members']) {
             await _databaseService.saveData('family_members', {
-              'session_id': state.sessionId,
+              'phone_number': state.phoneNumber,
               ...member,
             });
           }
@@ -291,13 +291,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
         break;
       case 2: // Land holding
         await _databaseService.saveData('land_holding', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
       case 3: // Irrigation
         await _databaseService.saveData('irrigation_facilities', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
@@ -305,7 +305,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         if (data['crops'] != null) {
           for (final crop in data['crops']) {
             await _databaseService.saveData('crop_productivity', {
-              'session_id': state.sessionId,
+              'phone_number': state.phoneNumber,
               ...crop,
             });
           }
@@ -313,7 +313,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         break;
       case 5: // Fertilizer
         await _databaseService.saveData('fertilizer_usage', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
@@ -321,7 +321,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         if (data['animals'] != null) {
           for (final animal in data['animals']) {
             await _databaseService.saveData('animals', {
-              'session_id': state.sessionId,
+              'phone_number': state.phoneNumber,
               ...animal,
             });
           }
@@ -329,55 +329,55 @@ class SurveyNotifier extends Notifier<SurveyState> {
         break;
       case 7: // Equipment
         await _databaseService.saveData('agricultural_equipment', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
       case 8: // Entertainment
         await _databaseService.saveData('entertainment_facilities', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
       case 9: // Transport
         await _databaseService.saveData('transport_facilities', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
       case 10: // Water sources
         await _databaseService.saveData('drinking_water_sources', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
       case 11: // Medical
         await _databaseService.saveData('medical_treatment', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
       case 12: // Disputes
         await _databaseService.saveData('disputes', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
       case 13: // House conditions
         await _databaseService.saveData('house_conditions', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
       case 14: // House facilities
         await _databaseService.saveData('house_facilities', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
       case 15: // Nutritional garden
         await _databaseService.saveData('nutritional_garden', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
@@ -385,7 +385,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         if (data['diseases'] != null) {
           for (final disease in data['diseases']) {
             await _databaseService.saveData('diseases', {
-              'session_id': state.sessionId,
+              'phone_number': state.phoneNumber,
               ...disease,
             });
           }
@@ -394,7 +394,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
       // Add more cases for other pages...
       case 22: // Social consciousness
         await _databaseService.saveData('social_consciousness', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           ...data,
         });
         break;
@@ -406,9 +406,9 @@ class SurveyNotifier extends Notifier<SurveyState> {
       // Save current page data before moving to next
       await saveCurrentPageData();
       // Update the survey session timestamp
-      if (state.sessionId != null) {
+      if (state.phoneNumber != null) {
         await _databaseService.saveData('survey_sessions', {
-          'session_id': state.sessionId,
+          'phone_number': state.phoneNumber,
           'updated_at': DateTime.now().toIso8601String(),
         });
       }
@@ -445,9 +445,9 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> completeSurvey() async {
-    if (state.sessionId != null) {
+    if (state.phoneNumber != null) {
       await saveCurrentPageData();
-      await _databaseService.updateSurveyStatus(state.sessionId!, 'completed');
+      await _databaseService.updateSurveyStatus(state.phoneNumber!, 'completed');
     }
   }
 
@@ -458,7 +458,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
       // Load session data
       final sessionData = await _databaseService.getSurveySession(sessionId);
       if (sessionData != null) {
-        state = state.copyWith(sessionId: sessionId);
+        state = state.copyWith(phoneNumber: sessionId);
 
         // Load all survey data for this session
         await _loadAllSurveyData();
@@ -476,7 +476,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   void reset() {
     state = const SurveyState(
       currentPage: 0,
-      totalPages: 23,
+      totalPages: 31,
       surveyData: {},
       isLoading: false,
     );

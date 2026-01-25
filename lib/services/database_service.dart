@@ -78,8 +78,7 @@ PRAGMA foreign_keys = ON;
 
 -- Survey Sessions Table (tracks each survey instance)
 CREATE TABLE survey_sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT UNIQUE NOT NULL,
+    phone_number TEXT PRIMARY KEY,
     village_name TEXT,
     village_number TEXT,
     panchayat TEXT,
@@ -98,7 +97,7 @@ CREATE TABLE survey_sessions (
 -- Family Members Table
 CREATE TABLE family_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT NOT NULL,
+    phone_number TEXT NOT NULL,
     sr_no INTEGER NOT NULL,
     name TEXT NOT NULL,
     fathers_name TEXT,
@@ -115,18 +114,18 @@ CREATE TABLE family_members (
     awareness_about_village TEXT,
     participate_gram_sabha TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (session_id) REFERENCES survey_sessions(session_id) ON DELETE CASCADE
+    FOREIGN KEY (phone_number) REFERENCES survey_sessions(phone_number) ON DELETE CASCADE
 );
 
 -- Land Holding Information
 CREATE TABLE land_holding (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT UNIQUE NOT NULL,
+    phone_number TEXT NOT NULL,
     irrigated_area REAL,
     cultivable_area REAL,
     orchard_plants_type TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (session_id) REFERENCES survey_sessions(session_id) ON DELETE CASCADE
+    FOREIGN KEY (phone_number) REFERENCES survey_sessions(phone_number) ON DELETE CASCADE
 );
 
 -- Irrigation Facilities
@@ -837,6 +836,54 @@ CREATE TABLE tribal_questions (
     FOREIGN KEY (session_id) REFERENCES survey_sessions(session_id) ON DELETE CASCADE
 );
 
+  -- Village Survey - Sessions
+  CREATE TABLE village_survey_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT UNIQUE NOT NULL,
+    village_name TEXT,
+    village_code TEXT,
+    state TEXT,
+    district TEXT,
+    block TEXT,
+    panchayat TEXT,
+    tehsil TEXT,
+    ldg_code TEXT,
+    gps_link TEXT,
+    status TEXT DEFAULT 'in_progress',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Village Survey - Population
+  CREATE TABLE village_population (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT UNIQUE NOT NULL,
+    total_families TEXT,
+    total_members TEXT,
+    men TEXT,
+    women TEXT,
+    male_children TEXT,
+    female_children TEXT,
+    caste TEXT,
+    religion TEXT,
+    other_religion TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE
+  );
+
+  -- Village Survey - Farm Families
+  CREATE TABLE village_farm_families (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT UNIQUE NOT NULL,
+    big_farmers TEXT,
+    small_farmers TEXT,
+    marginal_farmers TEXT,
+    landless_farmers TEXT,
+    total_farm_families TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE
+  );
+
 -- Indexes for better performance
 CREATE INDEX idx_survey_sessions_status ON survey_sessions(status);
 CREATE INDEX idx_survey_sessions_date ON survey_sessions(survey_date);
@@ -866,10 +913,28 @@ CREATE INDEX idx_fpo_session ON fpo_members(session_id);
     if (kIsWeb) return '';
 
     final db = await database;
-    final sessionId = phoneNumber ?? 'survey_${DateTime.now().millisecondsSinceEpoch}_${villageName.replaceAll(' ', '_')}';
 
+    // Phone number is required and serves as the primary key
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      throw ArgumentError('Phone number is required for survey session');
+    }
+
+    // Check if a survey already exists for this phone number
+    final existingSession = await db.query(
+      'survey_sessions',
+      where: 'phone_number = ?',
+      whereArgs: [phoneNumber],
+      limit: 1,
+    );
+
+    if (existingSession.isNotEmpty) {
+      // Return existing phone number
+      return phoneNumber;
+    }
+
+    // Insert new survey session
     await db.insert('survey_sessions', {
-      'session_id': sessionId,
+      'phone_number': phoneNumber,
       'village_name': villageName,
       'village_number': villageNumber,
       'panchayat': panchayat,
@@ -879,13 +944,105 @@ CREATE INDEX idx_fpo_session ON fpo_members(session_id);
       'postal_address': postalAddress,
       'pin_code': pinCode,
       'surveyor_name': surveyorName,
-      'phone_number': phoneNumber,
       'status': 'in_progress',
       'created_at': DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
     });
 
+    return phoneNumber;
+  }
+
+  // Village Survey Session Management
+  Future<String> createNewVillageSurveySession({
+    required String villageName,
+    String? villageCode,
+    String? state,
+    String? district,
+    String? block,
+    String? panchayat,
+    String? tehsil,
+    String? ldgCode,
+    String? gpsLink,
+  }) async {
+    if (kIsWeb) return '';
+
+    final db = await database;
+
+    // Create a new unique session id for village survey
+    final sessionId = 'village_${DateTime.now().millisecondsSinceEpoch}';
+
+    await db.insert(
+      'village_survey_sessions',
+      {
+        'session_id': sessionId,
+        'village_name': villageName,
+        'village_code': villageCode,
+        'state': state,
+        'district': district,
+        'block': block,
+        'panchayat': panchayat,
+        'tehsil': tehsil,
+        'ldg_code': ldgCode,
+        'gps_link': gpsLink,
+        'status': 'in_progress',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
     return sessionId;
+  }
+
+  Future<List<Map<String, dynamic>>> getAllVillageSurveySessions() async {
+    if (kIsWeb) return [];
+
+    final db = await database;
+    return await db.query(
+      'village_survey_sessions',
+      orderBy: 'created_at DESC',
+    );
+  }
+
+  Future<Map<String, dynamic>?> getVillageSurveySession(String sessionId) async {
+    if (kIsWeb) return null;
+
+    final db = await database;
+    final results = await db.query(
+      'village_survey_sessions',
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+      limit: 1,
+    );
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  Future<void> saveVillagePopulation(String sessionId, Map<String, dynamic> data) async {
+    if (kIsWeb) return;
+
+    final db = await database;
+    data['session_id'] = sessionId;
+    data['created_at'] = DateTime.now().toIso8601String();
+
+    await db.insert(
+      'village_population',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> saveVillageFarmFamilies(String sessionId, Map<String, dynamic> data) async {
+    if (kIsWeb) return;
+
+    final db = await database;
+    data['session_id'] = sessionId;
+    data['created_at'] = DateTime.now().toIso8601String();
+
+    await db.insert(
+      'village_farm_families',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<Map<String, dynamic>>> getAllSurveySessions() async {
@@ -898,19 +1055,19 @@ CREATE INDEX idx_fpo_session ON fpo_members(session_id);
     );
   }
 
-  Future<Map<String, dynamic>?> getSurveySession(String sessionId) async {
+  Future<Map<String, dynamic>?> getSurveySession(String phoneNumber) async {
     if (kIsWeb) return null;
 
     final db = await database;
     final results = await db.query(
       'survey_sessions',
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
+      where: 'phone_number = ?',
+      whereArgs: [phoneNumber],
     );
     return results.isNotEmpty ? results.first : null;
   }
 
-  Future<void> updateSurveyStatus(String sessionId, String status) async {
+  Future<void> updateSurveyStatus(String phoneNumber, String status) async {
     if (kIsWeb) return;
 
     final db = await database;
@@ -920,8 +1077,8 @@ CREATE INDEX idx_fpo_session ON fpo_members(session_id);
         'status': status,
         'updated_at': DateTime.now().toIso8601String(),
       },
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
+      where: 'phone_number = ?',
+      whereArgs: [phoneNumber],
     );
   }
 
@@ -939,14 +1096,14 @@ CREATE INDEX idx_fpo_session ON fpo_members(session_id);
     );
   }
 
-  Future<List<Map<String, dynamic>>> getData(String tableName, String sessionId) async {
+  Future<List<Map<String, dynamic>>> getData(String tableName, String phoneNumber) async {
     if (kIsWeb) return [];
 
     final db = await database;
     return await db.query(
       tableName,
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
+      where: 'phone_number = ?',
+      whereArgs: [phoneNumber],
     );
   }
 

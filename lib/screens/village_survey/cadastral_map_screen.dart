@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'detailed_map_screen.dart'; // Import the previous screen
 import 'forest_map_screen.dart';
 
 class CadastralMapScreen extends StatefulWidget {
+  const CadastralMapScreen({super.key});
+
   @override
   _CadastralMapScreenState createState() => _CadastralMapScreenState();
 }
@@ -13,126 +18,49 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
   bool hasCadastralMap = false;
   TextEditingController mapDetailsController = TextEditingController();
   TextEditingController availabilityStatusController = TextEditingController();
+  
+  // Image upload
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
 
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      // Show success dialog
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Color(0xFF800080)),
-              SizedBox(width: 10),
-              Text('Cadastral Map Data Saved'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Cadastral map information has been saved. Continue to Forest Map?'),
-                SizedBox(height: 15),
-                
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Color(0xFFE6E6FA),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('🗺️ Cadastral Map Summary:', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080))),
-                      SizedBox(height: 8),
-                      _buildSummaryItem('Cadastral Map Available:', hasCadastralMap ? 'Yes' : 'No'),
-                      if (hasCadastralMap && mapDetailsController.text.isNotEmpty)
-                        _buildSummaryItem('Map Details:', 'Documented'),
-                      
-                      if (hasCadastralMap)
-                        Container(
-                          margin: EdgeInsets.only(top: 8),
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.check, color: Colors.green, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Land records documentation available',
-                                style: TextStyle(color: Colors.green.shade800),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Edit', style: TextStyle(color: Color(0xFF800080))),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ForestMapScreen()),
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Cadastral map data saved! Moving to Forest Map'),
-                    backgroundColor: Color(0xFF800080),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800080)),
-              child: Text('Continue to Forest Map'),
-            ),
-          ],
-        ),
-      );
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+      });
     }
   }
 
-  Widget _buildSummaryItem(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 180,
-            child: Text(label, style: TextStyle(fontWeight: FontWeight.w500)),
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080)),
-            ),
-          ),
-        ],
-      ),
+  Future<void> _takePhoto() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+    if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+      });
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
+  }
+
+  void _submitForm() {
+    // Navigate directly to next screen without showing dialog
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => ForestMapScreen()),
     );
   }
 
-  void _resetForm() {
-    _formKey.currentState?.reset();
-    setState(() {
-      hasCadastralMap = false;
-      mapDetailsController.clear();
-      availabilityStatusController.clear();
-    });
+  void _goToPreviousScreen() {
+    // Navigate back to DetailedMapScreen
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => DetailedMapScreen()),
+    );
   }
 
   @override
@@ -232,19 +160,10 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
                             ),
                             SizedBox(height: 10),
                             Text(
-                              'Step 30: Cadastral map documentation (if available)',
+                              'Cadastral map documentation (if available)',
                               style: TextStyle(
                                 color: Colors.grey.shade600,
                                 fontSize: 15,
-                              ),
-                            ),
-                            SizedBox(height: 5),
-                            Container(
-                              height: 4,
-                              width: 100,
-                              decoration: BoxDecoration(
-                                color: Color(0xFF800080),
-                                borderRadius: BorderRadius.circular(2),
                               ),
                             ),
                           ],
@@ -335,17 +254,12 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
                                   controller: mapDetailsController,
                                   maxLines: 4,
                                   decoration: InputDecoration(
-                                    labelText: 'Enter cadastral map details',
+                                    labelText: 'Enter cadastral map details (optional)',
                                     border: OutlineInputBorder(),
                                     contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                     helperText: 'Include map number, year, jurisdiction, etc.',
                                   ),
-                                  validator: (value) {
-                                    if (hasCadastralMap && (value == null || value.isEmpty)) {
-                                      return 'Please enter cadastral map details';
-                                    }
-                                    return null;
-                                  },
+                                  // Removed validator to make it optional
                                 ),
                               ],
                             ),
@@ -353,22 +267,123 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
                       ),
                     ),
                     
+                    SizedBox(height: 20),
+                    
+                    // Photo Upload Section
+                    Container(
+                      padding: EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Upload Photo (Optional)',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF800080),
+                            ),
+                          ),
+                          SizedBox(height: 10),
+                          
+                          Text(
+                            'Upload a photo of the cadastral map if available',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          SizedBox(height: 15),
+                          
+                          // Image Preview
+                          if (_selectedImage != null)
+                            Column(
+                              children: [
+                                Container(
+                                  height: 200,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.file(
+                                      _selectedImage!,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 10),
+                                ElevatedButton.icon(
+                                  onPressed: _removeImage,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red.shade50,
+                                    foregroundColor: Colors.red.shade800,
+                                  ),
+                                  icon: Icon(Icons.delete, size: 20),
+                                  label: Text('Remove Photo'),
+                                ),
+                                SizedBox(height: 20),
+                              ],
+                            ),
+                          
+                          // Upload Buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _pickImage,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Color(0xFF800080),
+                                    padding: EdgeInsets.symmetric(vertical: 14),
+                                  ),
+                                  icon: Icon(Icons.photo_library, size: 22),
+                                  label: Text('Choose from Gallery'),
+                                ),
+                              ),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _takePhoto,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green.shade700,
+                                    padding: EdgeInsets.symmetric(vertical: 14),
+                                  ),
+                                  icon: Icon(Icons.camera_alt, size: 22),
+                                  label: Text('Take Photo'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    
                     SizedBox(height: 30),
                     
+                    // Buttons - Previous and Continue
                     Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _resetForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.shade700,
+                          child: OutlinedButton.icon(
+                            onPressed: _goToPreviousScreen,
+                            style: OutlinedButton.styleFrom(
                               padding: EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
+                              side: BorderSide(color: Color(0xFF800080), width: 2),
                             ),
-                            icon: Icon(Icons.refresh),
-                            label: Text('Reset Form'),
+                            icon: Icon(Icons.arrow_back, size: 24),
+                            label: Text(
+                              'Previous',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
                           ),
                         ),
                         SizedBox(width: 15),
@@ -390,61 +405,6 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
                           ),
                         ),
                       ],
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Progress Indicator
-                    Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.landscape, color: Color(0xFF800080), size: 24),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Step 30: Cadastral map documentation',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF800080),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.navigate_next, color: Colors.green.shade700, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Next: Forest Map Documentation',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.green.shade800,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                     
                     SizedBox(height: 20),

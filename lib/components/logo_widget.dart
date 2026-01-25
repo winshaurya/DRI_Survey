@@ -98,6 +98,12 @@ class AppHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF2E7D32)),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
           const LogoWidget(size: 40),
           const SizedBox(width: 12),
           Expanded(
@@ -136,6 +142,12 @@ class VillageAppHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF800080)),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
           const LogoWidget(size: 40),
           const SizedBox(width: 12),
           Expanded(

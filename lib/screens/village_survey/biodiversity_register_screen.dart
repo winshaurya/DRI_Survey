@@ -1,141 +1,107 @@
 import 'package:flutter/material.dart';
-import 'cooking_medium_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'forest_map_screen.dart'; // Import the previous screen
+import 'completion_screen.dart'; // Add this import
 
 class BiodiversityRegisterScreen extends StatefulWidget {
+  const BiodiversityRegisterScreen({super.key});
+
   @override
   _BiodiversityRegisterScreenState createState() => _BiodiversityRegisterScreenState();
 }
 
 class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController statusController = TextEditingController();
+  final TextEditingController detailsController = TextEditingController();
+  final TextEditingController componentsController = TextEditingController();
+  final TextEditingController knowledgeController = TextEditingController();
   
-  TextEditingController registerStatusController = TextEditingController();
-  TextEditingController documentationDetailsController = TextEditingController();
-  TextEditingController biodiversityComponentsController = TextEditingController();
-  TextEditingController traditionalKnowledgeController = TextEditingController();
+  // Image upload
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
 
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      // Show success dialog
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Color(0xFF800080)),
-              SizedBox(width: 10),
-              Text('Biodiversity Register Data Saved'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Biodiversity register information has been saved. Continue to Cooking Medium?'),
-                SizedBox(height: 15),
-                
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Color(0xFFE6E6FA),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('🌿 Biodiversity Register Summary:', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080))),
-                      SizedBox(height: 8),
-                      if (registerStatusController.text.isNotEmpty)
-                        _buildSummaryItem('Register Status:', registerStatusController.text),
-                      if (documentationDetailsController.text.isNotEmpty)
-                        _buildSummaryItem('Documentation:', 'Complete'),
-                      if (biodiversityComponentsController.text.isNotEmpty)
-                        _buildSummaryItem('Components:', 'Documented'),
-                      
-                      Container(
-                        margin: EdgeInsets.only(top: 8),
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.eco, color: Colors.green, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Biodiversity documentation complete',
-                              style: TextStyle(color: Colors.green.shade800),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Edit', style: TextStyle(color: Color(0xFF800080))),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => CookingMediumScreen()),
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Biodiversity register data saved! Moving to Cooking Medium'),
-                    backgroundColor: Color(0xFF800080),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800080)),
-              child: Text('Continue to Cooking Medium'),
-            ),
-          ],
-        ),
-      );
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+      });
     }
   }
 
-  Widget _buildSummaryItem(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 3),
-      child: Row(
+  Future<void> _takePhoto() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+    if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+      });
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
+  }
+
+  void _submitForm() {
+    // Navigate to completion screen
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => CompletionScreen()),
+      (route) => false, // Remove all previous routes
+    );
+  }
+
+  void _goToPreviousScreen() {
+    // Navigate back to ForestMapScreen
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => ForestMapScreen()),
+    );
+  }
+
+  Widget _buildInputField(String label, TextEditingController controller, {bool required = false, int lines = 1}) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12), // Reduced from 15
+      padding: EdgeInsets.all(10), // Reduced from 12
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10), // Slightly smaller
+        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 150,
-            child: Text(label, style: TextStyle(fontWeight: FontWeight.w500)),
+          Text(label, 
+            style: TextStyle(
+              fontSize: 14, // Reduced from default
+              fontWeight: FontWeight.w600, 
+              color: Color(0xFF800080)
+            )
           ),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080)),
+          SizedBox(height: 6), // Reduced from 8
+          TextFormField(
+            controller: controller,
+            maxLines: lines,
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: Colors.grey.shade400),
+              ),
+              hintText: 'Enter details... (optional)',
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 10, // Reduced from 12
+                vertical: 10   // Reduced from 10
+              ),
             ),
+            style: TextStyle(fontSize: 13), // Smaller text
           ),
         ],
       ),
     );
-  }
-
-  void _resetForm() {
-    _formKey.currentState?.reset();
-    setState(() {
-      registerStatusController.clear();
-      documentationDetailsController.clear();
-      biodiversityComponentsController.clear();
-      traditionalKnowledgeController.clear();
-    });
   }
 
   @override
@@ -145,106 +111,93 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Government of India Header
+            // Header - Made more compact
             Container(
-              width: double.infinity,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
-                    blurRadius: 5,
-                    offset: Offset(0, 2),
+              height: 90, // Reduced from 100
+              color: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Government of India', 
+                    style: TextStyle(
+                      fontSize: 18, // Reduced from 22
+                      fontWeight: FontWeight.bold, 
+                      color: Color(0xFF003366)
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 4),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 6,
+                    runSpacing: 2,
+                    children: [
+                      Text('Digital India', 
+                        style: TextStyle(
+                          fontSize: 14, // Reduced from 16
+                          color: Color(0xFFFF9933), 
+                          fontWeight: FontWeight.w600
+                        )
+                      ),
+                      Text('Power To Empower', 
+                        style: TextStyle(
+                          fontSize: 13, // Reduced from 14
+                          color: Color(0xFF138808), 
+                          fontStyle: FontStyle.italic
+                        )
+                      ),
+                    ],
                   ),
                 ],
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Government of India',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF003366),
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Digital India',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFF9933),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        Text(
-                          'Power To Empower',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF138808),
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
               ),
             ),
             
             Container(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.all(12), // Reduced from 16
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Title Card - Made more compact
                     Card(
-                      elevation: 4,
+                      elevation: 3, // Reduced from 4
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10), // Reduced from 12
                       ),
                       color: Colors.white,
                       child: Padding(
-                        padding: EdgeInsets.all(20),
+                        padding: EdgeInsets.all(12), // Reduced from 16
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.eco, color: Color(0xFF800080), size: 32),
-                                SizedBox(width: 12),
-                                Text(
-                                  'People\'s Biodiversity Register (PBR)',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF800080),
+                                Icon(Icons.flag, color: Color(0xFF800080), size: 28), // Reduced from 32
+                                SizedBox(width: 10), // Reduced from 12
+                                Expanded(
+                                  child: Text('Biodiversity Register', 
+                                    style: TextStyle(
+                                      fontSize: 18, // Reduced from 22
+                                      fontWeight: FontWeight.w700, 
+                                      color: Color(0xFF800080)
+                                    )
                                   ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 10),
-                            Text(
-                              'Step 32: Documentation of People\'s Biodiversity Register',
+                            SizedBox(height: 6), // Reduced from 8
+                            Text('Step 20: People\'s Biodiversity Register (PBR) Documentation',
                               style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 15,
-                              ),
+                                color: Colors.grey.shade600, 
+                                fontSize: 13 // Reduced from 15
+                              )
                             ),
-                            SizedBox(height: 5),
+                            SizedBox(height: 4), // Reduced from 5
                             Container(
-                              height: 4,
-                              width: 100,
+                              height: 3, // Reduced from 4
+                              width: 100, // Reduced from 120
                               decoration: BoxDecoration(
                                 color: Color(0xFF800080),
                                 borderRadius: BorderRadius.circular(2),
@@ -255,250 +208,74 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
                       ),
                     ),
                     
-                    SizedBox(height: 25),
+                    SizedBox(height: 16), // Reduced from 20
                     
-                    // Info Card
+                    // Info Card - Made more compact
                     Card(
-                      elevation: 3,
-                      color: Colors.green.shade50,
+                      elevation: 2, // Reduced from 3
+                      color: Colors.blue.shade50,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10), // Reduced from default
+                      ),
                       child: Padding(
-                        padding: EdgeInsets.all(16),
+                        padding: EdgeInsets.all(12), // Reduced from 16
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.info_outline, color: Colors.green.shade800),
-                                SizedBox(width: 10),
-                                Text(
-                                  'What is People\'s Biodiversity Register (PBR)?',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.green.shade800,
+                                Icon(Icons.info_outline, color: Colors.blue.shade800, size: 20), // Smaller
+                                SizedBox(width: 8), // Reduced from 10
+                                Expanded(
+                                  child: Text(
+                                    'About People\'s Biodiversity Register',
+                                    style: TextStyle(
+                                      fontSize: 14, // Reduced from 16
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.blue.shade800,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 10),
+                            SizedBox(height: 8), // Reduced from 10
                             Text(
-                              'PBR is a comprehensive record of local biological resources and traditional '
-                              'knowledge. It documents biodiversity, conservation practices, and community wisdom.',
-                              style: TextStyle(color: Colors.green.shade700),
+                              'PBR is a comprehensive record of local biological resources, their medicinal or any other use, or any other traditional knowledge associated with them.',
+                              style: TextStyle(
+                                color: Colors.blue.shade700,
+                                fontSize: 12, // Reduced from default
+                              ),
+                            ),
+                            SizedBox(height: 6), // Reduced from 8
+                            Text(
+                              'Note: All fields on this screen are optional.',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 12, // Reduced from 14
+                                fontStyle: FontStyle.italic,
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
                     
-                    SizedBox(height: 20),
+                    SizedBox(height: 20), // Reduced from 25
                     
-                    // Register Status
+                    // Input Fields (All Optional) - Now using smaller version
+                    _buildInputField('PBR Status (Available/Not Available) (optional)', statusController, lines: 1),
+                    _buildInputField('Documentation Details (optional)', detailsController, lines: 3),
+                    _buildInputField('Biodiversity Components Documented (optional)', componentsController, lines: 3),
+                    _buildInputField('Traditional Knowledge Recorded (optional)', knowledgeController, lines: 3),
+                    
+                    SizedBox(height: 20), // Reduced from 25
+                    
+                    // Photo Upload Section - Made more compact
                     Container(
-                      padding: EdgeInsets.all(15),
+                      padding: EdgeInsets.all(12), // Reduced from 15
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'PBR Status',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF800080),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          TextFormField(
-                            controller: registerStatusController,
-                            decoration: InputDecoration(
-                              labelText: 'Status of Biodiversity Register',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.assignment_turned_in),
-                              helperText: 'e.g., Completed, In Progress, Not Started, etc.',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter PBR status';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Documentation Details
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Documentation Details',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF800080),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          TextFormField(
-                            controller: documentationDetailsController,
-                            maxLines: 3,
-                            decoration: InputDecoration(
-                              labelText: 'Details of documentation',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              helperText: 'What has been documented, by whom, when, etc.',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter documentation details';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Biodiversity Components
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Biodiversity Components Documented',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF800080),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          TextFormField(
-                            controller: biodiversityComponentsController,
-                            maxLines: 4,
-                            decoration: InputDecoration(
-                              labelText: 'List biodiversity components documented',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              helperText: 'Flora, fauna, ecosystems, genetic resources, etc.',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please list biodiversity components';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Traditional Knowledge
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Traditional Knowledge Documented',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF800080),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          TextFormField(
-                            controller: traditionalKnowledgeController,
-                            maxLines: 4,
-                            decoration: InputDecoration(
-                              labelText: 'Traditional knowledge and practices documented',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              helperText: 'Medicinal uses, agricultural practices, conservation methods, etc.',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 30),
-                    
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _resetForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.shade700,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            icon: Icon(Icons.refresh),
-                            label: Text('Reset Form'),
-                          ),
-                        ),
-                        SizedBox(width: 15),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _submitForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF800080),
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            icon: Icon(Icons.arrow_forward, size: 24),
-                            label: Text(
-                              'Save & Continue',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Progress Indicator
-                    Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(10), // Reduced from 12
                         border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
                       ),
                       child: Column(
@@ -506,13 +283,13 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.eco, color: Color(0xFF800080), size: 24),
-                              SizedBox(width: 10),
+                              Icon(Icons.camera_alt, color: Color(0xFF800080), size: 20), // Smaller
+                              SizedBox(width: 8), // Reduced from 10
                               Expanded(
                                 child: Text(
-                                  'Step 32: People\'s Biodiversity Register documentation',
+                                  'Upload Photo (Optional)',
                                   style: TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 16, // Reduced from 18
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF800080),
                                   ),
@@ -520,23 +297,94 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
                               ),
                             ],
                           ),
-                          SizedBox(height: 8),
+                          SizedBox(height: 8), // Reduced from 10
+                          
+                          Text(
+                            'Upload a photo of the Biodiversity Register if available',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12, // Reduced from 14
+                            ),
+                          ),
+                          SizedBox(height: 12), // Reduced from 15
+                          
+                          // Image Preview
+                          if (_selectedImage != null)
+                            Column(
+                              children: [
+                                Container(
+                                  height: 180, // Reduced from 200
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(6), // Reduced from 8
+                                    border: Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6), // Reduced from 8
+                                    child: Image.file(
+                                      _selectedImage!,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 8), // Reduced from 10
+                                ElevatedButton.icon(
+                                  onPressed: _removeImage,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red.shade50,
+                                    foregroundColor: Colors.red.shade800,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 12, 
+                                      vertical: 10
+                                    ),
+                                  ),
+                                  icon: Icon(Icons.delete, size: 18), // Smaller
+                                  label: Text('Remove Photo',
+                                    style: TextStyle(fontSize: 13) // Smaller
+                                  ),
+                                ),
+                                SizedBox(height: 16), // Reduced from 20
+                              ],
+                            ),
+                          
+                          // Upload Buttons - Made more compact
                           Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.of(context).size.width,
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.navigate_next, color: Colors.green.shade700, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Next: Cooking Medium Survey',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.green.shade800,
-                                    fontWeight: FontWeight.w500,
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _pickImage,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Color(0xFF800080),
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 12, // Reduced from 14
+                                        horizontal: 8,
+                                      ),
+                                    ),
+                                    icon: Icon(Icons.photo_library, size: 20), // Reduced from 22
+                                    label: Text('Choose from Gallery',
+                                      style: TextStyle(fontSize: 13) // Smaller
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 8), // Reduced from 10
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _takePhoto,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green.shade700,
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 12, // Reduced from 14
+                                        horizontal: 8,
+                                      ),
+                                    ),
+                                    icon: Icon(Icons.camera_alt, size: 20), // Reduced from 22
+                                    label: Text('Take Photo',
+                                      style: TextStyle(fontSize: 13) // Smaller
+                                    ),
                                   ),
                                 ),
                               ],
@@ -546,39 +394,45 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
                       ),
                     ),
                     
-                    SizedBox(height: 20),
+                    SizedBox(height: 24), // Reduced from 30
                     
-                    // Congratulations Card
-                    Card(
-                      elevation: 3,
-                      color: Colors.purple.shade50,
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            Icon(Icons.celebration, color: Color(0xFF800080), size: 40),
-                            SizedBox(height: 10),
-                            Text(
-                              'Congratulations!',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF800080),
+                    // Buttons - Previous and Final Submit - Made more compact
+                    Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _goToPreviousScreen,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey.shade600,
+                                padding: EdgeInsets.symmetric(vertical: 14), // Reduced from 16
+                              ),
+                              icon: Icon(Icons.arrow_back, size: 18), // Reduced from 20
+                              label: Text('Previous',
+                                style: TextStyle(fontSize: 13) // Smaller
                               ),
                             ),
-                            SizedBox(height: 8),
-                            Text(
-                              'You have completed all biodiversity and environmental data collection. '
-                              'Only one more section remains!',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.purple.shade700),
+                          ),
+                          SizedBox(width: 12), // Reduced from 16
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _submitForm,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                padding: EdgeInsets.symmetric(vertical: 14), // Reduced from 16
+                              ),
+                              icon: Icon(Icons.done_all, size: 18), // Reduced from 20
+                              label: Text('Submit Final Data',
+                                style: TextStyle(fontSize: 13) // Smaller
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                    
-                    SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -591,10 +445,10 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
 
   @override
   void dispose() {
-    registerStatusController.dispose();
-    documentationDetailsController.dispose();
-    biodiversityComponentsController.dispose();
-    traditionalKnowledgeController.dispose();
+    statusController.dispose();
+    detailsController.dispose();
+    componentsController.dispose();
+    knowledgeController.dispose();
     super.dispose();
   }
 }

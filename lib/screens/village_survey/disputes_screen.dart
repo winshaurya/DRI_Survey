@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'social_consciousness_screen.dart';  // This is already imported
-// Remove import 'cooking_medium_screen.dart'; since we're not going there directly
+import 'unemployment_screen.dart';
+import 'social_consciousness_screen.dart';
 
 class DisputesScreen extends StatefulWidget {
+  const DisputesScreen({super.key});
+
   @override
   _DisputesScreenState createState() => _DisputesScreenState();
 }
@@ -15,131 +17,18 @@ class _DisputesScreenState extends State<DisputesScreen> {
   TextEditingController criminalDisputesController = TextEditingController();
 
   void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      int family = int.tryParse(familyDisputesController.text) ?? 0;
-      int revenue = int.tryParse(revenueDisputesController.text) ?? 0;
-      int criminal = int.tryParse(criminalDisputesController.text) ?? 0;
-      int total = family + revenue + criminal;
-      
-      // Show success dialog
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Color(0xFF800080)),
-              SizedBox(width: 10),
-              Text('Disputes Data Saved'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Disputes data has been saved. Continue to Social Consciousness?'),  // Updated text
-                SizedBox(height: 15),
-                
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Color(0xFFE6E6FA),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('⚖️ Disputes Summary:', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080))),
-                      SizedBox(height: 8),
-                      _buildSummaryItem('Family Disputes:', familyDisputesController.text),
-                      _buildSummaryItem('Revenue Disputes:', revenueDisputesController.text),
-                      _buildSummaryItem('Criminal Disputes:', criminalDisputesController.text),
-                      _buildSummaryItem('Total Disputes:', '$total'),
-                      
-                      if (total > 10)
-                        Container(
-                          margin: EdgeInsets.only(top: 8),
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.warning, color: Colors.orange, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'High number of disputes in village',
-                                style: TextStyle(color: Colors.orange.shade800),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Edit', style: TextStyle(color: Color(0xFF800080))),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                // Navigate to SocialConsciousnessScreen instead of CookingMediumScreen
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SocialConsciousnessScreen()),
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Disputes data saved! Moving to Social Consciousness'),  // Updated text
-                    backgroundColor: Color(0xFF800080),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800080)),
-              child: Text('Continue to Social Consciousness'),  // Updated text
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  Widget _buildSummaryItem(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 150,
-            child: Text(label, style: TextStyle(fontWeight: FontWeight.w500)),
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080)),
-            ),
-          ),
-        ],
-      ),
+    // Navigate directly to next screen without showing dialog
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => SocialConsciousnessScreen()),
     );
   }
 
-  void _resetForm() {
-    _formKey.currentState?.reset();
-    setState(() {
-      familyDisputesController.clear();
-      revenueDisputesController.clear();
-      criminalDisputesController.clear();
-    });
+  void _goToPreviousScreen() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => UnemploymentScreen()),
+    );
   }
 
   @override
@@ -288,14 +177,8 @@ class _DisputesScreenState extends State<DisputesScreen> {
                               labelText: 'Number of family disputes',
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.family_restroom, color: Colors.red),
-                              helperText: 'Disputes within families',
+                              helperText: 'Disputes within families (leave empty for zero)',
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Required (0 if none)';
-                              }
-                              return null;
-                            },
                           ),
                         ],
                       ),
@@ -330,14 +213,8 @@ class _DisputesScreenState extends State<DisputesScreen> {
                               labelText: 'Number of revenue disputes',
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.landscape, color: Colors.orange),
-                              helperText: 'Property, land, revenue related disputes',
+                              helperText: 'Property, land, revenue related disputes (leave empty for zero)',
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Required (0 if none)';
-                              }
-                              return null;
-                            },
                           ),
                         ],
                       ),
@@ -372,14 +249,8 @@ class _DisputesScreenState extends State<DisputesScreen> {
                               labelText: 'Number of criminal disputes',
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.security, color: Colors.purple),
-                              helperText: 'Criminal cases, police complaints',
+                              helperText: 'Criminal cases, police complaints (leave empty for zero)',
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Required (0 if none)';
-                              }
-                              return null;
-                            },
                           ),
                         ],
                       ),
@@ -387,20 +258,24 @@ class _DisputesScreenState extends State<DisputesScreen> {
                     
                     SizedBox(height: 30),
                     
+                    // Buttons - Previous and Continue
                     Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _resetForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.shade700,
+                          child: OutlinedButton.icon(
+                            onPressed: _goToPreviousScreen,
+                            style: OutlinedButton.styleFrom(
                               padding: EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
+                              side: BorderSide(color: Color(0xFF800080), width: 2),
                             ),
-                            icon: Icon(Icons.refresh),
-                            label: Text('Reset Form'),
+                            icon: Icon(Icons.arrow_back, size: 24),
+                            label: Text(
+                              'Previous',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
                           ),
                         ),
                         SizedBox(width: 15),
@@ -424,62 +299,8 @@ class _DisputesScreenState extends State<DisputesScreen> {
                       ],
                     ),
                     
-                    SizedBox(height: 20),
+                    // Removed: Progress Indicator with Navigation Info
                     
-                    // Progress Indicator
-                    Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.gavel, color: Color(0xFF800080), size: 24),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Step 25: Village disputes data collection',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF800080),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.navigate_next, color: Colors.green.shade700, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Next: Social Consciousness',  // Updated text
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.green.shade800,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
                   ],
                 ),
               ),

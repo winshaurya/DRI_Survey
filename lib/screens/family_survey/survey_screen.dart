@@ -68,64 +68,70 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 0,
-        elevation: 0,
-      ),
-      drawer: const SideNavigation(),
-      body: Column(
-        children: [
-          const AppHeader(),
-          // Progress Bar
-          SurveyProgressBar(
-            currentPage: surveyState.currentPage,
-            totalPages: surveyState.totalPages,
-          ),
+        drawer: const SideNavigation(),
+        body: Column(
+          children: [
+            const AppHeader(),
+            // Progress Bar
+            SurveyProgressBar(
+              currentPage: surveyState.currentPage,
+              totalPages: surveyState.totalPages,
+            ),
 
-          // Survey Pages
-          Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: surveyState.totalPages,
-              itemBuilder: (context, index) {
-                return SurveyPage(
-                  pageIndex: index,
-                  onNext: () {
-                    if (index < surveyState.totalPages - 1) {
-                      // Validate constraints before proceeding
-                      if (_validatePageConstraints(index)) {
+            // Survey Pages
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: surveyState.totalPages,
+                itemBuilder: (context, index) {
+                  return SurveyPage(
+                    pageIndex: index,
+                    onNext: ([Map<String, dynamic>? pageData]) async {
+                      if (index < surveyState.totalPages - 1) {
+                        // Constraints disabled: always allow next page
+                        if (index == 0) {
+                          await surveyNotifier.initializeSurvey(
+                            villageName: surveyState.surveyData['village_name'] ?? '',
+                            villageNumber: surveyState.surveyData['village_number'],
+                            panchayat: surveyState.surveyData['panchayat'],
+                            block: surveyState.surveyData['block'],
+                            tehsil: surveyState.surveyData['tehsil'],
+                            district: surveyState.surveyData['district'],
+                            postalAddress: surveyState.surveyData['postal_address'],
+                            pinCode: surveyState.surveyData['pin_code'],
+                            surveyorName: surveyState.surveyData['surveyor_name'],
+                            phoneNumber: surveyState.surveyData['phone_number'],
+                          );
+                        }
                         _pageController.nextPage(
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeInOut,
                         );
                         surveyNotifier.nextPage();
                       } else {
-                        _showConstraintError(index);
+                        // Complete survey
+                        _showCompletionDialog();
                       }
-                    } else {
-                      // Complete survey
-                      _showCompletionDialog();
-                    }
-                  },
-                  onPrevious: index > 0
-                      ? () async {
-                          final newPage = index - 1;
-                          _pageController.previousPage(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          );
-                          surveyNotifier.previousPage();
-                          // Load data for the previous page
-                          await surveyNotifier.loadPageData(newPage);
-                        }
-                      : null,
-                );
-              },
+                    },
+                    onPrevious: index > 0
+                        ? () async {
+                            final newPage = index - 1;
+                            _pageController.previousPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                            surveyNotifier.previousPage();
+                            // Load data for the previous page
+                            await surveyNotifier.loadPageData(newPage);
+                          }
+                        : null,
+                  );
+                },
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -179,7 +185,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     // Complete the survey and export XLSX
     await surveyNotifier.completeSurvey();
 
-    final sessionId = ref.read(surveyProvider).sessionId;
+    final sessionId = ref.read(surveyProvider).phoneNumber;
     if (sessionId != null) {
       final fileName = 'family_survey_${DateTime.now().millisecondsSinceEpoch}.xlsx';
       await XlsxExportService().exportSurveyToXlsx(sessionId, fileName);
@@ -227,16 +233,16 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     );
   }
 
-  bool _validatePageConstraints(int pageIndex) {
+  bool _validatePageConstraints(int pageIndex, [Map<String, dynamic>? pageData]) {
     final surveyData = ref.read(surveyProvider).surveyData;
+    final dataToCheck = pageData ?? surveyData;
 
     switch (pageIndex) {
-      case 0: // Location - phone number is required
-        return surveyData['phone_number']?.isNotEmpty ?? false;
+      case 0: // Location - phone number is optional
+        return true;
 
-      case 1: // Family Details - head of family name and age required
-        return (surveyData['member_1_name']?.isNotEmpty ?? false) &&
-               (surveyData['member_1_age']?.isNotEmpty ?? false);
+      case 1: // Family Details - optional
+        return true;
 
       case 2: // Social Consciousness 3a - at least one question answered
         return (surveyData['clothes_frequency']?.isNotEmpty ?? false) ||
@@ -347,7 +353,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
         errorMessage = 'Please enter the phone number to continue.';
         break;
       case 1:
-        errorMessage = 'Please provide head of family details (name and age).';
+        errorMessage = 'Please provide head of family details (name, age, and gender).';
         break;
       case 2:
         errorMessage = 'Please answer at least one social consciousness question.';

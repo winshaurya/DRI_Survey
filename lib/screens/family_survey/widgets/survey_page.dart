@@ -6,11 +6,14 @@ import '../../../database/database_helper.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/font_size_provider.dart';
 import '../../../providers/survey_provider.dart';
+import '../pages/animals_page.dart';
+import '../pages/crop_productivity_page.dart';
+import '../pages/family_details_page.dart';
 import '../pages/location_page.dart';
 
 class SurveyPage extends StatefulWidget {
   final int pageIndex;
-  final VoidCallback onNext;
+  final Function([Map<String, dynamic>?]) onNext;
   final VoidCallback? onPrevious;
 
   const SurveyPage({
@@ -129,13 +132,20 @@ class _SurveyPageState extends State<SurveyPage> {
           pageData: _pageData,
           onDataChanged: (data) {
             setState(() {
-              _pageData.clear();
               _pageData.addAll(data);
             });
           },
         );
       case 1:
-        return _buildFamilyDetailsPage(l10n);
+        return FamilyDetailsPage(
+          pageData: _pageData,
+          onDataChanged: (data) {
+            setState(() {
+              _pageData.addAll(data);
+            });
+          },
+          formKey: _formKey,
+        );
       case 2:
         return _buildSocialConsciousnessPage3a(l10n);
       case 3:
@@ -147,11 +157,25 @@ class _SurveyPageState extends State<SurveyPage> {
       case 6:
         return _buildIrrigationPage(l10n);
       case 7:
-        return _buildCropProductivityPage(l10n);
+        return CropProductivityPage(
+          pageData: _pageData,
+          onDataChanged: (data) {
+            setState(() {
+              _pageData.addAll(data);
+            });
+          },
+        );
       case 8:
         return _buildFertilizerPage(l10n);
       case 9:
-        return _buildAnimalsPage(l10n);
+        return AnimalsPage(
+          pageData: _pageData,
+          onDataChanged: (data) {
+            setState(() {
+              _pageData.addAll(data);
+            });
+          },
+        );
       case 10:
         return _buildEquipmentPage(l10n);
       case 11:
@@ -177,6 +201,22 @@ class _SurveyPageState extends State<SurveyPage> {
       case 21:
         return _buildTrainingPage(l10n);
       case 22:
+        return _buildFPOFamiliesPage(l10n);
+      case 23:
+        return _buildVBGramBeneficiariesPage(l10n);
+      case 24:
+        return _buildPMKisanBeneficiariesPage(l10n);
+      case 25:
+        return _buildPMKisanSammanBeneficiariesPage(l10n);
+      case 26:
+        return _buildKisanCreditCardBeneficiariesPage(l10n);
+      case 27:
+        return _buildSwachhBharatBeneficiariesPage(l10n);
+      case 28:
+        return _buildFasalBimaBeneficiariesPage(l10n);
+      case 29:
+        return _buildBankAccountHoldersPage(l10n);
+      case 30:
         return _buildFinalPage(l10n, ref);
       default:
         return const Center(child: Text('Page not found'));
@@ -210,12 +250,6 @@ class _SurveyPageState extends State<SurveyPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            validator: (value) {
-              if (value?.isEmpty ?? true) {
-                return 'Please enter village name';
-              }
-              return null;
-            },
             onSaved: (value) => _pageData['village_name'] = value,
           ),
         ),
@@ -294,6 +328,8 @@ class _SurveyPageState extends State<SurveyPage> {
   }
 
   Widget _buildFamilyDetailsPage(AppLocalizations l10n) {
+    final familyMembers = _pageData['family_members'] as List<Map<String, dynamic>>? ?? [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -312,18 +348,42 @@ class _SurveyPageState extends State<SurveyPage> {
         ),
         const SizedBox(height: 24),
 
-        // Family Member 1 (Head of Family)
-        _buildFamilyMemberCard(1, 'Head of Family', l10n, isRequired: true),
+        // Display existing family members
+        ...familyMembers.asMap().entries.map((entry) {
+          final index = entry.key;
+          final member = entry.value;
+          return Column(
+            children: [
+              _buildFamilyMemberCard(index + 1, 'Family Member ${index + 1}', l10n, memberData: member),
+              const SizedBox(height: 16),
+            ],
+          );
+        }),
 
-        const SizedBox(height: 24),
-
-        // Add more family members
+        // Add more family members button
         ElevatedButton.icon(
           onPressed: () {
-            // TODO: Add dynamic family member forms
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Dynamic family member addition coming soon')),
-            );
+            setState(() {
+              final familyMembers = _pageData['family_members'] as List<Map<String, dynamic>>? ?? [];
+              familyMembers.add({
+                'sr_no': familyMembers.length + 1,
+                'name': '',
+                'fathers_name': '',
+                'mothers_name': '',
+                'relationship_with_head': '',
+                'age': '',
+                'sex': '',
+                'physically_fit': '',
+                'educational_qualification': '',
+                'inclination_self_employment': '',
+                'occupation': '',
+                'days_employed': '',
+                'income': '',
+                'awareness_about_village': '',
+                'participate_gram_sabha': '',
+              });
+              _pageData['family_members'] = familyMembers;
+            });
           },
           icon: const Icon(Icons.add),
           label: Text(l10n.addMember),
@@ -334,29 +394,28 @@ class _SurveyPageState extends State<SurveyPage> {
           ),
         ),
 
-        const SizedBox(height: 16),
-
-        // Note about additional members
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.blue[50],
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue[200]!),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.info, color: Colors.blue[700]),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'You can add more family members in the next steps. For now, please provide details for the head of the family.',
-                  style: TextStyle(color: Colors.blue[700]),
+        if (familyMembers.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(top: 16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info, color: Colors.blue[700]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Click "Add Member" to add family members. At least one member is required.',
+                    style: TextStyle(color: Colors.blue[700]),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1425,7 +1484,7 @@ class _SurveyPageState extends State<SurveyPage> {
     );
   }
 
-  Widget _buildCropCard(int cropNumber, AppLocalizations l10n) {
+  Widget _buildCropCard(int cropNumber, AppLocalizations l10n, {Map<String, dynamic>? cropData}) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -1446,6 +1505,7 @@ class _SurveyPageState extends State<SurveyPage> {
             const SizedBox(height: 16),
 
             TextFormField(
+              initialValue: cropData?['crop_name'],
               decoration: InputDecoration(
                 labelText: l10n.cropName,
                 border: OutlineInputBorder(
@@ -1453,6 +1513,11 @@ class _SurveyPageState extends State<SurveyPage> {
                 ),
                 prefixIcon: const Icon(Icons.grass),
               ),
+              onChanged: (value) {
+                if (cropData != null) {
+                  cropData['crop_name'] = value;
+                }
+              },
               onSaved: (value) => _pageData['crop_${cropNumber}_name'] = value,
             ),
 
@@ -1462,6 +1527,7 @@ class _SurveyPageState extends State<SurveyPage> {
               children: [
                 Expanded(
                   child: TextFormField(
+                    initialValue: cropData?['area_acres'],
                     decoration: InputDecoration(
                       labelText: '${l10n.areaAcres} (Acres)',
                       border: OutlineInputBorder(
@@ -1470,6 +1536,11 @@ class _SurveyPageState extends State<SurveyPage> {
                       prefixIcon: const Icon(Icons.straighten),
                     ),
                     keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      if (cropData != null) {
+                        cropData['area_acres'] = value;
+                      }
+                    },
                     onSaved: (value) => _pageData['crop_${cropNumber}_area'] = value,
                   ),
                 ),
@@ -1478,6 +1549,7 @@ class _SurveyPageState extends State<SurveyPage> {
 
                 Expanded(
                   child: TextFormField(
+                    initialValue: cropData?['productivity_quintal_per_acre'],
                     decoration: InputDecoration(
                       labelText: '${l10n.productivity} (Qtl/Acre)',
                       border: OutlineInputBorder(
@@ -1486,6 +1558,11 @@ class _SurveyPageState extends State<SurveyPage> {
                       prefixIcon: const Icon(Icons.trending_up),
                     ),
                     keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      if (cropData != null) {
+                        cropData['productivity_quintal_per_acre'] = value;
+                      }
+                    },
                     onSaved: (value) => _pageData['crop_${cropNumber}_productivity'] = value,
                   ),
                 ),
@@ -1498,6 +1575,7 @@ class _SurveyPageState extends State<SurveyPage> {
               children: [
                 Expanded(
                   child: TextFormField(
+                    initialValue: cropData?['total_production'],
                     decoration: InputDecoration(
                       labelText: l10n.totalProduction,
                       border: OutlineInputBorder(
@@ -1506,6 +1584,11 @@ class _SurveyPageState extends State<SurveyPage> {
                       prefixIcon: const Icon(Icons.inventory),
                     ),
                     keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      if (cropData != null) {
+                        cropData['total_production'] = value;
+                      }
+                    },
                     onSaved: (value) => _pageData['crop_${cropNumber}_total_production'] = value,
                   ),
                 ),
@@ -1514,6 +1597,7 @@ class _SurveyPageState extends State<SurveyPage> {
 
                 Expanded(
                   child: TextFormField(
+                    initialValue: cropData?['quantity_consumed'],
                     decoration: InputDecoration(
                       labelText: l10n.quantityConsumed,
                       border: OutlineInputBorder(
@@ -1522,6 +1606,11 @@ class _SurveyPageState extends State<SurveyPage> {
                       prefixIcon: const Icon(Icons.restaurant),
                     ),
                     keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      if (cropData != null) {
+                        cropData['quantity_consumed'] = value;
+                      }
+                    },
                     onSaved: (value) => _pageData['crop_${cropNumber}_consumed'] = value,
                   ),
                 ),
@@ -1531,6 +1620,7 @@ class _SurveyPageState extends State<SurveyPage> {
             const SizedBox(height: 16),
 
             TextFormField(
+              initialValue: cropData?['quantity_sold'],
               decoration: InputDecoration(
                 labelText: l10n.quantitySold,
                 border: OutlineInputBorder(
@@ -1539,6 +1629,11 @@ class _SurveyPageState extends State<SurveyPage> {
                 prefixIcon: const Icon(Icons.sell),
               ),
               keyboardType: TextInputType.number,
+              onChanged: (value) {
+                if (cropData != null) {
+                  cropData['quantity_sold'] = value;
+                }
+              },
               onSaved: (value) => _pageData['crop_${cropNumber}_sold'] = value,
             ),
           ],
@@ -1547,7 +1642,7 @@ class _SurveyPageState extends State<SurveyPage> {
     );
   }
 
-  Widget _buildAnimalCard(int animalNumber, AppLocalizations l10n) {
+  Widget _buildAnimalCard(int animalNumber, AppLocalizations l10n, {Map<String, dynamic>? animalData}) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -1568,6 +1663,7 @@ class _SurveyPageState extends State<SurveyPage> {
             const SizedBox(height: 16),
 
             TextFormField(
+              initialValue: animalData?['animal_type'],
               decoration: InputDecoration(
                 labelText: l10n.animalType,
                 border: OutlineInputBorder(
@@ -1575,6 +1671,11 @@ class _SurveyPageState extends State<SurveyPage> {
                 ),
                 prefixIcon: const Icon(Icons.pets),
               ),
+              onChanged: (value) {
+                if (animalData != null) {
+                  animalData['animal_type'] = value;
+                }
+              },
               onSaved: (value) => _pageData['animal_${animalNumber}_type'] = value,
             ),
 
@@ -1584,6 +1685,7 @@ class _SurveyPageState extends State<SurveyPage> {
               children: [
                 Expanded(
                   child: TextFormField(
+                    initialValue: animalData?['number_of_animals'],
                     decoration: InputDecoration(
                       labelText: l10n.numberOfAnimals,
                       border: OutlineInputBorder(
@@ -1592,6 +1694,11 @@ class _SurveyPageState extends State<SurveyPage> {
                       prefixIcon: const Icon(Icons.format_list_numbered),
                     ),
                     keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      if (animalData != null) {
+                        animalData['number_of_animals'] = value;
+                      }
+                    },
                     onSaved: (value) => _pageData['animal_${animalNumber}_count'] = value,
                   ),
                 ),
@@ -1600,6 +1707,7 @@ class _SurveyPageState extends State<SurveyPage> {
 
                 Expanded(
                   child: TextFormField(
+                    initialValue: animalData?['breed'],
                     decoration: InputDecoration(
                       labelText: l10n.breed,
                       border: OutlineInputBorder(
@@ -1607,6 +1715,11 @@ class _SurveyPageState extends State<SurveyPage> {
                       ),
                       prefixIcon: const Icon(Icons.category),
                     ),
+                    onChanged: (value) {
+                      if (animalData != null) {
+                        animalData['breed'] = value;
+                      }
+                    },
                     onSaved: (value) => _pageData['animal_${animalNumber}_breed'] = value,
                   ),
                 ),
@@ -1616,6 +1729,7 @@ class _SurveyPageState extends State<SurveyPage> {
             const SizedBox(height: 16),
 
             TextFormField(
+              initialValue: animalData?['production_per_animal'],
               decoration: InputDecoration(
                 labelText: l10n.productionPerAnimal,
                 border: OutlineInputBorder(
@@ -1623,7 +1737,31 @@ class _SurveyPageState extends State<SurveyPage> {
                 ),
                 prefixIcon: const Icon(Icons.production_quantity_limits),
               ),
+              onChanged: (value) {
+                if (animalData != null) {
+                  animalData['production_per_animal'] = value;
+                }
+              },
               onSaved: (value) => _pageData['animal_${animalNumber}_production'] = value,
+            ),
+
+            const SizedBox(height: 16),
+
+            TextFormField(
+              initialValue: animalData?['quantity_sold'],
+              decoration: InputDecoration(
+                labelText: 'Quantity Sold',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: const Icon(Icons.sell),
+              ),
+              onChanged: (value) {
+                if (animalData != null) {
+                  animalData['quantity_sold'] = value;
+                }
+              },
+              onSaved: (value) => _pageData['animal_${animalNumber}_sold'] = value,
             ),
           ],
         ),
@@ -1631,7 +1769,7 @@ class _SurveyPageState extends State<SurveyPage> {
     );
   }
 
-  Widget _buildDiseaseCard(int diseaseNumber, AppLocalizations l10n, double fontScale) {
+  Widget _buildDiseaseCard(int diseaseNumber, AppLocalizations l10n, double fontScale, {Map<String, dynamic>? diseaseData}) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -1677,29 +1815,37 @@ class _SurveyPageState extends State<SurveyPage> {
                 DropdownMenuItem(value: 'other', child: Text('Other (please specify)')),
               ],
               onChanged: (value) {
-                setState(() {
-                  _pageData['disease_${diseaseNumber}_name'] = value;
-                });
+                if (diseaseData != null) {
+                  diseaseData['disease_name'] = value;
+                }
               },
-              value: _pageData['disease_${diseaseNumber}_name'],
+              value: diseaseData?['disease_name'],
+              onSaved: (value) => _pageData['disease_${diseaseNumber}_name'] = value,
             ),
 
             const SizedBox(height: 16),
 
-            if (_pageData['disease_${diseaseNumber}_name'] == 'other')
+            if (diseaseData?['disease_name'] == 'other')
               TextFormField(
+                initialValue: diseaseData?['other_disease'],
                 decoration: InputDecoration(
                   labelText: 'Specify other disease',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                onChanged: (value) {
+                  if (diseaseData != null) {
+                    diseaseData['other_disease'] = value;
+                  }
+                },
                 onSaved: (value) => _pageData['disease_${diseaseNumber}_other'] = value,
               ),
 
             const SizedBox(height: 16),
 
             TextFormField(
+              initialValue: diseaseData?['suffering_since'],
               decoration: InputDecoration(
                 labelText: l10n.sufferingSince,
                 border: OutlineInputBorder(
@@ -1707,12 +1853,18 @@ class _SurveyPageState extends State<SurveyPage> {
                 ),
                 prefixIcon: const Icon(Icons.calendar_today),
               ),
+              onChanged: (value) {
+                if (diseaseData != null) {
+                  diseaseData['suffering_since'] = value;
+                }
+              },
               onSaved: (value) => _pageData['disease_${diseaseNumber}_since'] = value,
             ),
 
             const SizedBox(height: 16),
 
             TextFormField(
+              initialValue: diseaseData?['treatment_from'],
               decoration: InputDecoration(
                 labelText: l10n.treatmentFrom,
                 border: OutlineInputBorder(
@@ -1720,6 +1872,11 @@ class _SurveyPageState extends State<SurveyPage> {
                 ),
                 prefixIcon: const Icon(Icons.local_hospital),
               ),
+              onChanged: (value) {
+                if (diseaseData != null) {
+                  diseaseData['treatment_from'] = value;
+                }
+              },
               onSaved: (value) => _pageData['disease_${diseaseNumber}_treatment'] = value,
             ),
           ],
@@ -1876,7 +2033,7 @@ class _SurveyPageState extends State<SurveyPage> {
     );
   }
 
-  Widget _buildFamilyMemberCard(int memberNumber, String relation, AppLocalizations l10n, {bool isRequired = false}) {
+  Widget _buildFamilyMemberCard(int memberNumber, String relation, AppLocalizations l10n, {bool isRequired = false, Map<String, dynamic>? memberData}) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -1913,18 +2070,18 @@ class _SurveyPageState extends State<SurveyPage> {
             const SizedBox(height: 16),
 
             TextFormField(
+              initialValue: memberData?['name'],
               decoration: InputDecoration(
-                labelText: '${l10n.memberName} *',
+                labelText: '${l10n.memberName}',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 prefixIcon: const Icon(Icons.person),
               ),
-              validator: (value) {
-                if (isRequired && (value?.isEmpty ?? true)) {
-                  return 'Please enter member name';
+              onChanged: (value) {
+                if (memberData != null) {
+                  memberData['name'] = value;
                 }
-                return null;
               },
               onSaved: (value) => _pageData['member_${memberNumber}_name'] = value,
             ),
@@ -1935,23 +2092,19 @@ class _SurveyPageState extends State<SurveyPage> {
               children: [
                 Expanded(
                   child: TextFormField(
+                    initialValue: memberData?['age'],
                     decoration: InputDecoration(
-                      labelText: '${l10n.age} *',
+                      labelText: '${l10n.age}',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       prefixIcon: const Icon(Icons.calendar_today),
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (isRequired && (value?.isEmpty ?? true)) {
-                        return 'Please enter age';
+                    onChanged: (value) {
+                      if (memberData != null) {
+                        memberData['age'] = value;
                       }
-                      final age = int.tryParse(value ?? '');
-                      if (age != null && (age < 0 || age > 120)) {
-                        return 'Please enter valid age';
-                      }
-                      return null;
                     },
                     onSaved: (value) => _pageData['member_${memberNumber}_age'] = value,
                   ),
@@ -1961,8 +2114,9 @@ class _SurveyPageState extends State<SurveyPage> {
 
                 Expanded(
                   child: DropdownButtonFormField<String>(
+                    value: memberData?['sex'],
                     decoration: InputDecoration(
-                      labelText: '${l10n.sex} *',
+                      labelText: '${l10n.sex}',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -1973,14 +2127,10 @@ class _SurveyPageState extends State<SurveyPage> {
                       DropdownMenuItem(value: 'female', child: Text(l10n.female)),
                       DropdownMenuItem(value: 'other', child: Text(l10n.other)),
                     ],
-                    validator: (value) {
-                      if (isRequired && value == null) {
-                        return 'Please select gender';
-                      }
-                      return null;
-                    },
                     onChanged: (value) {
-                      // Handle change
+                      if (memberData != null) {
+                        memberData['sex'] = value;
+                      }
                     },
                     onSaved: (value) => _pageData['member_${memberNumber}_sex'] = value,
                   ),
@@ -1991,6 +2141,7 @@ class _SurveyPageState extends State<SurveyPage> {
             const SizedBox(height: 16),
 
             TextFormField(
+              initialValue: memberData?['relationship_with_head'],
               decoration: InputDecoration(
                 labelText: l10n.relation,
                 border: OutlineInputBorder(
@@ -1998,12 +2149,18 @@ class _SurveyPageState extends State<SurveyPage> {
                 ),
                 prefixIcon: const Icon(Icons.family_restroom),
               ),
+              onChanged: (value) {
+                if (memberData != null) {
+                  memberData['relationship_with_head'] = value;
+                }
+              },
               onSaved: (value) => _pageData['member_${memberNumber}_relation'] = value,
             ),
 
             const SizedBox(height: 16),
 
             TextFormField(
+              initialValue: memberData?['educational_qualification'],
               decoration: InputDecoration(
                 labelText: l10n.education,
                 border: OutlineInputBorder(
@@ -2011,12 +2168,18 @@ class _SurveyPageState extends State<SurveyPage> {
                 ),
                 prefixIcon: const Icon(Icons.school),
               ),
+              onChanged: (value) {
+                if (memberData != null) {
+                  memberData['educational_qualification'] = value;
+                }
+              },
               onSaved: (value) => _pageData['member_${memberNumber}_education'] = value,
             ),
 
             const SizedBox(height: 16),
 
             TextFormField(
+              initialValue: memberData?['occupation'],
               decoration: InputDecoration(
                 labelText: l10n.occupation,
                 border: OutlineInputBorder(
@@ -2024,6 +2187,11 @@ class _SurveyPageState extends State<SurveyPage> {
                 ),
                 prefixIcon: const Icon(Icons.work),
               ),
+              onChanged: (value) {
+                if (memberData != null) {
+                  memberData['occupation'] = value;
+                }
+              },
               onSaved: (value) => _pageData['member_${memberNumber}_occupation'] = value,
             ),
           ],
@@ -2185,6 +2353,8 @@ class _SurveyPageState extends State<SurveyPage> {
     );
   }
   Widget _buildCropProductivityPage(AppLocalizations l10n) {
+    final crops = _pageData['crops'] as List<Map<String, dynamic>>? ?? [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2203,16 +2373,34 @@ class _SurveyPageState extends State<SurveyPage> {
         ),
         const SizedBox(height: 24),
 
-        // Crop 1
-        _buildCropCard(1, l10n),
+        // Display existing crops
+        ...crops.asMap().entries.map((entry) {
+          final index = entry.key;
+          final crop = entry.value;
+          return Column(
+            children: [
+              _buildCropCard(index + 1, l10n, cropData: crop),
+              const SizedBox(height: 16),
+            ],
+          );
+        }),
 
-        const SizedBox(height: 24),
-
+        // Add more crops button
         ElevatedButton.icon(
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Multiple crop entries coming soon')),
-            );
+            setState(() {
+              final crops = _pageData['crops'] as List<Map<String, dynamic>>? ?? [];
+              crops.add({
+                'sr_no': crops.length + 1,
+                'crop_name': '',
+                'area_acres': '',
+                'productivity_quintal_per_acre': '',
+                'total_production': '',
+                'quantity_consumed': '',
+                'quantity_sold': '',
+              });
+              _pageData['crops'] = crops;
+            });
           },
           icon: const Icon(Icons.add),
           label: const Text('Add Another Crop'),
@@ -2222,6 +2410,29 @@ class _SurveyPageState extends State<SurveyPage> {
             ),
           ),
         ),
+
+        if (crops.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(top: 16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info, color: Colors.blue[700]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Click "Add Another Crop" to add crop details.',
+                    style: TextStyle(color: Colors.blue[700]),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -2279,6 +2490,8 @@ class _SurveyPageState extends State<SurveyPage> {
   }
 
   Widget _buildAnimalsPage(AppLocalizations l10n) {
+    final animals = _pageData['animals'] as List<Map<String, dynamic>>? ?? [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2297,16 +2510,33 @@ class _SurveyPageState extends State<SurveyPage> {
         ),
         const SizedBox(height: 24),
 
-        // Animal 1
-        _buildAnimalCard(1, l10n),
+        // Display existing animals
+        ...animals.asMap().entries.map((entry) {
+          final index = entry.key;
+          final animal = entry.value;
+          return Column(
+            children: [
+              _buildAnimalCard(index + 1, l10n, animalData: animal),
+              const SizedBox(height: 16),
+            ],
+          );
+        }),
 
-        const SizedBox(height: 24),
-
+        // Add more animals button
         ElevatedButton.icon(
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Multiple animal entries coming soon')),
-            );
+            setState(() {
+              final animals = _pageData['animals'] as List<Map<String, dynamic>>? ?? [];
+              animals.add({
+                'sr_no': animals.length + 1,
+                'animal_type': '',
+                'number_of_animals': '',
+                'breed': '',
+                'production_per_animal': '',
+                'quantity_sold': '',
+              });
+              _pageData['animals'] = animals;
+            });
           },
           icon: const Icon(Icons.add),
           label: const Text('Add Another Animal'),
@@ -2316,6 +2546,29 @@ class _SurveyPageState extends State<SurveyPage> {
             ),
           ),
         ),
+
+        if (animals.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(top: 16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info, color: Colors.blue[700]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Click "Add Another Animal" to add livestock details.',
+                    style: TextStyle(color: Colors.blue[700]),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -2766,6 +3019,7 @@ class _SurveyPageState extends State<SurveyPage> {
         const SizedBox(height: 16),
 
         TextFormField(
+          initialValue: _pageData['number_of_rooms'],
           decoration: InputDecoration(
             labelText: 'Number of rooms',
             border: OutlineInputBorder(
@@ -2773,18 +3027,21 @@ class _SurveyPageState extends State<SurveyPage> {
             ),
           ),
           keyboardType: TextInputType.number,
+          onChanged: (value) => _pageData['number_of_rooms'] = value,
           onSaved: (value) => _pageData['number_of_rooms'] = value,
         ),
 
         const SizedBox(height: 16),
 
         TextFormField(
+          initialValue: _pageData['house_ownership'],
           decoration: InputDecoration(
             labelText: 'House ownership (Owned/Rented)',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
+          onChanged: (value) => _pageData['house_ownership'] = value,
           onSaved: (value) => _pageData['house_ownership'] = value,
         ),
       ],
@@ -3218,11 +3475,19 @@ class _SurveyPageState extends State<SurveyPage> {
 
           _buildPreviewSection('Family Details', [
             _buildPreviewField('Head of Family Name', surveyData['member_1_name']),
+            _buildPreviewField("Head of Family Father's Name", surveyData['member_1_fathers_name']),
+            _buildPreviewField("Head of Family Mother's Name", surveyData['member_1_mothers_name']),
+            _buildPreviewField('Head of Family Relationship', surveyData['member_1_relationship_with_head']),
             _buildPreviewField('Head of Family Age', surveyData['member_1_age']),
             _buildPreviewField('Head of Family Sex', surveyData['member_1_sex']),
-            _buildPreviewField('Head of Family Relation', surveyData['member_1_relation']),
-            _buildPreviewField('Head of Family Education', surveyData['member_1_education']),
+            _buildPreviewField('Head of Family Physically Fit', surveyData['member_1_physically_fit']),
+            _buildPreviewField('Head of Family Education', surveyData['member_1_educational_qualification']),
+            _buildPreviewField('Head of Family Self Employment Inclination', surveyData['member_1_inclination_self_employment']),
             _buildPreviewField('Head of Family Occupation', surveyData['member_1_occupation']),
+            _buildPreviewField('Head of Family Days Employed', surveyData['member_1_days_employed']),
+            _buildPreviewField('Head of Family Income', surveyData['member_1_income']),
+            _buildPreviewField('Head of Family Village Awareness', surveyData['member_1_awareness_about_village']),
+            _buildPreviewField('Head of Family Gram Sabha Participation', surveyData['member_1_participate_gram_sabha']),
           ]),
 
           _buildPreviewSection('Land Holding', [
@@ -3497,6 +3762,1141 @@ class _SurveyPageState extends State<SurveyPage> {
     );
   }
 
+  Widget _buildFPOFamiliesPage(AppLocalizations l10n) {
+    final fpoMembers = _pageData['fpo_members'] as List<Map<String, dynamic>>? ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'No. of Family Members Who Are Members of a FPO',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Please provide details about family members who are FPO members',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 24),
+
+        // Display existing FPO members
+        ...fpoMembers.asMap().entries.map((entry) {
+          final index = entry.key;
+          final member = entry.value;
+          return Column(
+            children: [
+              _buildFPOMemberCard(index + 1, memberData: member),
+              const SizedBox(height: 16),
+            ],
+          );
+        }),
+
+        // Add more FPO members button
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              final fpoMembers = _pageData['fpo_members'] as List<Map<String, dynamic>>? ?? [];
+              fpoMembers.add({
+                'sr_no': fpoMembers.length + 1,
+                'family_member_name': '',
+                'fpo_name': '',
+                'fpo_purpose': '',
+                'fpo_agency': '',
+              });
+              _pageData['fpo_members'] = fpoMembers;
+            });
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Add FPO Member'),
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+
+        if (fpoMembers.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(top: 16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info, color: Colors.blue[700]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Click "Add FPO Member" to add family members who are FPO members.',
+                    style: TextStyle(color: Colors.blue[700]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildVBGramBeneficiariesPage(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'VB G RAM G beneficiary',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Please provide VB Gram beneficiary information',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 24),
+
+        _buildRadioField('Yes', 'vb_gram_beneficiary', 'yes'),
+        _buildRadioField('No', 'vb_gram_beneficiary', 'no'),
+
+        const SizedBox(height: 16),
+
+        TextFormField(
+          decoration: InputDecoration(
+            labelText: 'Name included?',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onSaved: (value) => _pageData['vb_gram_name_included'] = value,
+        ),
+
+        const SizedBox(height: 16),
+
+        TextFormField(
+          decoration: InputDecoration(
+            labelText: 'Details Correct',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onSaved: (value) => _pageData['vb_gram_details_correct'] = value,
+        ),
+
+        const SizedBox(height: 24),
+
+        Text(
+          'Family Members Details',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // VB Gram members table
+        _buildVBGramMembersTable(),
+      ],
+    );
+  }
+
+  Widget _buildPMKisanBeneficiariesPage(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'PM Kisan Nidhi Yojna beneficiary',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Please provide PM Kisan beneficiary information',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 24),
+
+        _buildRadioField('Yes', 'pm_kisan_beneficiary', 'yes'),
+        _buildRadioField('No', 'pm_kisan_beneficiary', 'no'),
+
+        const SizedBox(height: 16),
+
+        TextFormField(
+          decoration: InputDecoration(
+            labelText: 'Name included?',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onSaved: (value) => _pageData['pm_kisan_name_included'] = value,
+        ),
+
+        const SizedBox(height: 16),
+
+        TextFormField(
+          decoration: InputDecoration(
+            labelText: 'Details Correct',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onSaved: (value) => _pageData['pm_kisan_details_correct'] = value,
+        ),
+
+        const SizedBox(height: 24),
+
+        Text(
+          'Family Members Details',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // PM Kisan members table
+        _buildPMKisanMembersTable(),
+      ],
+    );
+  }
+
+  Widget _buildPMKisanSammanBeneficiariesPage(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'PM Kisan Samman Nidhi beneficiary',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Please provide PM Kisan Samman Nidhi beneficiary information',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 24),
+
+        _buildRadioField('Yes', 'pm_kisan_samman_beneficiary', 'yes'),
+        _buildRadioField('No', 'pm_kisan_samman_beneficiary', 'no'),
+
+        const SizedBox(height: 16),
+
+        TextFormField(
+          decoration: InputDecoration(
+            labelText: 'Details Correct',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onSaved: (value) => _pageData['pm_kisan_samman_details_correct'] = value,
+        ),
+
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Received',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onSaved: (value) => _pageData['pm_kisan_samman_received'] = value,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Yes/No',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onSaved: (value) => _pageData['pm_kisan_samman_yes_no'] = value,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKisanCreditCardBeneficiariesPage(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Kisan Credit Card beneficiary',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Please provide Kisan Credit Card beneficiary information',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 24),
+
+        _buildRadioField('Yes', 'kisan_credit_card_beneficiary', 'yes'),
+        _buildRadioField('No', 'kisan_credit_card_beneficiary', 'no'),
+
+        const SizedBox(height: 16),
+
+        TextFormField(
+          decoration: InputDecoration(
+            labelText: 'Details Correct',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onSaved: (value) => _pageData['kisan_credit_card_details_correct'] = value,
+        ),
+
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Received',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onSaved: (value) => _pageData['kisan_credit_card_received'] = value,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Yes/No',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onSaved: (value) => _pageData['kisan_credit_card_yes_no'] = value,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSwachhBharatBeneficiariesPage(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Swachh Bharat Mission beneficiary',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Please provide Swachh Bharat Mission beneficiary information',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 24),
+
+        _buildRadioField('Yes', 'swachh_bharat_beneficiary', 'yes'),
+        _buildRadioField('No', 'swachh_bharat_beneficiary', 'no'),
+
+        const SizedBox(height: 16),
+
+        TextFormField(
+          decoration: InputDecoration(
+            labelText: 'Details Correct',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onSaved: (value) => _pageData['swachh_bharat_details_correct'] = value,
+        ),
+
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Received',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onSaved: (value) => _pageData['swachh_bharat_received'] = value,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Yes/No',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onSaved: (value) => _pageData['swachh_bharat_yes_no'] = value,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFasalBimaBeneficiariesPage(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Fasal Bima beneficiary',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Please provide Fasal Bima beneficiary information',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 24),
+
+        _buildRadioField('Yes', 'fasal_bima_beneficiary', 'yes'),
+        _buildRadioField('No', 'fasal_bima_beneficiary', 'no'),
+
+        const SizedBox(height: 16),
+
+        TextFormField(
+          decoration: InputDecoration(
+            labelText: 'Details Correct',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onSaved: (value) => _pageData['fasal_bima_details_correct'] = value,
+        ),
+
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Received',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onSaved: (value) => _pageData['fasal_bima_received'] = value,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Yes/No',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onSaved: (value) => _pageData['fasal_bima_yes_no'] = value,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBankAccountHoldersPage(AppLocalizations l10n) {
+    final bankMembers = _pageData['bank_members'] as List<Map<String, dynamic>>? ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Family Members who have a Bank Account',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Please provide details about family members with bank accounts',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 24),
+
+        TextFormField(
+          decoration: InputDecoration(
+            labelText: 'Details Correct',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onSaved: (value) => _pageData['bank_account_details_correct'] = value,
+        ),
+
+        const SizedBox(height: 24),
+
+        Text(
+          'Family Members Details',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Bank members table
+        _buildBankMembersTable(),
+      ],
+    );
+  }
+
+  Widget _buildFPOMemberCard(int memberNumber, {Map<String, dynamic>? memberData}) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'FPO Member ${memberNumber}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              initialValue: memberData?['family_member_name'],
+              decoration: InputDecoration(
+                labelText: 'Family Member\'s Name',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onChanged: (value) {
+                if (memberData != null) {
+                  memberData['family_member_name'] = value;
+                }
+              },
+              onSaved: (value) => _pageData['fpo_member_${memberNumber}_name'] = value,
+            ),
+
+            const SizedBox(height: 16),
+
+            TextFormField(
+              initialValue: memberData?['fpo_name'],
+              decoration: InputDecoration(
+                labelText: 'Name of FPO',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onChanged: (value) {
+                if (memberData != null) {
+                  memberData['fpo_name'] = value;
+                }
+              },
+              onSaved: (value) => _pageData['fpo_member_${memberNumber}_fpo_name'] = value,
+            ),
+
+            const SizedBox(height: 16),
+
+            TextFormField(
+              initialValue: memberData?['fpo_purpose'],
+              decoration: InputDecoration(
+                labelText: 'Purpose of FPO',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onChanged: (value) {
+                if (memberData != null) {
+                  memberData['fpo_purpose'] = value;
+                }
+              },
+              onSaved: (value) => _pageData['fpo_member_${memberNumber}_purpose'] = value,
+            ),
+
+            const SizedBox(height: 16),
+
+            TextFormField(
+              initialValue: memberData?['fpo_agency'],
+              decoration: InputDecoration(
+                labelText: 'Under which Agency',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onChanged: (value) {
+                if (memberData != null) {
+                  memberData['fpo_agency'] = value;
+                }
+              },
+              onSaved: (value) => _pageData['fpo_member_${memberNumber}_agency'] = value,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVBGramMembersTable() {
+    final vbGramMembers = _pageData['vb_gram_members'] as List<Map<String, dynamic>>? ?? [];
+
+    return Column(
+      children: [
+        // Table Header
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.green[100],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            children: [
+              Expanded(flex: 1, child: Text('Sr. No.', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text('Family Member\'s Name', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('Yes', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('No', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('No. of days', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('Yes', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('No', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Table Rows
+        ...vbGramMembers.asMap().entries.map((entry) {
+          final index = entry.key;
+          return Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              children: [
+                Expanded(flex: 1, child: Text('${index + 1}')),
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    initialValue: entry.value['name'],
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onChanged: (value) => entry.value['name'] = value,
+                    onSaved: (value) => _pageData['vb_gram_member_${index + 1}_name'] = value,
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['yes_1'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['yes_1'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['no_1'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['no_1'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: TextFormField(
+                    initialValue: entry.value['days'],
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onChanged: (value) => entry.value['days'] = value,
+                    onSaved: (value) => _pageData['vb_gram_member_${index + 1}_days'] = value,
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['yes_2'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['yes_2'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['no_2'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['no_2'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+
+        // Add member button
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              final vbGramMembers = _pageData['vb_gram_members'] as List<Map<String, dynamic>>? ?? [];
+              vbGramMembers.add({
+                'name': '',
+                'yes_1': false,
+                'no_1': false,
+                'days': '',
+                'yes_2': false,
+                'no_2': false,
+              });
+              _pageData['vb_gram_members'] = vbGramMembers;
+            });
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Add Member'),
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPMKisanMembersTable() {
+    final pmKisanMembers = _pageData['pm_kisan_members'] as List<Map<String, dynamic>>? ?? [];
+
+    return Column(
+      children: [
+        // Table Header
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.green[100],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            children: [
+              Expanded(flex: 1, child: Text('Sr. No.', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text('Family Member\'s Name', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('Yes', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('No', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('No. of days', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('Yes', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('No', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Table Rows
+        ...pmKisanMembers.asMap().entries.map((entry) {
+          final index = entry.key;
+          return Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              children: [
+                Expanded(flex: 1, child: Text('${index + 1}')),
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    initialValue: entry.value['name'],
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onChanged: (value) => entry.value['name'] = value,
+                    onSaved: (value) => _pageData['pm_kisan_member_${index + 1}_name'] = value,
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['yes_1'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['yes_1'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['no_1'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['no_1'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: TextFormField(
+                    initialValue: entry.value['days'],
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onChanged: (value) => entry.value['days'] = value,
+                    onSaved: (value) => _pageData['pm_kisan_member_${index + 1}_days'] = value,
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['yes_2'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['yes_2'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['no_2'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['no_2'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+
+        // Add member button
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              final pmKisanMembers = _pageData['pm_kisan_members'] as List<Map<String, dynamic>>? ?? [];
+              pmKisanMembers.add({
+                'name': '',
+                'yes_1': false,
+                'no_1': false,
+                'days': '',
+                'yes_2': false,
+                'no_2': false,
+              });
+              _pageData['pm_kisan_members'] = pmKisanMembers;
+            });
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Add Member'),
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBankMembersTable() {
+    final bankMembers = _pageData['bank_members'] as List<Map<String, dynamic>>? ?? [];
+
+    return Column(
+      children: [
+        // Table Header
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.green[100],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            children: [
+              Expanded(flex: 1, child: Text('Sr. No.', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('Yes', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('No', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('Yes', style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('No', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Table Rows
+        ...bankMembers.asMap().entries.map((entry) {
+          final index = entry.key;
+          return Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              children: [
+                Expanded(flex: 1, child: Text('${index + 1}')),
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    initialValue: entry.value['name'],
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onChanged: (value) => entry.value['name'] = value,
+                    onSaved: (value) => _pageData['bank_member_${index + 1}_name'] = value,
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['yes_1'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['yes_1'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['no_1'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['no_1'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['yes_2'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['yes_2'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Checkbox(
+                    value: entry.value['no_2'] ?? false,
+                    onChanged: (value) {
+                      setState(() {
+                        entry.value['no_2'] = value ?? false;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+
+        // Add member button
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              final bankMembers = _pageData['bank_members'] as List<Map<String, dynamic>>? ?? [];
+              bankMembers.add({
+                'name': '',
+                'yes_1': false,
+                'no_1': false,
+                'yes_2': false,
+                'no_2': false,
+              });
+              _pageData['bank_members'] = bankMembers;
+            });
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Add Member'),
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBankMemberCard(int memberNumber, {Map<String, dynamic>? memberData}) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Bank Account Holder ${memberNumber}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    initialValue: memberData?['name'],
+                    decoration: InputDecoration(
+                      labelText: 'Name',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      if (memberData != null) {
+                        memberData['name'] = value;
+                      }
+                    },
+                    onSaved: (value) => _pageData['bank_member_${memberNumber}_name'] = value,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    initialValue: memberData?['has_bank_account'],
+                    decoration: InputDecoration(
+                      labelText: 'Yes',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      if (memberData != null) {
+                        memberData['has_bank_account'] = value;
+                      }
+                    },
+                    onSaved: (value) => _pageData['bank_member_${memberNumber}_has_account'] = value,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    initialValue: memberData?['no_bank_account'],
+                    decoration: InputDecoration(
+                      labelText: 'No',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      if (memberData != null) {
+                        memberData['no_bank_account'] = value;
+                      }
+                    },
+                    onSaved: (value) => _pageData['bank_member_${memberNumber}_no_account'] = value,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    initialValue: memberData?['details_correct'],
+                    decoration: InputDecoration(
+                      labelText: 'Details Correct',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      if (memberData != null) {
+                        memberData['details_correct'] = value;
+                      }
+                    },
+                    onSaved: (value) => _pageData['bank_member_${memberNumber}_details_correct'] = value,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPlaceholderPage(String title, AppLocalizations l10n) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -3530,7 +4930,8 @@ class _SurveyPageState extends State<SurveyPage> {
   }
 
   Future<void> _handleNext(WidgetRef ref) async {
-    if (_formKey.currentState?.validate() ?? false) {
+    // Validation disabled: always proceed
+    if (true) {
       _formKey.currentState?.save();
 
       try {
@@ -3554,8 +4955,8 @@ class _SurveyPageState extends State<SurveyPage> {
         // Update provider
         ref.read(surveyProvider.notifier).updateSurveyDataMap(_pageData);
 
-        // Navigate to next page
-        widget.onNext();
+        // Navigate to next page with page data for validation
+        widget.onNext(_pageData);
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

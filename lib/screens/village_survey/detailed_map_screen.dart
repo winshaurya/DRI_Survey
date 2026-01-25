@@ -1,492 +1,256 @@
 import 'package:flutter/material.dart';
+import 'survey_details_screen.dart';
 import 'cadastral_map_screen.dart';
 
 class DetailedMapScreen extends StatefulWidget {
+  const DetailedMapScreen({super.key});
+
   @override
   _DetailedMapScreenState createState() => _DetailedMapScreenState();
 }
 
 class _DetailedMapScreenState extends State<DetailedMapScreen> {
-  final _formKey = GlobalKey<FormState>();
-  
-  TextEditingController mapDetailsController = TextEditingController();
-  TextEditingController gpsCoordinatesController = TextEditingController();
-  TextEditingController claimantsDetailsController = TextEditingController();
+  final List<MapPoint> _mapPoints = [];
+  MapPoint? _selectedPoint;
+  int _pointCounter = 1;
 
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      // Show success dialog
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Color(0xFF800080)),
-              SizedBox(width: 10),
-              Text('Detailed Map Data Saved'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Detailed map information has been saved. Continue to Cadastral Map?'),
-                SizedBox(height: 15),
-                
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Color(0xFFE6E6FA),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('🗺️ Detailed Map Summary:', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080))),
-                      SizedBox(height: 8),
-                      if (mapDetailsController.text.isNotEmpty)
-                        _buildSummaryItem('Map Features:', 'Documented'),
-                      if (gpsCoordinatesController.text.isNotEmpty)
-                        _buildSummaryItem('GPS Coordinates:', 'Recorded'),
-                      if (claimantsDetailsController.text.isNotEmpty)
-                        _buildSummaryItem('Claimants Details:', 'Included'),
-                      
-                      Container(
-                        margin: EdgeInsets.only(top: 8),
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.check, color: Colors.green, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Comprehensive map documentation',
-                              style: TextStyle(color: Colors.green.shade800),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Edit', style: TextStyle(color: Color(0xFF800080))),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => CadastralMapScreen()),
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Detailed map data saved! Moving to Cadastral Map'),
-                    backgroundColor: Color(0xFF800080),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800080)),
-              child: Text('Continue to Cadastral Map'),
-            ),
-          ],
-        ),
+  final List<String> _categories = [
+    'Forest', 'Wasteland', 'Garden/Orchard', 'Burial Ground/Crematory',
+    'Crop Plants', 'Vegetables', 'Fruit Trees', 'Trees', 'Plants',
+    'Medicinal Plants', 'Herbs', 'Animals', 'Birds', 'Insects',
+    'Micro Flora', 'Micro Fauna', 'Traditional Collection Areas for MFPs',
+    'TK on above', 'Local Biodiversity Hotspots', 'Other biological significant areas',
+    'Local Endemic and Endangered Species', 'Lifescape diversity', 'Knowledge',
+    'Special features like local rituals', 'Ecological History of Area', 'Others'
+  ];
+
+  void _addPoint(Offset position) {
+    setState(() {
+      _selectedPoint = MapPoint(
+        id: _pointCounter++,
+        position: position,
+        category: _categories.first,
+        remarks: '',
       );
-    }
+      _mapPoints.add(_selectedPoint!);
+    });
   }
 
-  Widget _buildSummaryItem(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 150,
-            child: Text(label, style: TextStyle(fontWeight: FontWeight.w500)),
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF800080)),
-            ),
-          ),
-        ],
-      ),
+  void _deletePoint(MapPoint point) {
+    setState(() {
+      _mapPoints.remove(point);
+      if (_selectedPoint?.id == point.id) _selectedPoint = null;
+    });
+  }
+
+  void _saveAndContinue() {
+    // Navigate directly to next screen without showing dialog
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => CadastralMapScreen()),
     );
   }
 
-  void _resetForm() {
-    _formKey.currentState?.reset();
-    setState(() {
-      mapDetailsController.clear();
-      gpsCoordinatesController.clear();
-      claimantsDetailsController.clear();
-    });
+  void _goToPreviousScreen() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => SurveyDetailsScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color(0xFFF5F5F5),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Government of India Header
-            Container(
-              width: double.infinity,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
-                    blurRadius: 5,
-                    offset: Offset(0, 2),
-                  ),
+      body: Column(
+        children: [
+          // Header
+          Container(
+            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            color: Colors.white,
+            child: Column(
+              children: [
+                Text('Government of India', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF003366))),
+                SizedBox(height: 4),
+                Text('Digital India', style: TextStyle(fontSize: 14, color: Color(0xFFFF9933), fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+
+          // Title
+          Card(
+            margin: EdgeInsets.all(12),
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.map_outlined, color: Color(0xFF800080)),
+                    SizedBox(width: 10),
+                    Text('Village Map Points', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF800080))),
+                  ]),
+                  SizedBox(height: 8),
+                  Text('Step 29: Add points with categories and remarks'),
+                  SizedBox(height: 8),
+                  Row(children: [
+                    Text('Points: ${_mapPoints.length}', style: TextStyle(fontWeight: FontWeight.w600)),
+                    Spacer(),
+                    if (_selectedPoint != null)
+                      OutlinedButton(
+                        onPressed: () => _deletePoint(_selectedPoint!),
+                        style: OutlinedButton.styleFrom(side: BorderSide(color: Colors.red)),
+                        child: Text('Delete Selected', style: TextStyle(color: Colors.red)),
+                      ),
+                  ]),
                 ],
               ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+            ),
+          ),
+
+          // Map Area
+          Expanded(
+            child: GestureDetector(
+              onTapDown: (details) => _addPoint(details.localPosition),
+              child: Container(
+                margin: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade400),
+                ),
+                child: Stack(
                   children: [
-                    Text(
-                      'Government of India',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF003366),
-                        letterSpacing: 1.5,
+                    // Grid background
+                    Container(
+                      decoration: BoxDecoration(
+                        image: DecorationImage(
+                          image: AssetImage('assets/images/map_background.png'),
+                          fit: BoxFit.cover,
+                          colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.1), BlendMode.darken),
+                        ),
                       ),
                     ),
-                    SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Digital India',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFF9933),
+                    
+                    // Points
+                    ..._mapPoints.map((point) => Positioned(
+                      left: point.position.dx - 15,
+                      top: point.position.dy - 15,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedPoint = point),
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          child: Stack(
+                            children: [
+                              Icon(Icons.location_on, color: _selectedPoint?.id == point.id ? Colors.red : Colors.blue, size: 30),
+                              Center(child: Text('${point.id}', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
+                            ],
                           ),
                         ),
-                        SizedBox(width: 10),
-                        Text(
-                          'Power To Empower',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF138808),
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
+                      ),
+                    )),
+                    
+                    // Instructions
+                    Positioned(
+                      bottom: 10,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        padding: EdgeInsets.all(8),
+                        color: Colors.black54,
+                        child: Text('Tap anywhere to add a point', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 12)),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            
-            Container(
-              padding: EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
+          ),
+
+          // Point Editor
+          if (_selectedPoint != null)
+            Card(
+              margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Padding(
+                padding: EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      color: Colors.white,
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.map_outlined, color: Color(0xFF800080), size: 32),
-                                SizedBox(width: 12),
-                                Text(
-                                  'Detailed Village Map',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF800080),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              'Step 29: Detailed map with GPS coordinates and claimant details',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 15,
-                              ),
-                            ),
-                            SizedBox(height: 5),
-                            Container(
-                              height: 4,
-                              width: 100,
-                              decoration: BoxDecoration(
-                                color: Color(0xFF800080),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    
-                    SizedBox(height: 25),
-                    
-                    // Map Details
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Map Features to Include',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF800080),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          TextFormField(
-                            controller: mapDetailsController,
-                            maxLines: 4,
-                            decoration: InputDecoration(
-                              labelText: 'Describe map features (forest, water bodies, ponds, temples, etc.)',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please describe map features';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // GPS Coordinates
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'GPS Coordinates',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF800080),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          TextFormField(
-                            controller: gpsCoordinatesController,
-                            decoration: InputDecoration(
-                              labelText: 'Enter GPS coordinates of important locations',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.location_on),
-                              helperText: 'Format: Latitude, Longitude (e.g., 28.6139, 77.2090)',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter GPS coordinates';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Claimants Details
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Claimants Details',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF800080),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          TextFormField(
-                            controller: claimantsDetailsController,
-                            maxLines: 4,
-                            decoration: InputDecoration(
-                              labelText: 'Details of all claimants mentioned in the map',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              helperText: 'Include names, locations, and claim details',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter claimants details';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: 30),
-                    
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _resetForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.shade700,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            icon: Icon(Icons.refresh),
-                            label: Text('Reset Form'),
-                          ),
-                        ),
-                        SizedBox(width: 15),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _submitForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF800080),
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            icon: Icon(Icons.arrow_forward, size: 24),
-                            label: Text(
-                              'Save & Continue',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ),
+                        Text('Point #${_selectedPoint!.id}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF800080))),
+                        IconButton(icon: Icon(Icons.close), onPressed: () => setState(() => _selectedPoint = null), iconSize: 20),
                       ],
                     ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Progress Indicator
+                    SizedBox(height: 12),
+                    Text('Category', style: TextStyle(fontWeight: FontWeight.w500)),
+                    SizedBox(height: 4),
                     Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.map_outlined, color: Color(0xFF800080), size: 24),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Step 29: Detailed map documentation with GPS',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF800080),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.navigate_next, color: Colors.green.shade700, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Next: Cadastral Map Documentation',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.green.shade800,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(4)),
+                      child: DropdownButton<String>(
+                        value: _selectedPoint!.category,
+                        isExpanded: true,
+                        items: _categories.map((category) => DropdownMenuItem(value: category, child: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text(category)))).toList(),
+                        onChanged: (value) => setState(() => _selectedPoint!.category = value!),
                       ),
                     ),
-                    
-                    SizedBox(height: 20),
+                    SizedBox(height: 12),
+                    Text('Remarks', style: TextStyle(fontWeight: FontWeight.w500)),
+                    SizedBox(height: 4),
+                    TextField(
+                      onChanged: (value) => setState(() => _selectedPoint!.remarks = value),
+                      decoration: InputDecoration(hintText: 'Enter remarks...', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                      maxLines: 2,
+                    ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+
+          // Navigation
+          Container(
+            padding: EdgeInsets.all(12),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _goToPreviousScreen,
+                    icon: Icon(Icons.arrow_back),
+                    label: Text('Previous'),
+                    style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 12), side: BorderSide(color: Color(0xFF800080))),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _saveAndContinue,
+                    icon: Icon(Icons.arrow_forward),
+                    label: Text('Save & Continue'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800080), padding: EdgeInsets.symmetric(vertical: 12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  @override
-  void dispose() {
-    mapDetailsController.dispose();
-    gpsCoordinatesController.dispose();
-    claimantsDetailsController.dispose();
-    super.dispose();
-  }
+class MapPoint {
+  final int id;
+  final Offset position;
+  String category;
+  String remarks;
+
+  MapPoint({
+    required this.id,
+    required this.position,
+    required this.category,
+    required this.remarks,
+  });
 }

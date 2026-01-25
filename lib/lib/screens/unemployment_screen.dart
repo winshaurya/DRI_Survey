@@ -136,69 +136,7 @@ class _UnemploymentScreenState extends State<UnemploymentScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Government of India Header - FIXED
-            Container(
-              width: double.infinity,
-              height: 110, // Reduced height
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
-                    blurRadius: 5,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Government of India',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 22, // Reduced font size
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF003366),
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 6),
-                      Container(
-                        constraints: BoxConstraints(maxWidth: 400), // Constraint for width
-                        child: Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            Text(
-                              'Digital India',
-                              style: TextStyle(
-                                fontSize: 18, // Reduced font size
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFFF9933),
-                              ),
-                            ),
-                            Text(
-                              'Power To Empower',
-                              style: TextStyle(
-                                fontSize: 16, // Reduced font size
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF138808),
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            // Header removed
             
             Container(
               padding: EdgeInsets.all(16), // Reduced padding

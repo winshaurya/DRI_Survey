@@ -24,7 +24,7 @@ class _LocationPageState extends State<LocationPage> {
   @override
   void initState() {
     super.initState();
-    _fetchLocation();
+    // Optional: Don't auto-fetch location to allow direct pass-through
   }
 
   Future<void> _fetchLocation() async {
@@ -46,7 +46,7 @@ class _LocationPageState extends State<LocationPage> {
           widget.pageData['accuracy'] = locationData['accuracy'];
           widget.pageData['location_timestamp'] = locationData['timestamp'];
 
-          // Auto-fill address fields
+          // Auto-fill address fields (optional)
           if (locationData['village']?.isNotEmpty == true) {
             widget.pageData['village_name'] = locationData['village'];
           }
@@ -90,6 +90,7 @@ class _LocationPageState extends State<LocationPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Header with optional location fetching
         Row(
           children: [
             Expanded(
@@ -119,7 +120,7 @@ class _LocationPageState extends State<LocationPage> {
         if (_locationFetched)
           Container(
             padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(bottom: 16),
+            margin: const EdgeInsets.only(bottom: 16, top: 16),
             decoration: BoxDecoration(
               color: Colors.green[50],
               borderRadius: BorderRadius.circular(8),
@@ -139,11 +140,11 @@ class _LocationPageState extends State<LocationPage> {
 
         const SizedBox(height: 16),
 
-        // Phone Number Field (Primary Key for Survey)
+        // Phone Number Field
         TextFormField(
           initialValue: widget.pageData['phone_number'],
           decoration: InputDecoration(
-            labelText: 'Phone Number (Required)',
+            labelText: 'Phone Number',
             hintText: 'Enter 10-digit phone number',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -152,15 +153,6 @@ class _LocationPageState extends State<LocationPage> {
           ),
           keyboardType: TextInputType.phone,
           maxLength: 10,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Phone number is required';
-            }
-            if (value.length != 10) {
-              return 'Phone number must be 10 digits';
-            }
-            return null;
-          },
           onChanged: (value) {
             widget.pageData['phone_number'] = value;
             widget.onDataChanged(widget.pageData);
@@ -272,6 +264,8 @@ class _LocationPageState extends State<LocationPage> {
             widget.onDataChanged(widget.pageData);
           },
         ),
+
+
       ],
     );
   }

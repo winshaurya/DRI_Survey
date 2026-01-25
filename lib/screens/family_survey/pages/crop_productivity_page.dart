@@ -32,7 +32,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
   }
 
   void _addCrop() {
-    if (_crops.length < 11) {
+    if (_crops.length < 10) {
       setState(() {
         final newId = _crops.length + 1;
         _crops.add({
@@ -59,7 +59,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          l10n.cropProductivityAndArea,
+          l10n.cropProductivity,
           style: const TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -68,7 +68,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
         ),
         const SizedBox(height: 16),
         Text(
-          l10n.provideCropProductionDetails,
+          'Please provide details about your crop production',
           style: TextStyle(color: Colors.grey[600]),
         ),
         const SizedBox(height: 24),
@@ -82,12 +82,11 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
           ),
           child: Row(
             children: [
-              Expanded(flex: 2, child: Text(l10n.crop, style: TextStyle(fontWeight: FontWeight.bold))),
-              Expanded(flex: 1, child: Text(l10n.areaAcres, style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-              Expanded(flex: 1, child: Text(l10n.productivityQtlAcre, style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-              Expanded(flex: 1, child: Text(l10n.totalProd, style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-              Expanded(flex: 1, child: Text(l10n.consumed, style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-              Expanded(flex: 2, child: Text(l10n.soldQtlRs, style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+              Expanded(flex: 2, child: Text(l10n.cropName, style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 1, child: Text('${l10n.areaAcres} (Acres)', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+              Expanded(flex: 1, child: Text('${l10n.productivity} (Qtl/Acre)', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+              Expanded(flex: 1, child: Text(l10n.totalProduction, style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+              Expanded(flex: 1, child: Text(l10n.quantitySold, style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
             ],
           ),
         ),
@@ -108,11 +107,11 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
 
         const SizedBox(height: 16),
 
-        if (_crops.length < 11)
+        if (_crops.length < 10)
           ElevatedButton.icon(
             onPressed: _addCrop,
             icon: const Icon(Icons.add),
-            label: Text(l10n.addAnotherCrop),
+            label: const Text('Add Another Crop'),
             style: ElevatedButton.styleFrom(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -132,11 +131,11 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
           ),
           child: Row(
             children: [
-              Icon(Icons.agriculture, color: Colors.blue[700]),
+              Icon(Icons.grass, color: Colors.blue[700]),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  l10n.totalCrops(_crops.length.toString()),
+                  'Total crop types: ${_crops.length}',
                   style: TextStyle(
                     color: Colors.blue[700],
                     fontWeight: FontWeight.w500,
@@ -163,7 +162,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
             Row(
               children: [
                 Text(
-                  l10n.cropNumber(cropNumber.toString()),
+                  'Crop ${cropNumber}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -174,7 +173,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                   IconButton(
                     onPressed: onRemove,
                     icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                    tooltip: l10n.removeCrop,
+                    tooltip: 'Remove Crop',
                   ),
               ],
             ),
@@ -204,7 +203,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                   child: TextFormField(
                     initialValue: widget.pageData['crop_${cropNumber}_area'],
                     decoration: InputDecoration(
-                      labelText: l10n.area,
+                      labelText: '${l10n.areaAcres} (Acres)',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -223,7 +222,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                   child: TextFormField(
                     initialValue: widget.pageData['crop_${cropNumber}_productivity'],
                     decoration: InputDecoration(
-                      labelText: l10n.prod,
+                      labelText: '${l10n.productivity} (Qtl/Acre)',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -242,7 +241,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                   child: TextFormField(
                     initialValue: widget.pageData['crop_${cropNumber}_total_production'],
                     decoration: InputDecoration(
-                      labelText: l10n.total,
+                      labelText: l10n.totalProduction,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -259,33 +258,15 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                 Expanded(
                   flex: 1,
                   child: TextFormField(
-                    initialValue: widget.pageData['crop_${cropNumber}_consumed'],
+                    initialValue: widget.pageData['crop_${cropNumber}_sold'],
                     decoration: InputDecoration(
-                      labelText: l10n.consumed,
+                      labelText: l10n.quantitySold,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     ),
                     keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      widget.pageData['crop_${cropNumber}_consumed'] = value;
-                      widget.onDataChanged(widget.pageData);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  flex: 2,
-                  child: TextFormField(
-                    initialValue: widget.pageData['crop_${cropNumber}_sold'],
-                    decoration: InputDecoration(
-                      labelText: l10n.soldQtlAndRs,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    ),
                     onChanged: (value) {
                       widget.pageData['crop_${cropNumber}_sold'] = value;
                       widget.onDataChanged(widget.pageData);
