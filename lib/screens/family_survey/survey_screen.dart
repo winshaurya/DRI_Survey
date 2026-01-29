@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../components/logo_widget.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/survey_provider.dart';
-import '../../services/xlsx_export_service.dart';
 import 'widgets/progress_bar.dart';
 import 'widgets/side_navigation.dart';
 import 'widgets/survey_page.dart';
@@ -69,7 +68,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
       onWillPop: _onWillPop,
       child: Scaffold(
         drawer: const SideNavigation(),
-        body: Column(
+body: Column(
           children: [
             const AppHeader(),
             // Progress Bar
@@ -110,8 +109,8 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                         );
                         surveyNotifier.nextPage();
                       } else {
-                        // Complete survey
-                        _showCompletionDialog();
+        // Complete survey
+        _showCompletionDialog();
                       }
                     },
                     onPrevious: index > 0
@@ -182,14 +181,8 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     final l10n = AppLocalizations.of(context)!;
     final surveyNotifier = ref.read(surveyProvider.notifier);
 
-    // Complete the survey and export XLSX
+    // Complete the survey
     await surveyNotifier.completeSurvey();
-
-    final sessionId = ref.read(surveyProvider).phoneNumber;
-    if (sessionId != null) {
-      final fileName = 'family_survey_${DateTime.now().millisecondsSinceEpoch}.xlsx';
-      await XlsxExportService().exportSurveyToXlsx(sessionId, fileName);
-    }
 
     if (!mounted) return;
 
@@ -210,7 +203,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
             Text('Thank you for completing the family survey!'),
             const SizedBox(height: 8),
             Text(
-              'Your responses have been saved locally and exported to XLSX.',
+              'Your responses have been saved locally.',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey[600],

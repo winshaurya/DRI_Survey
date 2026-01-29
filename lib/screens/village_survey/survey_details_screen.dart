@@ -30,7 +30,7 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
 
   void _submitForm() {
     // Navigate directly to next screen without showing dialog
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => DetailedMapScreen()),
     );
@@ -112,21 +112,6 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
     return Scaffold(
       backgroundColor: Color(0xFFF5F5F5),
       body: Column(children: [
-        // Compact Header
-        Container(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          color: Colors.white,
-          child: Column(children: [
-            Text('Government of India', style: TextStyle(
-              fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF003366)
-            )),
-            SizedBox(height: 4),
-            Text('Digital India', style: TextStyle(
-              fontSize: 12, color: Color(0xFFFF9933), fontWeight: FontWeight.w600
-            )),
-          ]),
-        ),
-
         // Main Content
         Expanded(
           child: SingleChildScrollView(
@@ -153,7 +138,7 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
                             ),
                           ]),
                           SizedBox(height: 4),
-                          Text('Step 28: Survey information and remarks'),
+                          Text('Step 10: Survey information and remarks'),
                         ],
                       ),
                     ),

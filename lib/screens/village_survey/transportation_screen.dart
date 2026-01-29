@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../form_template.dart';
-import 'panchavati_trees_screen.dart';
-import 'animals_fisheries_screen.dart'; // Import the previous screen
+import 'irrigation_facilities_screen.dart'; // Import the previous screen
 
 class TransportationScreen extends StatefulWidget {
   const TransportationScreen({super.key});
@@ -21,17 +20,14 @@ class _TransportationScreenState extends State<TransportationScreen> {
   };
 
   void _submitForm() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => PanchavatiTreesScreen()),
-    );
+    Navigator.pop(context);
   }
 
   void _goToPreviousScreen() {
-    // Navigate back to AnimalsFisheriesScreen
+    // Navigate back to IrrigationFacilitiesScreen
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => AnimalsFisheriesScreen()),
+      MaterialPageRoute(builder: (context) => IrrigationFacilitiesScreen()),
     );
   }
 
@@ -147,8 +143,8 @@ class _TransportationScreenState extends State<TransportationScreen> {
     return FormTemplateScreen(
       title: 'Transportation Facilities',
       stepNumber: 'Step 17',
-      nextScreenRoute: '/panchavati-trees',
-      nextScreenName: 'Panchavati Trees',
+      nextScreenRoute: '/completion',
+      nextScreenName: 'Completion',
       icon: Icons.directions_car,
       instructions: 'Enter number of vehicles available in the village',
       contentWidget: _buildTransportationContent(),

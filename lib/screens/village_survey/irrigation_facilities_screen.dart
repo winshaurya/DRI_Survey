@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
-import 'animals_fisheries_screen.dart';
-import 'kitchen_gardens_screen.dart';
+import 'seed_clubs_screen.dart';
+import 'drainage_waste_screen.dart';
 
 class IrrigationFacilitiesScreen extends StatefulWidget {
   const IrrigationFacilitiesScreen({super.key});
@@ -21,18 +22,19 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
   void _submitForm() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => AnimalsFisheriesScreen()),
+      MaterialPageRoute(builder: (context) => SeedClubsScreen()),
     );
   }
 
   void _goToPreviousScreen() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => KitchenGardensScreen()),
+      MaterialPageRoute(builder: (context) => const DrainageWasteScreen()),
     );
   }
 
   Widget _buildYesNoOption(String label, bool? value, Function(bool?) onChanged) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -62,11 +64,11 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
           Row(
             children: [
               Expanded( // FIX: Wrap the button in Expanded at Row level
-                child: _buildOptionButton('Yes', value == true, () => onChanged(true)),
+                child: _buildOptionButton(l10n.yes, value == true, () => onChanged(true)),
               ),
               SizedBox(width: 12),
               Expanded( // FIX: Wrap the button in Expanded at Row level
-                child: _buildOptionButton('No', value == false, () => onChanged(false)),
+                child: _buildOptionButton(l10n.no, value == false, () => onChanged(false)),
               ),
             ],
           ),
@@ -109,66 +111,67 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
   }
 
   Widget _buildIrrigationContent() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         // Facilities List
         QuestionCard(
-          question: 'Available irrigation facilities',
-          description: 'Select Yes or No for each facility',
+          question: l10n.availableIrrigationFacilities,
+          description: l10n.selectYesOrNoForEachFacility,
           child: Column(
             children: [
               SizedBox(height: 10),
-              
+
               // Canal
               _buildYesNoOption(
-                'Canal',
+                l10n.canal,
                 _hasCanal,
                 (value) => setState(() => _hasCanal = value),
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Tube Well/Bore Well
               _buildYesNoOption(
-                'Tube Well/Bore Well',
+                l10n.tubeWellBoreWell,
                 _hasTubeWell,
                 (value) => setState(() => _hasTubeWell = value),
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Ponds
               _buildYesNoOption(
-                'Ponds',
+                l10n.ponds,
                 _hasPonds,
                 (value) => setState(() => _hasPonds = value),
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // River
               _buildYesNoOption(
-                'River',
+                l10n.river,
                 _hasRiver,
                 (value) => setState(() => _hasRiver = value),
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Well
               _buildYesNoOption(
-                'Well',
+                l10n.well,
                 _hasWell,
                 (value) => setState(() => _hasWell = value),
               ),
             ],
           ),
         ),
-        
+
         SizedBox(height: 20),
-        
+
         // Summary (optional)
-        if (_hasCanal != null || _hasTubeWell != null || _hasPonds != null || 
+        if (_hasCanal != null || _hasTubeWell != null || _hasPonds != null ||
             _hasRiver != null || _hasWell != null)
           Container(
             padding: EdgeInsets.all(16),
@@ -185,7 +188,7 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
                     Icon(Icons.water_drop, color: Color(0xFF800080), size: 20),
                     SizedBox(width: 8),
                     Text(
-                      'Selected Facilities',
+                      l10n.selectedFacilities,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF800080),
@@ -198,11 +201,11 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    if (_hasCanal == true) _buildSelectedChip('Canal', Colors.green),
-                    if (_hasTubeWell == true) _buildSelectedChip('Tube Well', Colors.blue),
-                    if (_hasPonds == true) _buildSelectedChip('Ponds', Colors.orange),
-                    if (_hasRiver == true) _buildSelectedChip('River', Colors.purple),
-                    if (_hasWell == true) _buildSelectedChip('Well', Colors.brown),
+                    if (_hasCanal == true) _buildSelectedChip(l10n.canal, Colors.green),
+                    if (_hasTubeWell == true) _buildSelectedChip(l10n.tubeWellBoreWell, Colors.blue),
+                    if (_hasPonds == true) _buildSelectedChip(l10n.ponds, Colors.orange),
+                    if (_hasRiver == true) _buildSelectedChip(l10n.river, Colors.purple),
+                    if (_hasWell == true) _buildSelectedChip(l10n.well, Colors.brown),
                   ],
                 ),
               ],
@@ -226,13 +229,14 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return FormTemplateScreen(
-      title: 'Irrigation Facilities',
-      stepNumber: 'Step 15',
-      nextScreenRoute: '/animals-fisheries',
-      nextScreenName: 'Animals/Fisheries',
+      title: l10n.availableIrrigationFacilities,
+      stepNumber: l10n.step6,
+      nextScreenRoute: '/seed-clubs',
+      nextScreenName: l10n.seedClubs,
       icon: Icons.water,
-      instructions: 'Select Yes or No for each irrigation facility',
+      instructions: l10n.selectYesOrNoForEachFacility,
       contentWidget: _buildIrrigationContent(),
       onSubmit: _submitForm,
       onBack: _goToPreviousScreen,

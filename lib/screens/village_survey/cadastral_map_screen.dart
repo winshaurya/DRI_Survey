@@ -49,7 +49,7 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
 
   void _submitForm() {
     // Navigate directly to next screen without showing dialog
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => ForestMapScreen()),
     );
@@ -160,7 +160,7 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
                             ),
                             SizedBox(height: 10),
                             Text(
-                              'Cadastral map documentation (if available)',
+                              'Step 12: Cadastral map documentation (if available)',
                               style: TextStyle(
                                 color: Colors.grey.shade600,
                                 fontSize: 15,

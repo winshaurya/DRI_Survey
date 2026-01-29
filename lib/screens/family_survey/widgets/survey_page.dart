@@ -10,8 +10,11 @@ import '../pages/animals_page.dart';
 import '../pages/crop_productivity_page.dart';
 import '../pages/family_details_page.dart';
 import '../pages/location_page.dart';
+import '../pages/social_consciousness_page_1.dart';
+import '../pages/social_consciousness_page_2.dart';
+import '../pages/social_consciousness_page_3.dart';
 
-class SurveyPage extends StatefulWidget {
+class SurveyPage extends ConsumerStatefulWidget {
   final int pageIndex;
   final Function([Map<String, dynamic>?]) onNext;
   final VoidCallback? onPrevious;
@@ -24,10 +27,10 @@ class SurveyPage extends StatefulWidget {
   });
 
   @override
-  State<SurveyPage> createState() => _SurveyPageState();
+  ConsumerState<SurveyPage> createState() => _SurveyPageState();
 }
 
-class _SurveyPageState extends State<SurveyPage> {
+class _SurveyPageState extends ConsumerState<SurveyPage> {
   final _formKey = GlobalKey<FormState>();
   final Map<String, dynamic> _pageData = {};
   late double fontScale;
@@ -37,16 +40,24 @@ class _SurveyPageState extends State<SurveyPage> {
     super.initState();
     // Initialize fontScale with default value
     fontScale = 0.7;
+    
+    // Initialize pageData from provider to persist state across page navigation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final surveyData = ref.read(surveyProvider).surveyData;
+      if (surveyData.isNotEmpty) {
+        setState(() {
+          _pageData.addAll(surveyData);
+        });
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final l10n = AppLocalizations.of(context)!;
-        fontScale = ref.watch(fontSizeProvider);
+    final l10n = AppLocalizations.of(context)!;
+    fontScale = ref.watch(fontSizeProvider);
 
-        return Scaffold(
+    return Scaffold(
           body: SafeArea(
             child: Form(
               key: _formKey,
@@ -121,8 +132,6 @@ class _SurveyPageState extends State<SurveyPage> {
             ),
           ),
         );
-      },
-    );
   }
 
   Widget _buildPageContent(int pageIndex, AppLocalizations l10n, double fontScale, WidgetRef ref) {
@@ -130,28 +139,20 @@ class _SurveyPageState extends State<SurveyPage> {
       case 0:
         return LocationPage(
           pageData: _pageData,
-          onDataChanged: (data) {
-            setState(() {
-              _pageData.addAll(data);
-            });
-          },
+          onDataChanged: _mergePageData,
         );
       case 1:
         return FamilyDetailsPage(
           pageData: _pageData,
-          onDataChanged: (data) {
-            setState(() {
-              _pageData.addAll(data);
-            });
-          },
+          onDataChanged: _mergePageData,
           formKey: _formKey,
         );
       case 2:
-        return _buildSocialConsciousnessPage3a(l10n);
+        return SocialConsciousnessPage1();
       case 3:
-        return _buildSocialConsciousnessPage3b(l10n);
+        return SocialConsciousnessPage2();
       case 4:
-        return _buildSocialConsciousnessPage3c(l10n);
+        return SocialConsciousnessPage3();
       case 5:
         return _buildLandHoldingPage(l10n);
       case 6:
@@ -159,23 +160,12 @@ class _SurveyPageState extends State<SurveyPage> {
       case 7:
         return CropProductivityPage(
           pageData: _pageData,
-          onDataChanged: (data) {
-            setState(() {
-              _pageData.addAll(data);
-            });
-          },
+          onDataChanged: _mergePageData,
         );
       case 8:
         return _buildFertilizerPage(l10n);
       case 9:
-        return AnimalsPage(
-          pageData: _pageData,
-          onDataChanged: (data) {
-            setState(() {
-              _pageData.addAll(data);
-            });
-          },
-        );
+        return AnimalsPage();
       case 10:
         return _buildEquipmentPage(l10n);
       case 11:
@@ -221,6 +211,16 @@ class _SurveyPageState extends State<SurveyPage> {
       default:
         return const Center(child: Text('Page not found'));
     }
+  }
+
+  void _mergePageData(Map<String, dynamic> data) {
+    // Defer the merge to avoid setState during build callbacks.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _pageData.addAll(data);
+      });
+    });
   }
 
   Widget _buildLocationPage(AppLocalizations l10n) {

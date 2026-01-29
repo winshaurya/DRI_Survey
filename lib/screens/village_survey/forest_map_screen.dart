@@ -20,7 +20,7 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
 
   void _submitForm() {
     // Navigate directly to next screen without showing dialog
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => BiodiversityRegisterScreen()),
     );
@@ -131,7 +131,7 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
                             ),
                             SizedBox(height: 10),
                             Text(
-                              'Step 31: Forest map documentation for village',
+                              'Step 13: Forest map documentation for village',
                               style: TextStyle(
                                 color: Colors.grey.shade600,
                                 fontSize: 15,

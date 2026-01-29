@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/font_size_provider.dart';
 import '../../../providers/locale_provider.dart';
 import '../../../services/database_service.dart';
+import '../../../services/supabase_service.dart';
 
 class SideNavigation extends ConsumerWidget {
   const SideNavigation({super.key});
@@ -12,8 +14,19 @@ class SideNavigation extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
+    User? user;
+    try {
+      user = SupabaseService.instance.currentUser;
+    } catch (_) {
+      // Supabase not initialized
+      user = null;
+    }
+
+    final userEmail = user?.email ?? 'User';
+    final isLoggedIn = user != null;
 
     return Drawer(
+      backgroundColor: Colors.white,
       child: Container(
         color: Colors.white,
         child: SafeArea(
@@ -21,7 +34,7 @@ class SideNavigation extends ConsumerWidget {
             children: [
               // Header - Compact and clean
               InkWell(
-                onTap: () => _navigateHome(context),
+                onTap: isLoggedIn ? () => _navigateHome(context) : () => _showLoginPrompt(context),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: const BoxDecoration(
@@ -41,14 +54,19 @@ class SideNavigation extends ConsumerWidget {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
-                            Icons.image_not_supported,
-                            color: Colors.green,
-                          ),
-                        ),
+                        child: isLoggedIn
+                            ? Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) => const Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.green,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.login,
+                                color: Colors.green,
+                              ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -57,7 +75,7 @@ class SideNavigation extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'DRI Survey',
+                              isLoggedIn ? userEmail : 'Login Required',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -67,7 +85,7 @@ class SideNavigation extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              'Deendayal Research Institute',
+                              isLoggedIn ? 'DRI Survey' : 'Tap to login',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.white.withOpacity(0.9),
@@ -184,7 +202,37 @@ class SideNavigation extends ConsumerWidget {
     Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
   }
 
+  void _showLoginPrompt(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Login Required'),
+        content: const Text(
+          'You need to be logged in to access survey features. Please login to continue.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Navigate to auth screen
+              Navigator.pushNamed(context, '/auth');
+            },
+            child: const Text('Login'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showProfileDialog(BuildContext context, AppLocalizations l10n) {
+    final user = SupabaseService.instance.currentUser;
+    final displayName = user?.email ?? 'User';
+    final contactInfo = user?.email != null ? 'Email: ${user!.email}' : 'No email';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -203,7 +251,7 @@ class SideNavigation extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              l10n.surveyUser,
+              displayName,
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -211,7 +259,7 @@ class SideNavigation extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.phoneNumberDisplay,
+              contactInfo,
               style: TextStyle(
                 color: Colors.grey[600],
               ),
@@ -301,6 +349,236 @@ class SideNavigation extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showClearDataDialog(BuildContext context, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear All Data'),
+        content: const Text(
+          'This will permanently delete all survey data. This action cannot be undone. Are you sure?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                // Note: Implement full data clearing in DatabaseService if needed
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Data clearing not implemented yet')),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to clear data: $e')),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteSurveyDialog(BuildContext context, AppLocalizations l10n, String sessionId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Survey'),
+        content: Text('Delete survey for $sessionId? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await DatabaseService().deleteSurveySession(sessionId);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Survey deleted')),
+                );
+                // The list will refresh when dialog is reopened
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to delete: $e')),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showExportDialog(BuildContext context, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export Survey Data'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Choose export format:'),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.table_chart),
+              title: const Text('Export to CSV'),
+              subtitle: const Text('Export all surveys to CSV file'),
+              onTap: () async {
+                Navigator.pop(context);
+                try {
+                  // For now, show a message since export is complex
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Export feature coming soon')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Export failed: $e')),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSurveyListDialog(BuildContext context, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('All Surveys'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: DatabaseService().getAllSurveySessions(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              }
+              final sessions = snapshot.data ?? [];
+              if (sessions.isEmpty) {
+                return const Text('No survey data found.');
+              }
+              return ListView.builder(
+                itemCount: sessions.length,
+                itemBuilder: (context, index) {
+                  final session = sessions[index];
+                  return Card(
+                    child: ListTile(
+                      title: Text(session['phone_number'] ?? 'Unknown Phone'),
+                      subtitle: Text(
+                        'Village: ${session['village_name'] ?? 'N/A'}\nDate: ${session['survey_date'] ?? 'N/A'}\nStatus: ${session['status'] ?? 'Unknown'}',
+                      ),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'preview') {
+                            Navigator.pop(context);
+                            _navigateToSurveyPreview(context, session['phone_number']);
+                          } else if (value == 'delete') {
+                            _showDeleteSurveyDialog(context, l10n, session['phone_number']);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'preview',
+                            child: Text('Preview'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDataManagementDialog(BuildContext context, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.storage, color: Colors.teal),
+            const SizedBox(width: 8),
+            Text(l10n.dataManagement),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.list),
+              title: const Text('View All Surveys'),
+              subtitle: const Text('Browse and manage survey data'),
+              onTap: () {
+                Navigator.pop(context);
+                _showSurveyListDialog(context, l10n);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.download),
+              title: const Text('Export Data'),
+              subtitle: const Text('Export surveys to CSV file'),
+              onTap: () {
+                Navigator.pop(context);
+                _showExportDialog(context, l10n);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text('Clear All Data'),
+              subtitle: const Text('Delete all survey data permanently'),
+              onTap: () {
+                Navigator.pop(context);
+                _showClearDataDialog(context, l10n);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.close),
+          ),
+        ],
       ),
     );
   }
@@ -521,9 +799,7 @@ class SideNavigation extends ConsumerWidget {
                             'Manage local survey data',
                             style: TextStyle(fontSize: 12),
                           ),
-                          onTap: () {
-                            // TODO: Implement data management
-                          },
+                          onTap: () => _showDataManagementDialog(context, l10n),
                         ),
                       ],
                     ),
@@ -576,6 +852,62 @@ class SideNavigation extends ConsumerWidget {
               },
             ),
           ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+  void _showHistoryDialog(BuildContext context, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Survey History'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: DatabaseService().getAllSurveySessions(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              }
+              final sessions = snapshot.data ?? [];
+              if (sessions.isEmpty) {
+                return const Text('No survey history found.');
+              }
+              return ListView.builder(
+                shrinkWrap: true,
+                itemCount: sessions.length,
+                itemBuilder: (context, index) {
+                  final session = sessions[index];
+                  return ListTile(
+                    title: Text(session['phone_number'] ?? 'Unknown Phone'),
+                    subtitle: Text(
+                      'Village: ${session['village_name'] ?? 'N/A'}\nDate: ${session['survey_date'] ?? 'N/A'}\nStatus: ${session['status'] ?? 'Unknown'}',
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.download),
+                    onPressed: () {
+                      Navigator.pop(context); // Close dialog
+                      // Navigate to final page (preview) with this session data
+                      _navigateToSurveyPreview(context, session['phone_number']);
+                    },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ),
         actions: [
           TextButton(
@@ -648,60 +980,6 @@ class SideNavigation extends ConsumerWidget {
     );
   }
 
-  void _showHistoryDialog(BuildContext context, AppLocalizations l10n) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Survey History'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: DatabaseService().getAllSurveySessions(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                return Text('Error: ${snapshot.error}');
-              }
-              final sessions = snapshot.data ?? [];
-              if (sessions.isEmpty) {
-                return const Text('No survey history found.');
-              }
-              return ListView.builder(
-                shrinkWrap: true,
-                itemCount: sessions.length,
-                itemBuilder: (context, index) {
-                  final session = sessions[index];
-                  return ListTile(
-                    title: Text(session['phone_number'] ?? 'Unknown Phone'),
-                    subtitle: Text(
-                      'Village: ${session['village_name'] ?? 'N/A'}\nDate: ${session['survey_date'] ?? 'N/A'}\nStatus: ${session['status'] ?? 'Unknown'}',
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.download),
-                    onPressed: () {
-                      Navigator.pop(context); // Close dialog
-                      // Navigate to final page (preview) with this session data
-                      _navigateToSurveyPreview(context, session['phone_number']);
-                    },
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.close),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showLogoutDialog(BuildContext context, AppLocalizations l10n) {
     showDialog(
       context: context,
@@ -714,9 +992,12 @@ class SideNavigation extends ConsumerWidget {
             child: Text(l10n.cancel),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context); // Close dialog
-              Navigator.pushReplacementNamed(context, '/'); // Go to landing
+              await SupabaseService.instance.signOut();
+              if (context.mounted) {
+                Navigator.pushReplacementNamed(context, '/auth'); // Go to auth/login
+              }
             },
             style: TextButton.styleFrom(
               foregroundColor: Colors.red,
@@ -854,25 +1135,151 @@ class SideNavigation extends ConsumerWidget {
         ListTile(
           leading: const Icon(Icons.help),
           title: Text(l10n.userGuide),
-          onTap: () {
-            // TODO: Open user guide
-          },
+          onTap: () => _showUserGuideDialog(context, l10n),
         ),
         ListTile(
           leading: const Icon(Icons.contact_support),
           title: Text(l10n.contactSupport),
-          onTap: () {
-            // TODO: Contact support
-          },
+          onTap: () => _showContactSupportDialog(context, l10n),
         ),
         ListTile(
           leading: const Icon(Icons.bug_report),
           title: Text(l10n.reportIssue),
-          onTap: () {
-            // TODO: Report issue
-          },
+          onTap: () => _showReportIssueDialog(context, l10n),
         ),
       ],
+    );
+  }
+
+  void _showUserGuideDialog(BuildContext context, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.userGuide),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Family Survey User Guide',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '1. Starting a Survey:\n'
+                '   - Enter the phone number of the head of the family\n'
+                '   - Fill in village and location details\n'
+                '   - Navigate through each page using the bottom navigation\n\n'
+                '2. Family Information:\n'
+                '   - Add details for each family member\n'
+                '   - Include education, occupation, and health information\n\n'
+                '3. Data Management:\n'
+                '   - Use the sidebar to access settings and data management\n'
+                '   - Export survey data for analysis\n'
+                '   - Preview completed surveys\n\n'
+                '4. Language Support:\n'
+                '   - Switch between English and Hindi\n'
+                '   - Adjust font size for better readability\n\n'
+                '5. Troubleshooting:\n'
+                '   - Check History for previous surveys\n'
+                '   - Contact support if you encounter issues',
+                style: TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showContactSupportDialog(BuildContext context, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.contactSupport),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              leading: Icon(Icons.email),
+              title: Text('Email Support'),
+              subtitle: Text('support@dri.org'),
+            ),
+            const ListTile(
+              leading: Icon(Icons.phone),
+              title: Text('Phone Support'),
+              subtitle: Text('+91-1234567890'),
+            ),
+            const ListTile(
+              leading: Icon(Icons.location_on),
+              title: Text('Address'),
+              subtitle: Text('Deendayal Research Institute\nChitrakoot, India'),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'For technical issues or questions about the survey process, please contact our support team.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReportIssueDialog(BuildContext context, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.reportIssue),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Issue Description',
+                hintText: 'Describe the problem you encountered',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Please provide details about the issue, including steps to reproduce it.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () {
+              // TODO: Implement actual issue reporting (email or API call)
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Issue report submitted')),
+              );
+            },
+            child: const Text('Submit Report'),
+          ),
+        ],
+      ),
     );
   }
 

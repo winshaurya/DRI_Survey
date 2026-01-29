@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../form_template.dart'; // Import the form template
 import 'infrastructure_availability_screen.dart';
-import 'housing_screen.dart'; // Import the previous screen
+import 'village_form_screen.dart'; // Import the previous screen
 
 class InfrastructureScreen extends StatefulWidget {
   const InfrastructureScreen({super.key});
@@ -42,30 +43,31 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
   }
 
   void _goToPreviousScreen() {
-    // Navigate back to HousingScreen
+    // Navigate back to VillageFormScreen
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => HousingScreen()),
+      MaterialPageRoute(builder: (context) => VillageFormScreen()),
     );
   }
 
   Widget _buildInfrastructureContent() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         // Approach Roads Section
         QuestionCard(
-          question: ' Approach Roads',
-          description: 'Availability and condition of approach roads to village',
+          question: l10n.approachRoads,
+          description: l10n.availabilityConditionApproachRoads,
           child: Column(
             children: [
               // Availability Radio
               RadioOptionGroup(
-                label: 'Are Approach Roads available?',
-                options: ['Yes', 'No'],
-                selectedValue: _hasApproachRoads ? 'Yes' : 'No',
+                label: l10n.areApproachRoadsAvailable,
+                options: [l10n.yes, l10n.no],
+                selectedValue: _hasApproachRoads ? l10n.yes : l10n.no,
                 onChanged: (value) {
                   setState(() {
-                    _hasApproachRoads = value == 'Yes';
+                    _hasApproachRoads = value == l10n.yes;
                     if (!_hasApproachRoads) {
                       approachRoadsController.clear();
                       _selectedApproachCondition = null;
@@ -77,14 +79,14 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
                   });
                 },
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Conditional fields (only show if approach roads are available)
               if (_hasApproachRoads) ...[
                 // Number of Approach Roads
                 NumberInput(
-                  label: 'Number of Approach Roads',
+                  label: l10n.numberOfApproachRoads,
                   controller: approachRoadsController,
                   prefixIcon: Icons.numbers,
                   onChanged: (value) {
@@ -93,12 +95,12 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
                     });
                   },
                 ),
-                
+
                 SizedBox(height: 15),
-                
+
                 // Condition Dropdown
                 DropdownInput(
-                  label: 'Condition of Approach Roads',
+                  label: l10n.conditionOfApproachRoads,
                   value: _selectedApproachCondition,
                   items: _conditionOptions,
                   prefixIcon: Icons.assessment,
@@ -109,12 +111,12 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
                     });
                   },
                 ),
-                
+
                 SizedBox(height: 15),
-                
+
                 // Remarks
                 TextInput(
-                  label: 'Remarks (if any)',
+                  label: l10n.remarksIfAny,
                   controller: approachRemarksController,
                   prefixIcon: Icons.note,
                   isRequired: false,
@@ -126,23 +128,23 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
             ],
           ),
         ),
-        
+
         SizedBox(height: 25),
-        
+
         // Internal Lanes Section
         QuestionCard(
-          question: ' Internal Lanes',
-          description: 'Availability and condition of internal lanes in village',
+          question: l10n.internalLanes,
+          description: l10n.availabilityConditionInternalLanes,
           child: Column(
             children: [
               // Availability Radio
               RadioOptionGroup(
-                label: 'Are Internal Lanes available?',
-                options: ['Yes', 'No'],
-                selectedValue: _hasInternalLanes ? 'Yes' : 'No',
+                label: l10n.areInternalLanesAvailable,
+                options: [l10n.yes, l10n.no],
+                selectedValue: _hasInternalLanes ? l10n.yes : l10n.no,
                 onChanged: (value) {
                   setState(() {
-                    _hasInternalLanes = value == 'Yes';
+                    _hasInternalLanes = value == l10n.yes;
                     if (!_hasInternalLanes) {
                       internalLanesController.clear();
                       _selectedInternalCondition = null;
@@ -154,14 +156,14 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
                   });
                 },
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Conditional fields (only show if internal lanes are available)
               if (_hasInternalLanes) ...[
                 // Number of Internal Lanes
                 NumberInput(
-                  label: 'Number of Internal Lanes',
+                  label: l10n.numberOfInternalLanes,
                   controller: internalLanesController,
                   prefixIcon: Icons.numbers,
                   onChanged: (value) {
@@ -170,12 +172,12 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
                     });
                   },
                 ),
-                
+
                 SizedBox(height: 15),
-                
+
                 // Condition Dropdown
                 DropdownInput(
-                  label: 'Condition of Internal Lanes',
+                  label: l10n.conditionOfInternalLanes,
                   value: _selectedInternalCondition,
                   items: _conditionOptions,
                   prefixIcon: Icons.assessment,
@@ -186,12 +188,12 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
                     });
                   },
                 ),
-                
+
                 SizedBox(height: 15),
-                
+
                 // Remarks
                 TextInput(
-                  label: 'Remarks (if any)',
+                  label: l10n.remarksIfAny,
                   controller: internalRemarksController,
                   prefixIcon: Icons.note,
                   isRequired: false,
@@ -203,23 +205,24 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
             ],
           ),
         ),
-        
+
         SizedBox(height: 20),
-        
-        
+
+
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return FormTemplateScreen(
-      title: 'Infrastructure Information',
-      stepNumber: 'Step 5',
+      title: l10n.infrastructureInformation,
+      stepNumber: 'Step 2',
       nextScreenRoute: '/infrastructure-availability',
-      nextScreenName: 'Infrastructure Availability',
+      nextScreenName: 'Availability of Infrastructure',
       icon: Icons.engineering,
-      instructions: 'Availability of Approach Roads and Internal Lanes',
+      instructions: l10n.availabilityApproachRoadsInternalLanes,
       contentWidget: _buildInfrastructureContent(),
       onSubmit: _submitForm,
       onBack: _goToPreviousScreen, onReset: () {  }, // Add back button callback

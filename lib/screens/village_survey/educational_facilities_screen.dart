@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
-import 'drainage_waste_screen.dart';
 import 'infrastructure_availability_screen.dart';
+import 'drainage_waste_screen.dart';
+import 'irrigation_facilities_screen.dart';
 
 class EducationalFacilitiesScreen extends StatefulWidget {
   const EducationalFacilitiesScreen({super.key});
@@ -20,7 +22,7 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
   void _submitForm() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => DrainageWasteScreen()),
+      MaterialPageRoute(builder: (context) => const DrainageWasteScreen()),
     );
   }
 
@@ -32,60 +34,61 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
   }
 
   Widget _buildEducationalContent() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         // Anganwadi Section
         QuestionCard(
-          question: 'a) No. of Anganwadi',
-          description: 'Number of Anganwadi centers in village',
+          question: l10n.numberOfAnganwadi,
+          description: l10n.anganwadiCenters,
           child: NumberInput(
-            label: 'Enter number of Anganwadi',
+            label: l10n.enterNumberOfAnganwadi,
             controller: numAnganwadiController,
             prefixIcon: Icons.child_care,
           ),
         ),
-        
+
         SizedBox(height: 25),
-        
+
         // Shiksha Guarantee Section
         QuestionCard(
-          question: 'b) No. of Shiksha Guarantee Beneficiaries',
-          description: 'Number of beneficiaries under Shiksha Guarantee Scheme',
+          question: l10n.numberOfShikshaGuarantee,
+          description: l10n.shikshaGuaranteeBeneficiaries,
           child: NumberInput(
-            label: 'Enter number of beneficiaries',
+            label: l10n.enterNumberOfBeneficiaries,
             controller: numShikshaGuaranteeController,
             prefixIcon: Icons.school,
           ),
         ),
-        
+
         SizedBox(height: 25),
-        
+
         // Other Facilities Section
         QuestionCard(
-          question: ' Other Educational Facilities',
-          description: 'Other educational facilities in village',
+          question: l10n.otherEducationalFacilitiesTitle,
+          description: l10n.otherEducationalFacilitiesDesc,
           child: Column(
             children: [
               TextInput(
-                label: 'Facility Name (e.g., Coaching Center, Library, etc.)',
+                label: l10n.facilityName,
                 controller: otherFacilityNameController,
                 prefixIcon: Icons.menu_book,
                 isRequired: false,
               ),
-              
+
               SizedBox(height: 15),
-              
+
               NumberInput(
-                label: 'Number of such facilities',
+                label: l10n.numberOfSuchFacilities,
                 controller: otherFacilityCountController,
                 prefixIcon: Icons.numbers,
               ),
             ],
           ),
         ),
-        
+
         // Removed: Progress Indicator (Step Locator)
-        
+
       ],
     );
   }
@@ -94,13 +97,14 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return FormTemplateScreen(
-      title: 'Educational Facilities',
-      stepNumber: 'Step 7',
+      title: l10n.educationalFacilities,
+      stepNumber: 'Step 4',
       nextScreenRoute: '/drainage-waste',
-      nextScreenName: 'Drainage & Waste Management',
+      nextScreenName: 'Drainage System',
       icon: Icons.school,
-      instructions: 'Other educational facilities and type',
+      instructions: l10n.otherEducationalFacilities,
       contentWidget: _buildEducationalContent(),
       onSubmit: _submitForm,
       onBack: _goToPreviousScreen,

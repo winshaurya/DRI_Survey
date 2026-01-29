@@ -53,13 +53,15 @@ dependencies:
   google_sign_in: ^6.2.1
   permission_handler: ^11.3.1
   image_picker: ^1.0.4
+  flutter_map: ^6.1.0
+  location: ^6.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
 flutter_launcher_icons:
-  android: "edu_survey"
+  android: "dri_survey"
   ios: false
   image_path: "assets/images/logo.png"
   min_sdk_android: 33 # android min sdk min:16, default 21

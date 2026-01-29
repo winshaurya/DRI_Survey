@@ -23,7 +23,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -34,7 +34,117 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Handle database upgrades here
+    if (oldVersion < 2) {
+      await db.execute('DROP TABLE IF EXISTS family_details');
+      await db.execute('''
+        CREATE TABLE family_details (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          survey_id INTEGER,
+          name TEXT,
+          fathers_name TEXT,
+          mothers_name TEXT,
+          relationship_with_head TEXT,
+          age INTEGER,
+          sex TEXT,
+          physically_fit TEXT,
+          physically_fit_cause TEXT,
+          educational_qualification TEXT,
+          inclination_self_employment TEXT,
+          occupation TEXT,
+          days_employed INTEGER,
+          income REAL,
+          awareness_about_village TEXT,
+          participate_gram_sabha TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
+        )
+      ''');
+    }
+    if (oldVersion < 3) {
+      // Add sync support columns
+      await db.execute('ALTER TABLE surveys ADD COLUMN remote_id TEXT');
+      await db.execute('ALTER TABLE surveys ADD COLUMN is_deleted INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE family_details ADD COLUMN remote_id TEXT');
+      await db.execute('ALTER TABLE family_details ADD COLUMN is_deleted INTEGER DEFAULT 0');
+    }
+    
+    // Version 4: Add missing tables for data synchronization
+    if (oldVersion < 4) {
+       // Migration Data
+       await db.execute('''
+        CREATE TABLE IF NOT EXISTS migration_data (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          survey_id INTEGER,
+          member_count INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
+        )
+      ''');
+
+      // Training Data
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS training_data (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          survey_id INTEGER,
+          sr_no INTEGER,
+          name TEXT,
+          gender TEXT,
+          age INTEGER,
+          training_type TEXT,
+          duration TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
+        )
+      ''');
+
+      // Self Help Groups
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS self_help_groups (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          survey_id INTEGER,
+          sr_no INTEGER,
+          group_name TEXT,
+          member_name TEXT,
+          role TEXT,
+          monthly_saving REAL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
+        )
+      ''');
+      
+      // Social Consciousness
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS social_consciousness (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          survey_id INTEGER,
+          clothing_frequency TEXT,
+          food_waste TEXT,
+          waste_disposal TEXT,
+          toilet_usage TEXT,
+          energy_saving TEXT,
+          water_conservation TEXT,
+          plastic_usage TEXT,
+          addictions TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
+        )
+      ''');
+      
+      // Bank Accounts
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS bank_accounts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          survey_id INTEGER,
+          sr_no INTEGER,
+          member_name TEXT,
+          account_type TEXT,
+          bank_name TEXT,
+          has_kcc TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
+        )
+      ''');
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -42,6 +152,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE surveys (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        remote_id TEXT,
         survey_date TEXT NOT NULL DEFAULT CURRENT_DATE,
         village_name TEXT,
         panchayat TEXT,
@@ -52,7 +163,8 @@ class DatabaseHelper {
         pin_code TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        synced INTEGER DEFAULT 0
+        synced INTEGER DEFAULT 0,
+        is_deleted INTEGER DEFAULT 0
       )
     ''');
 
@@ -60,14 +172,25 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE family_details (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        remote_id TEXT,
         survey_id INTEGER,
-        member_name TEXT,
+        name TEXT,
+        fathers_name TEXT,
+        mothers_name TEXT,
+        relationship_with_head TEXT,
         age INTEGER,
         sex TEXT,
-        relation TEXT,
-        education TEXT,
+        physically_fit TEXT,
+        physically_fit_cause TEXT,
+        educational_qualification TEXT,
+        inclination_self_employment TEXT,
         occupation TEXT,
+        days_employed INTEGER,
+        income REAL,
+        awareness_about_village TEXT,
+        participate_gram_sabha TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
         FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
       )
     ''');
@@ -611,8 +734,11 @@ class DatabaseHelper {
           case 'family_members':
             if (entry.value is List) {
               for (var member in entry.value) {
+                final memberData = Map<String, dynamic>.from(member);
+                memberData.remove('sr_no');
+
                 await txn.insert('family_details', {
-                  ...member,
+                  ...memberData,
                   'survey_id': surveyId,
                 });
               }
@@ -649,8 +775,11 @@ class DatabaseHelper {
           case 'animals':
             if (entry.value is List) {
               for (var animal in entry.value) {
+                final animalData = Map<String, dynamic>.from(animal);
+                animalData.remove('sr_no');
+
                 await txn.insert('animals', {
-                  ...animal,
+                  ...animalData,
                   'survey_id': surveyId,
                 });
               }

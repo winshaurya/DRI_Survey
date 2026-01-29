@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:location/location.dart';
 import 'survey_details_screen.dart';
 import 'cadastral_map_screen.dart';
 
@@ -14,6 +17,11 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
   MapPoint? _selectedPoint;
   int _pointCounter = 1;
 
+  MapController _mapController = MapController();
+  LatLng _currentLocation = LatLng(28.6139, 77.2090); // Default to Delhi
+  Location _location = Location();
+  bool _locationLoaded = false;
+
   final List<String> _categories = [
     'Forest', 'Wasteland', 'Garden/Orchard', 'Burial Ground/Crematory',
     'Crop Plants', 'Vegetables', 'Fruit Trees', 'Trees', 'Plants',
@@ -24,7 +32,35 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
     'Special features like local rituals', 'Ecological History of Area', 'Others'
   ];
 
-  void _addPoint(Offset position) {
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await _location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await _location.requestService();
+        if (!serviceEnabled) return;
+      }
+      PermissionStatus permissionGranted = await _location.hasPermission();
+      if (permissionGranted == PermissionStatus.denied) {
+        permissionGranted = await _location.requestPermission();
+        if (permissionGranted != PermissionStatus.granted) return;
+      }
+      LocationData locationData = await _location.getLocation();
+      setState(() {
+        _currentLocation = LatLng(locationData.latitude!, locationData.longitude!);
+        _locationLoaded = true;
+      });
+    } catch (e) {
+      // Handle error
+    }
+  }
+
+  void _addPoint(LatLng position) {
     setState(() {
       _selectedPoint = MapPoint(
         id: _pointCounter++,
@@ -45,7 +81,7 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
 
   void _saveAndContinue() {
     // Navigate directly to next screen without showing dialog
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => CadastralMapScreen()),
     );
@@ -64,18 +100,7 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
       backgroundColor: Color(0xFFF5F5F5),
       body: Column(
         children: [
-          // Header
-          Container(
-            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            color: Colors.white,
-            child: Column(
-              children: [
-                Text('Government of India', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF003366))),
-                SizedBox(height: 4),
-                Text('Digital India', style: TextStyle(fontSize: 14, color: Color(0xFFFF9933), fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
+
 
           // Title
           Card(
@@ -91,7 +116,7 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
                     Text('Village Map Points', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF800080))),
                   ]),
                   SizedBox(height: 8),
-                  Text('Step 29: Add points with categories and remarks'),
+                  Text('Step 11: Add points with categories and remarks'),
                   SizedBox(height: 8),
                   Row(children: [
                     Text('Points: ${_mapPoints.length}', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -110,61 +135,63 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
 
           // Map Area
           Expanded(
-            child: GestureDetector(
-              onTapDown: (details) => _addPoint(details.localPosition),
-              child: Container(
-                margin: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade400),
-                ),
-                child: Stack(
+            child: Stack(
+              children: [
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    center: _currentLocation,
+                    zoom: 15.0,
+                    onTap: (tapPosition, point) => _addPoint(point),
+                  ),
                   children: [
-                    // Grid background
-                    Container(
-                      decoration: BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/map_background.png'),
-                          fit: BoxFit.cover,
-                          colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.1), BlendMode.darken),
-                        ),
-                      ),
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.edu_survey_new',
                     ),
-                    
-                    // Points
-                    ..._mapPoints.map((point) => Positioned(
-                      left: point.position.dx - 15,
-                      top: point.position.dy - 15,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _selectedPoint = point),
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          child: Stack(
-                            children: [
-                              Icon(Icons.location_on, color: _selectedPoint?.id == point.id ? Colors.red : Colors.blue, size: 30),
-                              Center(child: Text('${point.id}', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
-                            ],
+                    MarkerLayer(
+                      markers: [
+                        // Current location marker
+                        if (_locationLoaded)
+                          Marker(
+                            point: _currentLocation,
+                            child: Icon(Icons.my_location, color: Colors.blue, size: 30),
                           ),
-                        ),
-                      ),
-                    )),
-                    
-                    // Instructions
-                    Positioned(
-                      bottom: 10,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        padding: EdgeInsets.all(8),
-                        color: Colors.black54,
-                        child: Text('Tap anywhere to add a point', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 12)),
-                      ),
+                        // Points markers
+                        ..._mapPoints.map((point) => Marker(
+                          point: point.position,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedPoint = point),
+                            child: Container(
+                              width: 30,
+                              height: 30,
+                              child: Stack(
+                                children: [
+                                  Icon(Icons.location_on, color: _selectedPoint?.id == point.id ? Colors.red : Colors.blue, size: 30),
+                                  Center(child: Text('${point.id}', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )),
+                      ],
                     ),
                   ],
                 ),
-              ),
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton(
+                    heroTag: "btn_location",
+                    mini: true,
+                    backgroundColor: Colors.white,
+                    onPressed: () {
+                       _mapController.move(_currentLocation, 15.0);
+                    },
+                    child: Icon(Icons.my_location, color: Colors.blue),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -243,7 +270,7 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
 
 class MapPoint {
   final int id;
-  final Offset position;
+  final LatLng position;
   String category;
   String remarks;
 

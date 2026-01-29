@@ -48,10 +48,9 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
 
   void _submitForm() {
     // Navigate to completion screen
-    Navigator.pushAndRemoveUntil(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => CompletionScreen()),
-      (route) => false, // Remove all previous routes
     );
   }
 
@@ -188,7 +187,7 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
                               ],
                             ),
                             SizedBox(height: 6), // Reduced from 8
-                            Text('Step 20: People\'s Biodiversity Register (PBR) Documentation',
+                            Text('Step 14: People\'s Biodiversity Register (PBR) Documentation',
                               style: TextStyle(
                                 color: Colors.grey.shade600, 
                                 fontSize: 13 // Reduced from 15

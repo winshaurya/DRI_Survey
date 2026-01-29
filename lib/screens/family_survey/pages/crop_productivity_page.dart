@@ -180,10 +180,10 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
             const SizedBox(height: 8),
             Row(
               children: [
-                Expanded(
+Expanded(
                   flex: 2,
-                  child: TextFormField(
-                    initialValue: widget.pageData['crop_${cropNumber}_name'],
+                  child: DropdownButtonFormField<String>(
+                    value: widget.pageData['crop_${cropNumber}_name'],
                     decoration: InputDecoration(
                       labelText: l10n.cropName,
                       border: OutlineInputBorder(
@@ -191,6 +191,22 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     ),
+                    items: const [
+                      DropdownMenuItem(value: 'Sorghum', child: Text('Sorghum')),
+                      DropdownMenuItem(value: 'Pearlmillet', child: Text('Pearlmillet')),
+                      DropdownMenuItem(value: 'Rice', child: Text('Rice')),
+                      DropdownMenuItem(value: 'Greengram', child: Text('Greengram')),
+                      DropdownMenuItem(value: 'Blackgram', child: Text('Blackgram')),
+                      DropdownMenuItem(value: 'Pigeon pea', child: Text('Pigeon pea')),
+                      DropdownMenuItem(value: 'Sesame', child: Text('Sesame')),
+                      DropdownMenuItem(value: 'Vegetables', child: Text('Vegetables')),
+                      DropdownMenuItem(value: 'Wheat', child: Text('Wheat')),
+                      DropdownMenuItem(value: 'Barley', child: Text('Barley')),
+                      DropdownMenuItem(value: 'Chickpea', child: Text('Chickpea')),
+                      DropdownMenuItem(value: 'Lentil', child: Text('Lentil')),
+                      DropdownMenuItem(value: 'Mustard', child: Text('Mustard')),
+                      DropdownMenuItem(value: 'Linseed', child: Text('Linseed')),
+                    ],
                     onChanged: (value) {
                       widget.pageData['crop_${cropNumber}_name'] = value;
                       widget.onDataChanged(widget.pageData);

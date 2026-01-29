@@ -123,12 +123,12 @@ class LandingScreen extends ConsumerWidget {
 
                     const Spacer(flex: 1),
 
-                    // DRI Family Survey Button
+                    // DRI PRA Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.pushNamed(context, '/survey');
+                          Navigator.pushNamed(context, '/village-survey');
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
@@ -141,7 +141,7 @@ class LandingScreen extends ConsumerWidget {
                           shadowColor: Colors.black.withOpacity(0.2),
                         ),
                         child: const Text(
-                          'DRI Family Survey',
+                          'DRI PRA',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -153,12 +153,12 @@ class LandingScreen extends ConsumerWidget {
 
                     const SizedBox(height: 16),
 
-                    // DRI Village Survey Button
+                    // DRI Family Survey Button
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
                         onPressed: () {
-                          Navigator.pushNamed(context, '/village-survey');
+                          Navigator.pushNamed(context, '/survey');
                         },
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Colors.white, width: 2),
@@ -169,7 +169,7 @@ class LandingScreen extends ConsumerWidget {
                           ),
                         ),
                         child: const Text(
-                          'DRI Village Survey',
+                          'DRI Family Survey',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,

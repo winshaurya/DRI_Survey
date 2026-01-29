@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'agricultural_implements_screen.dart';
-import 'unemployment_screen.dart';
+import 'seed_clubs_screen.dart';
+import 'social_map_screen.dart';
 
 class SignboardsScreen extends StatefulWidget {
   const SignboardsScreen({super.key});
@@ -16,17 +16,16 @@ class _SignboardsScreenState extends State<SignboardsScreen> {
   final _wallWritingController = TextEditingController();
 
   void _submitForm() {
-    // Navigate directly to next screen without showing dialog
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => UnemploymentScreen()),
+      MaterialPageRoute(builder: (context) => const SocialMapScreen()),
     );
   }
 
   void _goToPreviousScreen() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => AgriculturalImplementsScreen()),
+      MaterialPageRoute(builder: (context) => const SeedClubsScreen()),
     );
   }
 
@@ -106,7 +105,7 @@ class _SignboardsScreenState extends State<SignboardsScreen> {
                             ),
                           ]),
                           SizedBox(height: 4),
-                          Text('Step 23: Availability of signboards',
+                          Text('Step 8: Availability of signboards',
                             style: TextStyle(
                               fontSize: 13, // Reduced font size
                               color: Colors.grey.shade600,
@@ -170,8 +169,8 @@ class _SignboardsScreenState extends State<SignboardsScreen> {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: _submitForm,
-                          icon: Icon(Icons.arrow_forward, size: 18),
-                          label: Text('Save & Continue',
+                        icon: Icon(Icons.done, size: 18),
+                        label: Text('Save & Continue',
                             style: TextStyle(fontSize: 13)
                           ),
                           style: ElevatedButton.styleFrom(

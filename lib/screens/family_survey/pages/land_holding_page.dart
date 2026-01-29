@@ -1,10 +1,12 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 
-class LandHoldingPage extends StatefulWidget {
+
+class LandHoldingPage extends ConsumerWidget {
   final Map<String, dynamic> pageData;
   final Function(Map<String, dynamic>) onDataChanged;
 
@@ -15,10 +17,33 @@ class LandHoldingPage extends StatefulWidget {
   });
 
   @override
-  State<LandHoldingPage> createState() => _LandHoldingPageState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    return LandHoldingPageContent(
+      pageData: pageData,
+      onDataChanged: onDataChanged,
+      l10n: l10n,
+    );
+  }
 }
 
-class _LandHoldingPageState extends State<LandHoldingPage> {
+class LandHoldingPageContent extends StatefulWidget {
+  final Map<String, dynamic> pageData;
+  final Function(Map<String, dynamic>) onDataChanged;
+  final AppLocalizations l10n;
+
+  const LandHoldingPageContent({
+    super.key,
+    required this.pageData,
+    required this.onDataChanged,
+    required this.l10n,
+  });
+
+  @override
+  State<LandHoldingPageContent> createState() => _LandHoldingPageContentState();
+}
+
+class _LandHoldingPageContentState extends State<LandHoldingPageContent> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _irrigatedController;
   late TextEditingController _cultivableController;
@@ -98,16 +123,6 @@ class _LandHoldingPageState extends State<LandHoldingPage> {
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
-                validator: (value) {
-                  if (value?.isEmpty ?? true) {
-                    return l10n.pleaseEnterIrrigatedArea;
-                  }
-                  final area = double.tryParse(value!);
-                  if (area == null || area < 0) {
-                    return l10n.pleaseEnterValidArea;
-                  }
-                  return null;
-                },
                 onChanged: (value) => _updateData(),
               ),
             ),
@@ -134,16 +149,6 @@ class _LandHoldingPageState extends State<LandHoldingPage> {
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
-                validator: (value) {
-                  if (value?.isEmpty ?? true) {
-                    return l10n.pleaseEnterCultivableArea;
-                  }
-                  final area = double.tryParse(value!);
-                  if (area == null || area < 0) {
-                    return l10n.pleaseEnterValidArea;
-                  }
-                  return null;
-                },
                 onChanged: (value) => _updateData(),
               ),
             ),

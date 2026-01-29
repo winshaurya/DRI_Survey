@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../lib/screens/village_form_screen.dart';
+import 'village_survey/village_form_screen.dart';
 
 class VillageSurveyScreen extends StatelessWidget {
   const VillageSurveyScreen({super.key});

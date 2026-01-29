@@ -153,6 +153,7 @@ class _LocationPageState extends State<LocationPage> {
           ),
           keyboardType: TextInputType.phone,
           maxLength: 10,
+          onSaved: (value) => widget.pageData['phone_number'] = value,
           onChanged: (value) {
             widget.pageData['phone_number'] = value;
             widget.onDataChanged(widget.pageData);
@@ -169,6 +170,7 @@ class _LocationPageState extends State<LocationPage> {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
+          onSaved: (value) => widget.pageData['village_name'] = value,
           onChanged: (value) {
             widget.pageData['village_name'] = value;
             widget.onDataChanged(widget.pageData);
@@ -185,6 +187,7 @@ class _LocationPageState extends State<LocationPage> {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
+          onSaved: (value) => widget.pageData['panchayat'] = value,
           onChanged: (value) {
             widget.pageData['panchayat'] = value;
             widget.onDataChanged(widget.pageData);
@@ -204,6 +207,7 @@ class _LocationPageState extends State<LocationPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                onSaved: (value) => widget.pageData['block'] = value,
                 onChanged: (value) {
                   widget.pageData['block'] = value;
                   widget.onDataChanged(widget.pageData);
@@ -222,6 +226,7 @@ class _LocationPageState extends State<LocationPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                onSaved: (value) => widget.pageData['district'] = value,
                 onChanged: (value) {
                   widget.pageData['district'] = value;
                   widget.onDataChanged(widget.pageData);
@@ -242,6 +247,7 @@ class _LocationPageState extends State<LocationPage> {
             ),
           ),
           maxLines: 3,
+          onSaved: (value) => widget.pageData['postal_address'] = value,
           onChanged: (value) {
             widget.pageData['postal_address'] = value;
             widget.onDataChanged(widget.pageData);
@@ -259,6 +265,7 @@ class _LocationPageState extends State<LocationPage> {
             ),
           ),
           keyboardType: TextInputType.number,
+          onSaved: (value) => widget.pageData['pin_code'] = value,
           onChanged: (value) {
             widget.pageData['pin_code'] = value;
             widget.onDataChanged(widget.pageData);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import 'educational_facilities_screen.dart';
 import 'infrastructure_screen.dart';
@@ -61,97 +62,98 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
   }
 
   Widget _buildInfrastructureContent() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         // School Availability Section
         QuestionCard(
-          question: ' School Availability',
-          description: 'Availability of different types of schools',
+          question: l10n.schoolAvailability,
+          description: l10n.availabilityOfDifferentTypesOfSchools,
           child: Column(
             children: [
               // Primary School
               _buildSchoolRadioField(
-                label: 'Primary School (Upto 5th Standard)',
+                label: l10n.primarySchoolUpto5thStandard,
                 hasSchool: _hasPrimarySchool,
                 distanceController: primarySchoolDistanceController,
                 onChanged: (value) {
                   setState(() {
-                    _hasPrimarySchool = value == 'Yes';
+                    _hasPrimarySchool = value == l10n.yes;
                     if (!_hasPrimarySchool) primarySchoolDistanceController.clear();
                   });
                 },
               ),
-              
+
               SizedBox(height: 20),
-              
+
               // Junior School
               _buildSchoolRadioField(
-                label: 'Junior School (6th to 8th Standard)',
+                label: l10n.juniorSchool6thTo8thStandard,
                 hasSchool: _hasJuniorSchool,
                 distanceController: juniorSchoolDistanceController,
                 onChanged: (value) {
                   setState(() {
-                    _hasJuniorSchool = value == 'Yes';
+                    _hasJuniorSchool = value == l10n.yes;
                     if (!_hasJuniorSchool) juniorSchoolDistanceController.clear();
                   });
                 },
               ),
-              
+
               SizedBox(height: 20),
-              
+
               // High School
               _buildSchoolRadioField(
-                label: 'High School (9th to 10th Standard)',
+                label: l10n.highSchool9thTo10thStandard,
                 hasSchool: _hasHighSchool,
                 distanceController: highSchoolDistanceController,
                 onChanged: (value) {
                   setState(() {
-                    _hasHighSchool = value == 'Yes';
+                    _hasHighSchool = value == l10n.yes;
                     if (!_hasHighSchool) highSchoolDistanceController.clear();
                   });
                 },
               ),
-              
+
               SizedBox(height: 20),
-              
+
               // Intermediate School
               _buildSchoolRadioField(
-                label: 'Intermediate School (10+2)',
+                label: l10n.intermediateSchool102,
                 hasSchool: _hasIntermediateSchool,
                 distanceController: intermediateSchoolDistanceController,
                 onChanged: (value) {
                   setState(() {
-                    _hasIntermediateSchool = value == 'Yes';
+                    _hasIntermediateSchool = value == l10n.yes;
                     if (!_hasIntermediateSchool) intermediateSchoolDistanceController.clear();
                   });
                 },
               ),
-              
+
               SizedBox(height: 20),
-              
+
               // Other Educational Facilities
               TextInput(
-                label: 'Other (like Anganwadi, Shiksha Guarantee Scheme, etc.)',
+                label: l10n.otherLikeAnganwadiShikshaGuaranteeSchemeEtc,
                 controller: otherEducationalFacilityController,
                 prefixIcon: Icons.menu_book,
               ),
             ],
           ),
         ),
-        
+
         SizedBox(height: 25),
-        
+
         // Number of Students Section
         QuestionCard(
-          question: ' Number of Students',
-          description: 'Total number of students in village',
+          question: l10n.numberOfStudents,
+          description: l10n.totalNumberOfStudentsInVillage,
           child: Column(
             children: [
               Row(
                 children: [
                   Expanded(
                     child: NumberInput(
-                      label: 'Boys',
+                      label: l10n.boys,
                       controller: boysStudentsController,
                       prefixIcon: Icons.boy,
                     ),
@@ -159,7 +161,7 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
                   SizedBox(width: 15),
                   Expanded(
                     child: NumberInput(
-                      label: 'Girls',
+                      label: l10n.girls,
                       controller: girlsStudentsController,
                       prefixIcon: Icons.girl,
                     ),
@@ -169,60 +171,60 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
             ],
           ),
         ),
-        
+
         SizedBox(height: 25),
-        
+
         // Infrastructure Facilities Section
         QuestionCard(
-          question: ' Other Infrastructure Facilities',
-          description: 'Availability of various infrastructure facilities',
+          question: l10n.otherInfrastructureFacilities,
+          description: l10n.availabilityOfVariousInfrastructureFacilities,
           child: Column(
             children: [
               // Playground
               _buildFacilityRadioField(
-                label: 'Playground',
+                label: l10n.playground,
                 hasFacility: _hasPlayground,
                 remarksController: playgroundRemarksController,
                 onChanged: (value) {
                   setState(() {
-                    _hasPlayground = value == 'Yes';
+                    _hasPlayground = value == l10n.yes;
                     if (!_hasPlayground) playgroundRemarksController.clear();
                   });
                 },
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Panchayat Bhavan
               _buildFacilityRadioField(
-                label: 'Panchayat Bhavan',
+                label: l10n.panchayatBhavan,
                 hasFacility: _hasPanchayatBhavan,
                 remarksController: panchayatRemarksController,
                 onChanged: (value) {
                   setState(() {
-                    _hasPanchayatBhavan = value == 'Yes';
+                    _hasPanchayatBhavan = value == l10n.yes;
                     if (!_hasPanchayatBhavan) panchayatRemarksController.clear();
                   });
                 },
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Sharda Kendra
               _buildFacilityRadioDistanceField(
-                label: 'Sharda Kendra (Place of Worship)',
+                label: l10n.shardaKendraPlaceOfWorship,
                 hasFacility: _hasShardaKendra,
                 distanceController: shardaKendraDistanceController,
                 onChanged: (value) {
                   setState(() {
-                    _hasShardaKendra = value == 'Yes';
+                    _hasShardaKendra = value == l10n.yes;
                     if (!_hasShardaKendra) shardaKendraDistanceController.clear();
                   });
                 },
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Post Office
               _buildFacilityRadioDistanceField(
                 label: 'Post Office',
@@ -230,76 +232,76 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
                 distanceController: postOfficeDistanceController,
                 onChanged: (value) {
                   setState(() {
-                    _hasPostOffice = value == 'Yes';
+                    _hasPostOffice = value == l10n.yes;
                     if (!_hasPostOffice) postOfficeDistanceController.clear();
                   });
                 },
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Health Facility
               _buildFacilityRadioDistanceField(
-                label: 'Health Facility (General Practitioners)',
+                label: l10n.healthFacilityGeneralPractitioners,
                 hasFacility: _hasHealthFacility,
                 distanceController: healthFacilityDistanceController,
                 onChanged: (value) {
                   setState(() {
-                    _hasHealthFacility = value == 'Yes';
+                    _hasHealthFacility = value == l10n.yes;
                     if (!_hasHealthFacility) healthFacilityDistanceController.clear();
                   });
                 },
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Primary Health Centre
               _buildSimpleRadioField(
-                label: 'Primary Health Centre',
+                label: l10n.primaryHealthCentre,
                 hasFacility: _hasPrimaryHealthCentre,
                 onChanged: (value) {
                   setState(() {
-                    _hasPrimaryHealthCentre = value == 'Yes';
+                    _hasPrimaryHealthCentre = value == l10n.yes;
                   });
                 },
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Bank
               _buildFacilityRadioDistanceField(
-                label: 'Bank',
+                label: l10n.bank,
                 hasFacility: _hasBank,
                 distanceController: bankDistanceController,
                 onChanged: (value) {
                   setState(() {
-                    _hasBank = value == 'Yes';
+                    _hasBank = value == l10n.yes;
                     if (!_hasBank) bankDistanceController.clear();
                   });
                 },
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Electrical Connection
               _buildSimpleRadioField(
-                label: 'Electrical Connection',
+                label: l10n.electricalConnection,
                 hasFacility: _hasElectricalConnection,
                 onChanged: (value) {
                   setState(() {
-                    _hasElectricalConnection = value == 'Yes';
+                    _hasElectricalConnection = value == l10n.yes;
                   });
                 },
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Water Source Section
               _buildWaterSourceSection(),
             ],
           ),
         ),
-        
+
         SizedBox(height: 20),
       ],
     );
@@ -501,16 +503,17 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return FormTemplateScreen(
-      title: 'Infrastructure Availability',
-      stepNumber: 'Step 6',
+      title: l10n.infrastructureAvailabilityInVillage,
+      stepNumber: 'Step 3',
       nextScreenRoute: '/educational-facilities',
-      nextScreenName: 'Educational Facilities',
+      nextScreenName: l10n.educationalFacilities,
       icon: Icons.school,
-      instructions: 'Availability of Infrastructure in Village',
+      instructions: l10n.availabilityOfInfrastructure,
       contentWidget: _buildInfrastructureContent(),
       onSubmit: _submitForm,
-      onBack: _goToPreviousScreen, 
+      onBack: _goToPreviousScreen,
       onReset: () {  },
     );
   }

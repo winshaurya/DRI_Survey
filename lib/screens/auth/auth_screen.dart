@@ -39,21 +39,17 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   }
 
   void _checkAuthState() {
-    final session = Supabase.instance.client.auth.currentSession;
-    if (session != null) {
-      final now = DateTime.now();
-      final sessionExpiry = session.expiresAt;
-      if (sessionExpiry != null) {
-        final expiryDate = DateTime.fromMillisecondsSinceEpoch(sessionExpiry * 1000);
-        final twentyFiveDaysAgo = expiryDate.subtract(const Duration(days: 25));
-        if (now.isBefore(twentyFiveDaysAgo)) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              Navigator.pushReplacementNamed(context, '/');
-            }
-          });
-        }
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/');
+          }
+        });
       }
+    } catch (_) {
+      // Supabase might not be initialized or other error
     }
   }
 
@@ -97,14 +93,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           ),
         );
       }
-    }
-  }
-
-  Future<void> _developerBypass() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/');
     }
   }
 
@@ -280,33 +268,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                         elevation: 0,
                         shadowColor: Colors.transparent,
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Developer Access Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: OutlinedButton(
-                      onPressed: _isLoading ? null : _developerBypass,
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.white, width: 2),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              'Developer Access',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
                     ),
                   ),
 

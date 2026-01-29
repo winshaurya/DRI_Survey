@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'organic_manure_screen.dart'; // Import the previous screen
-import 'agricultural_technology_screen.dart';
+import 'irrigation_facilities_screen.dart'; // Import the previous screen
+import 'signboards_screen.dart';
 
 class SeedClubsScreen extends StatefulWidget {
   const SeedClubsScreen({super.key});
@@ -14,18 +14,17 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
   final _seedClubsController = TextEditingController();
 
   void _submitForm() {
-    // Navigate directly to next screen without showing dialog
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => AgriculturalTechnologyScreen()),
+      MaterialPageRoute(builder: (context) => const SignboardsScreen()),
     );
   }
 
   void _goToPreviousScreen() {
-    // Navigate back to OrganicManureScreen
+    // Navigate back to IrrigationFacilitiesScreen
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => OrganicManureScreen()),
+      MaterialPageRoute(builder: (context) => IrrigationFacilitiesScreen()),
     );
   }
 
@@ -55,6 +54,10 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
                 )),
               ],
             ),
+            SizedBox(height: 5),
+            Text('Step 7', style: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF800080)
+            )),
           ]),
         ),
 
@@ -77,9 +80,19 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
                           Row(children: [
                             Icon(Icons.agriculture, color: Color(0xFF800080)),
                             SizedBox(width: 10),
-                            Text('Seed Clubs', style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF800080)
-                            )),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Seed Clubs', style: TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF800080)
+                                  )),
+                                  Text('Step 7', style: TextStyle(
+                                    fontSize: 14, color: Colors.grey.shade600
+                                  )),
+                                ],
+                              ),
+                            ),
                           ]),
                           SizedBox(height: 5),
                           Text('Number of seed clubs in village'),
@@ -161,7 +174,7 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _submitForm,
-                        icon: Icon(Icons.arrow_forward),
+                        icon: Icon(Icons.done),
                         label: Text('Save & Continue'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Color(0xFF800080),

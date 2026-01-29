@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../form_template.dart';
 import 'children_not_in_school_screen.dart';
-import 'bpl_families_screen.dart';
+import 'educational_facilities_screen.dart';
 
 class TraditionalOccupationsScreen extends StatefulWidget {
   const TraditionalOccupationsScreen({super.key});
@@ -44,7 +44,7 @@ class _TraditionalOccupationsScreenState extends State<TraditionalOccupationsScr
   void _goToPreviousScreen() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => BPLFamiliesScreen()),
+      MaterialPageRoute(builder: (context) => EducationalFacilitiesScreen()),
     );
   }
 

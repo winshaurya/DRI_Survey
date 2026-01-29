@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'social_consciousness_screen.dart'; // Import the previous screen
+import 'signboards_screen.dart';
 import 'survey_details_screen.dart';
 
 class SocialMapScreen extends StatefulWidget {
@@ -44,17 +44,16 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
 
   void _submitForm() {
     // Navigate directly to next screen without showing dialog
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => SurveyDetailsScreen()),
     );
   }
 
   void _goToPreviousScreen() {
-    // Navigate back to SocialConsciousnessScreen
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => SocialConsciousnessScreen()),
+      MaterialPageRoute(builder: (context) => const SignboardsScreen()),
     );
   }
 
@@ -155,47 +154,6 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
       backgroundColor: Color(0xFFF5F5F5),
       body: Column(
         children: [
-          // Header
-          Container(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            color: Colors.white,
-            child: Column(
-              children: [
-                Text(
-                  'Government of India',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF003366),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Digital India',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFFFF9933),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      'Power To Empower',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF138808),
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
           // Main Content
           Expanded(
             child: SingleChildScrollView(
@@ -224,7 +182,7 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
                             ],
                           ),
                           SizedBox(height: 4),
-                          Text('Step 27: Upload map images'),
+                          Text('Step 8: Upload map images'),
                         ],
                       ),
                     ),

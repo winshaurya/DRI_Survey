@@ -14,6 +14,7 @@ class FormTemplateScreen extends StatefulWidget {
   final Color? primaryColor;
   final Color? backgroundColor;
   final VoidCallback onReset;
+  final Widget? drawer;
   
   const FormTemplateScreen({super.key, 
     required this.title,
@@ -29,6 +30,7 @@ class FormTemplateScreen extends StatefulWidget {
     this.primaryColor,
     this.backgroundColor,
     required this.onReset,
+    this.drawer,
   });
 
   @override
@@ -103,14 +105,23 @@ class _FormTemplateScreenState extends State<FormTemplateScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _backgroundColor,
+      drawer: widget.drawer,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: _primaryColor),
-          onPressed: _goBack,
-          tooltip: 'Go back',
-        ),
+        leading: widget.drawer != null
+            ? Builder(
+                builder: (context) => IconButton(
+                  icon: Icon(Icons.menu, color: _primaryColor),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                  tooltip: 'Menu',
+                ),
+              )
+            : IconButton(
+                icon: Icon(Icons.arrow_back, color: _primaryColor),
+                onPressed: _goBack,
+                tooltip: 'Go back',
+              ),
         title: Text(
           widget.title,
           style: TextStyle(
@@ -487,6 +498,22 @@ class _DropdownInputState extends State<DropdownInput> {
   }
 
   @override
+  void didUpdateWidget(DropdownInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != oldWidget.value) {
+      if (widget.value != null && widget.items.contains(widget.value)) {
+        setState(() {
+          _selectedValue = widget.value;
+        });
+      } else if (widget.value == null || widget.value!.isEmpty) {
+        setState(() {
+          _selectedValue = null;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -510,7 +537,7 @@ class _DropdownInputState extends State<DropdownInput> {
               : null,
           helperText: widget.helperText,
         ),
-        items: widget.items.map((String item) {
+        items: widget.items.toSet().toList().map((String item) {
           return DropdownMenuItem<String>(
             value: item,
             child: Text(
