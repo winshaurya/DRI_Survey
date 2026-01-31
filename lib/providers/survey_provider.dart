@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dri_survey/services/database_service.dart';
 import 'package:dri_survey/services/supabase_service.dart';
 import 'package:dri_survey/services/sync_service.dart';
+import 'package:dri_survey/services/form_history_service.dart';
 
 class SurveyState {
   final int currentPage;
@@ -43,6 +44,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   final DatabaseService _databaseService = DatabaseService();
   final SupabaseService _supabaseService = SupabaseService.instance;
   final SyncService _syncService = SyncService.instance;
+  final FormHistoryService _historyService = FormHistoryService();
 
   @override
   SurveyState build() {
@@ -194,89 +196,96 @@ class SurveyNotifier extends Notifier<SurveyState> {
             data['family_members'] = familyMembers;
           }
           break;
-        case 2: // Agriculture data (merged: land holding, irrigation, fertilizer)
-          final agricultureData = await _databaseService.getData('agriculture_data', state.phoneNumber!);
-          if (agricultureData.isNotEmpty) {
-            data.addAll(agricultureData.first);
+        case 2: // Social Consciousness 1
+        case 3: // Social Consciousness 2
+        case 4: // Social Consciousness 3
+          final socialData = await _databaseService.getData('social_consciousness', state.phoneNumber!);
+          if (socialData.isNotEmpty) {
+            data.addAll(socialData.first);
           }
           break;
-        case 3: // Crop productivity
+        case 5: // Land Holding
+          final landData = await _databaseService.getData('land_holding', state.phoneNumber!);
+          if (landData.isNotEmpty) {
+            data.addAll(landData.first);
+          }
+          break;
+        case 6: // Irrigation
+          final irrigationData = await _databaseService.getData('irrigation_facilities', state.phoneNumber!);
+          if (irrigationData.isNotEmpty) {
+            data.addAll(irrigationData.first);
+          }
+          break;
+        case 7: // Crop productivity
           final cropData = await _databaseService.getData('crop_productivity', state.phoneNumber!);
           if (cropData.isNotEmpty) {
             data['crops'] = cropData;
           }
           break;
-        case 6: // Animals
+        case 8: // Fertilizer usage
+          final fertilizerData = await _databaseService.getData('fertilizer_usage', state.phoneNumber!);
+          if (fertilizerData.isNotEmpty) {
+            data.addAll(fertilizerData.first);
+          }
+          break;
+        case 9: // Animals
           final animalData = await _databaseService.getData('animals', state.phoneNumber!);
           if (animalData.isNotEmpty) {
             data['animals'] = animalData;
           }
           break;
-        case 7: // Equipment
+        case 10: // Agricultural Equipment
           final equipmentData = await _databaseService.getData('agricultural_equipment', state.phoneNumber!);
           if (equipmentData.isNotEmpty) {
             data.addAll(equipmentData.first);
           }
           break;
-        case 8: // Entertainment
+        case 11: // Entertainment Facilities
           final entertainmentData = await _databaseService.getData('entertainment_facilities', state.phoneNumber!);
           if (entertainmentData.isNotEmpty) {
             data.addAll(entertainmentData.first);
           }
           break;
-        case 9: // Transport
+        case 12: // Transport Facilities
           final transportData = await _databaseService.getData('transport_facilities', state.phoneNumber!);
           if (transportData.isNotEmpty) {
             data.addAll(transportData.first);
           }
           break;
-        case 10: // Water sources
+        case 13: // Drinking Water Sources
           final waterData = await _databaseService.getData('drinking_water_sources', state.phoneNumber!);
           if (waterData.isNotEmpty) {
             data.addAll(waterData.first);
           }
           break;
-        case 11: // Medical
+        case 14: // Medical Treatment
           final medicalData = await _databaseService.getData('medical_treatment', state.phoneNumber!);
           if (medicalData.isNotEmpty) {
             data.addAll(medicalData.first);
           }
           break;
-        case 12: // Disputes
+        case 15: // Disputes
           final disputeData = await _databaseService.getData('disputes', state.phoneNumber!);
           if (disputeData.isNotEmpty) {
             data.addAll(disputeData.first);
           }
           break;
-        case 13: // House conditions
+        case 16: // House conditions
           final houseConditionData = await _databaseService.getData('house_conditions', state.phoneNumber!);
           if (houseConditionData.isNotEmpty) {
             data.addAll(houseConditionData.first);
           }
           break;
-        case 14: // House facilities
-          final houseFacilityData = await _databaseService.getData('house_facilities', state.phoneNumber!);
-          if (houseFacilityData.isNotEmpty) {
-            data.addAll(houseFacilityData.first);
-          }
-          break;
-        case 15: // Nutritional garden
-          final gardenData = await _databaseService.getData('nutritional_garden', state.phoneNumber!);
-          if (gardenData.isNotEmpty) {
-            data.addAll(gardenData.first);
-          }
-          break;
-        case 16: // Diseases
+        case 17: // Diseases
           final diseaseData = await _databaseService.getData('diseases', state.phoneNumber!);
           if (diseaseData.isNotEmpty) {
             data['diseases'] = diseaseData;
           }
           break;
-        // Add more cases for other pages...
-        case 22: // Social consciousness
-          final socialData = await _databaseService.getData('social_consciousness', state.phoneNumber!);
-          if (socialData.isNotEmpty) {
-            data.addAll(socialData.first);
+        case 18: // Govt Schemes
+          final govtData = await _databaseService.getData('government_schemes', state.phoneNumber!);
+          if (govtData.isNotEmpty) {
+            data.addAll(govtData.first);
           }
           break;
       }
@@ -318,14 +327,30 @@ class SurveyNotifier extends Notifier<SurveyState> {
         }
         await _syncPageDataToSupabase(page, data);
         break;
-      case 2: // Agriculture data (merged)
-        await _databaseService.saveData('agriculture_data', {
+      case 2: // Social Consciousness 1
+      case 3: // Social Consciousness 2
+      case 4: // Social Consciousness 3
+        await _databaseService.saveData('social_consciousness', {
           'phone_number': state.phoneNumber,
           ...data,
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 3: // Crop productivity
+      case 5: // Land Holding
+        await _databaseService.saveData('land_holding', {
+          'phone_number': state.phoneNumber,
+          ...data,
+        });
+        await _syncPageDataToSupabase(page, data);
+        break;
+      case 6: // Irrigation
+        await _databaseService.saveData('irrigation_facilities', {
+          'phone_number': state.phoneNumber,
+          ...data,
+        });
+        await _syncPageDataToSupabase(page, data);
+        break;
+      case 7: // Crop Productivity
         if (data['crops'] != null) {
           for (final crop in data['crops']) {
             await _databaseService.saveData('crop_productivity', {
@@ -336,7 +361,14 @@ class SurveyNotifier extends Notifier<SurveyState> {
         }
         await _syncPageDataToSupabase(page, data);
         break;
-      case 6: // Animals
+      case 8: // Fertilizer Usage
+        await _databaseService.saveData('fertilizer_usage', {
+          'phone_number': state.phoneNumber,
+          ...data,
+        });
+        await _syncPageDataToSupabase(page, data);
+        break;
+      case 9: // Animals
         if (data['animals'] != null) {
           for (final animal in data['animals']) {
             await _databaseService.saveData('animals', {
@@ -347,70 +379,56 @@ class SurveyNotifier extends Notifier<SurveyState> {
         }
         await _syncPageDataToSupabase(page, data);
         break;
-      case 7: // Equipment
+      case 10: // Agricultural Equipment
         await _databaseService.saveData('agricultural_equipment', {
           'phone_number': state.phoneNumber,
           ...data,
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 8: // Entertainment
+      case 11: // Entertainment Facilities
         await _databaseService.saveData('entertainment_facilities', {
           'phone_number': state.phoneNumber,
           ...data,
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 9: // Transport
+      case 12: // Transport Facilities
         await _databaseService.saveData('transport_facilities', {
           'phone_number': state.phoneNumber,
           ...data,
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 10: // Water sources
+      case 13: // Water Sources
         await _databaseService.saveData('drinking_water_sources', {
           'phone_number': state.phoneNumber,
           ...data,
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 11: // Medical
+      case 14: // Medical Treatment
         await _databaseService.saveData('medical_treatment', {
           'phone_number': state.phoneNumber,
           ...data,
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 12: // Disputes
+      case 15: // Disputes
         await _databaseService.saveData('disputes', {
           'phone_number': state.phoneNumber,
           ...data,
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 13: // House conditions
+      case 16: // House Conditions
         await _databaseService.saveData('house_conditions', {
           'phone_number': state.phoneNumber,
           ...data,
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 14: // House facilities
-        await _databaseService.saveData('house_facilities', {
-          'phone_number': state.phoneNumber,
-          ...data,
-        });
-        await _syncPageDataToSupabase(page, data);
-        break;
-      case 15: // Nutritional garden
-        await _databaseService.saveData('nutritional_garden', {
-          'phone_number': state.phoneNumber,
-          ...data,
-        });
-        await _syncPageDataToSupabase(page, data);
-        break;
-      case 16: // Diseases
+      case 17: // Diseases
         if (data['diseases'] != null) {
           for (final disease in data['diseases']) {
             await _databaseService.saveData('diseases', {
@@ -566,6 +584,10 @@ class SurveyNotifier extends Notifier<SurveyState> {
     state = state.copyWith(surveyData: newData);
   }
 
+  Future<void> savePageData(int page, Map<String, dynamic> data) async {
+    await _savePageData(page, data);
+  }
+
   void setLoading(bool loading) {
     state = state.copyWith(isLoading: loading);
   }
@@ -610,6 +632,29 @@ class SurveyNotifier extends Notifier<SurveyState> {
       }
     } catch (e) {
       print('Error loading survey session for preview: $e');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  Future<void> loadSurveySessionForContinuation(String sessionId) async {
+    try {
+      setLoading(true);
+
+      // Load session data
+      final sessionData = await _databaseService.getSurveySession(sessionId);
+      if (sessionData != null) {
+        state = state.copyWith(phoneNumber: sessionId);
+
+        // Load all survey data for this session
+        await _loadAllSurveyData();
+
+        // For continuation, start from page 0 but with existing data loaded
+        // The user can navigate through pages and continue filling
+        state = state.copyWith(currentPage: 0);
+      }
+    } catch (e) {
+      print('Error loading survey session for continuation: $e');
     } finally {
       setLoading(false);
     }

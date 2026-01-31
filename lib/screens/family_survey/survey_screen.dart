@@ -4,14 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../components/logo_widget.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/survey_provider.dart';
-import 'widgets/progress_bar.dart';
+ import 'widgets/progress_bar.dart';
 import 'widgets/side_navigation.dart';
 import 'widgets/survey_page.dart';
 
 class SurveyScreen extends ConsumerStatefulWidget {
   final String? previewSessionId;
+  final String? continueSessionId;
 
-  const SurveyScreen({super.key, this.previewSessionId});
+  const SurveyScreen({super.key, this.previewSessionId, this.continueSessionId});
 
   @override
   ConsumerState<SurveyScreen> createState() => _SurveyScreenState();
@@ -27,6 +28,22 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     _initializeSurvey();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Handle route arguments here since context is now available
+    if (!_isPreviewMode && widget.previewSessionId == null && widget.continueSessionId == null) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null) {
+        if (args.containsKey('previewSessionId')) {
+          _handlePreviewMode(args['previewSessionId']);
+        } else if (args.containsKey('continueSessionId')) {
+          _handleContinueMode(args['continueSessionId']);
+        }
+      }
+    }
+  }
+
   Future<void> _initializeSurvey() async {
     final surveyNotifier = ref.read(surveyProvider.notifier);
 
@@ -38,18 +55,25 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _pageController.jumpToPage(surveyNotifier.state.totalPages - 1);
       });
-    } else {
-      // Normal survey mode - initialize new survey
-      // Check if we have route arguments for preview
-      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      if (args != null && args.containsKey('previewSessionId')) {
-        _isPreviewMode = true;
-        await surveyNotifier.loadSurveySessionForPreview(args['previewSessionId']);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _pageController.jumpToPage(surveyNotifier.state.totalPages - 1);
-        });
-      }
+    } else if (widget.continueSessionId != null) {
+      // Continue mode - load existing session data for continuation
+      await surveyNotifier.loadSurveySessionForContinuation(widget.continueSessionId!);
     }
+    // Route arguments are now handled in didChangeDependencies
+  }
+
+  Future<void> _handlePreviewMode(String previewSessionId) async {
+    final surveyNotifier = ref.read(surveyProvider.notifier);
+    _isPreviewMode = true;
+    await surveyNotifier.loadSurveySessionForPreview(previewSessionId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pageController.jumpToPage(surveyNotifier.state.totalPages - 1);
+    });
+  }
+
+  Future<void> _handleContinueMode(String continueSessionId) async {
+    final surveyNotifier = ref.read(surveyProvider.notifier);
+    await surveyNotifier.loadSurveySessionForContinuation(continueSessionId);
   }
 
   @override
@@ -262,7 +286,7 @@ body: Column(
         return surveyData['crop_1_name']?.isNotEmpty ?? false;
 
       case 8: // Fertilizer - at least one type selected
-        return (surveyData['chemical_fertilizer'] == true) ||
+        return (surveyData['urea_fertilizer'] == true) ||
                (surveyData['organic_fertilizer'] == true);
 
       case 9: // Animals - at least one animal if any livestock

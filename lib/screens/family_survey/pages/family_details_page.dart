@@ -51,6 +51,9 @@ class _FamilyDetailsPageState extends State<FamilyDetailsPage> {
       'income': '',
       'awareness_about_village': '',
       'participate_gram_sabha': '',
+      // Insurance details
+      'insured': 'no',
+      'insurance_company': '',
     };
   }
 
@@ -346,6 +349,31 @@ class _FamilyDetailsPageState extends State<FamilyDetailsPage> {
                 _updateData();
               },
             ),
+
+            // Insured?
+            _buildDropdown(
+              label: 'Insured',
+              value: member['insured']?.toString().isNotEmpty == true ? member['insured'] : 'no',
+              items: ['yes', 'no'],
+              onChanged: (val) {
+                setState(() {
+                  member['insured'] = val;
+                  if (val != 'yes') member['insurance_company'] = '';
+                });
+                _updateData();
+              },
+            ),
+
+            // Insurance Company (only if insured)
+            if (member['insured'] == 'yes')
+              _buildTextField(
+                label: 'Insurance Company',
+                initialValue: member['insurance_company'],
+                onChanged: (val) {
+                  member['insurance_company'] = val;
+                  _updateData();
+                },
+              ),
           ],
         ),
       ),

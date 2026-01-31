@@ -1,9 +1,11 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../../providers/survey_provider.dart';
 
-class IrrigationPage extends StatefulWidget {
+class IrrigationPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> pageData;
   final Function(Map<String, dynamic>) onDataChanged;
 
@@ -14,36 +16,50 @@ class IrrigationPage extends StatefulWidget {
   });
 
   @override
-  State<IrrigationPage> createState() => _IrrigationPageState();
+  ConsumerState<IrrigationPage> createState() => _IrrigationPageState();
 }
 
-class _IrrigationPageState extends State<IrrigationPage> {
+class _IrrigationPageState extends ConsumerState<IrrigationPage> {
   late bool _canal;
   late bool _tubeWell;
   late bool _ponds;
   late bool _otherFacilities;
 
+  String? _otherIrrigationSpecify;
+
   @override
   void initState() {
     super.initState();
-    _canal = widget.pageData['canal'] ?? false;
-    _tubeWell = widget.pageData['tube_well'] ?? false;
-    _ponds = widget.pageData['ponds'] ?? false;
-    _otherFacilities = widget.pageData['other_facilities'] ?? false;
+    _canal = _parseBool(widget.pageData['canal']);
+    _tubeWell = _parseBool(widget.pageData['tube_well']);
+    _ponds = _parseBool(widget.pageData['ponds']);
+    _otherFacilities = _parseBool(widget.pageData['other_facilities']);
+    
+    _otherIrrigationSpecify = widget.pageData['other_irrigation_specify'];
+  }
+
+  bool _parseBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is String) return value.toLowerCase() == 'yes' || value.toLowerCase() == 'true';
+    if (value is int) return value == 1;
+    return false;
   }
 
   void _updateData() {
     final data = {
-      'canal': _canal,
-      'tube_well': _tubeWell,
-      'ponds': _ponds,
-      'other_facilities': _otherFacilities,
+      'canal': _canal ? 'Yes' : 'No',
+      'tube_well': _tubeWell ? 'Yes' : 'No',
+      'ponds': _ponds ? 'Yes' : 'No',
+      'other_facilities': _otherFacilities ? 'Yes' : 'No',
+      'other_irrigation_specify': _otherIrrigationSpecify,
     };
     widget.onDataChanged(data);
+    ref.read(surveyProvider.notifier).savePageData(6, data);
   }
 
   @override
   Widget build(BuildContext context) {
+    // ignore: unused_local_variable
     final l10n = AppLocalizations.of(context)!;
 
     return SingleChildScrollView(
@@ -64,7 +80,7 @@ class _IrrigationPageState extends State<IrrigationPage> {
           FadeInDown(
             delay: const Duration(milliseconds: 100),
             child: Text(
-              l10n.selectIrrigationFacilities,
+              l10n.selectIrrigationFacilities ?? 'Select available irrigation facilities',
               style: TextStyle(
                 color: Colors.grey[600],
                 fontSize: 16,
@@ -83,10 +99,10 @@ class _IrrigationPageState extends State<IrrigationPage> {
               ),
               child: CheckboxListTile(
                 title: Text(
-                  l10n.canalIrrigation,
-                  style: TextStyle(fontWeight: FontWeight.w500),
+                  l10n.canal,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
-                subtitle: Text(l10n.governmentCanalWaterSupply),
+                subtitle: const Text('Government canal water supply'),
                 secondary: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -119,17 +135,17 @@ class _IrrigationPageState extends State<IrrigationPage> {
               ),
               child: CheckboxListTile(
                 title: Text(
-                  l10n.tubeWellBoreWell,
-                  style: TextStyle(fontWeight: FontWeight.w500),
+                  l10n.tubeWell,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
-                subtitle: Text(l10n.undergroundWaterExtraction),
+                subtitle: const Text('Borewell or tube well'),
                 secondary: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange[100],
+                    color: Colors.teal[100],
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.settings, color: Colors.orange),
+                  child: const Icon(Icons.arrow_downward, color: Colors.teal),
                 ),
                 value: _tubeWell,
                 onChanged: (value) {
@@ -155,17 +171,17 @@ class _IrrigationPageState extends State<IrrigationPage> {
               ),
               child: CheckboxListTile(
                 title: Text(
-                  l10n.pondsLakes,
-                  style: TextStyle(fontWeight: FontWeight.w500),
+                  l10n.ponds,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
-                subtitle: Text(l10n.naturalWaterStorageBodies),
+                subtitle: const Text('Farm ponds or community ponds'),
                 secondary: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.teal[100],
+                    color: Colors.cyan[100],
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.pool, color: Colors.teal),
+                  child: const Icon(Icons.waves, color: Colors.cyan),
                 ),
                 value: _ponds,
                 onChanged: (value) {
@@ -191,10 +207,10 @@ class _IrrigationPageState extends State<IrrigationPage> {
               ),
               child: CheckboxListTile(
                 title: Text(
-                  l10n.otherIrrigationFacilities,
-                  style: TextStyle(fontWeight: FontWeight.w500),
+                  l10n.otherFacilities,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
-                subtitle: Text(l10n.dripSprinklerEtc),
+                subtitle: const Text('Any other irrigation source'),
                 secondary: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -216,10 +232,32 @@ class _IrrigationPageState extends State<IrrigationPage> {
             ),
           ),
           const SizedBox(height: 24),
+          
+          if (_otherFacilities) ...[
+            FadeInLeft(
+              delay: const Duration(milliseconds: 550),
+              child: TextFormField(
+                initialValue: _otherIrrigationSpecify,
+                decoration: InputDecoration(
+                  labelText: 'Specify other irrigation facilities',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onChanged: (value) {
+                  _otherIrrigationSpecify = value;
+                  _updateData();
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+
 
           // Information Text
           FadeInUp(
-            delay: const Duration(milliseconds: 600),
+            delay: const Duration(milliseconds: 500),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -233,7 +271,7 @@ class _IrrigationPageState extends State<IrrigationPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      l10n.selectIrrigationMethodsInfo,
+                      l10n.selectIrrigationMethodsInfo ?? 'Please select all applicable irrigation sources',
                       style: TextStyle(
                         color: Colors.green[700],
                         fontSize: 14,
@@ -244,37 +282,6 @@ class _IrrigationPageState extends State<IrrigationPage> {
               ),
             ),
           ),
-
-          // Validation Message
-          if (!_canal && !_tubeWell && !_ponds && !_otherFacilities)
-            FadeInUp(
-              delay: const Duration(milliseconds: 700),
-              child: Container(
-                margin: const EdgeInsets.only(top: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.orange[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.pleaseSelectIrrigationFacility,
-                        style: TextStyle(
-                          color: Colors.orange[700],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
     );

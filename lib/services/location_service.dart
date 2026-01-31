@@ -1,43 +1,73 @@
-// Temporarily disabled native location services for minimal APK build
-// import 'package:geolocator/geolocator.dart';
-// import 'package:geocoding/geocoding.dart';
+import 'package:location/location.dart';
 
 class LocationService {
+  static final Location _location = Location();
+
   static Future<bool> checkLocationPermission() async {
-    // Mock implementation - location services disabled
-    print('Location services temporarily disabled for minimal APK build');
-    return false;
+    bool serviceEnabled = await _location.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await _location.requestService();
+      if (!serviceEnabled) return false;
+    }
+
+    PermissionStatus permissionGranted = await _location.hasPermission();
+    if (permissionGranted == PermissionStatus.denied) {
+      permissionGranted = await _location.requestPermission();
+      if (permissionGranted != PermissionStatus.granted) return false;
+    }
+
+    return true;
   }
 
   static Future<Map<String, dynamic>?> getCurrentPosition() async {
-    // Mock implementation - return null to indicate location unavailable
-    print('Location services temporarily disabled for minimal APK build');
-    return null;
+    try {
+      if (!await checkLocationPermission()) return null;
+
+      LocationData locationData = await _location.getLocation();
+      return {
+        'latitude': locationData.latitude,
+        'longitude': locationData.longitude,
+        'accuracy': locationData.accuracy,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+    } catch (e) {
+      print('Error getting current position: $e');
+      return null;
+    }
   }
 
   static Future<Map<String, String>?> getAddressFromCoordinates(
       double latitude, double longitude) async {
-    // Mock implementation - return null to indicate geocoding unavailable
-    print('Geocoding services temporarily disabled for minimal APK build');
-    return null;
+    // For now, return basic location info
+    // TODO: Implement reverse geocoding when needed
+    return {
+      'latitude': latitude.toString(),
+      'longitude': longitude.toString(),
+      'coordinates': '$latitude, $longitude',
+    };
   }
 
   static Future<Map<String, dynamic>?> getCompleteLocationData() async {
-    // Mock implementation - return sample data for testing
-    print('Location services temporarily disabled for minimal APK build');
-    print('Returning mock location data for testing purposes');
+    try {
+      if (!await checkLocationPermission()) return null;
 
-    // Return mock data to allow the app to function
-    return {
-      'latitude': 28.6139,  // Delhi coordinates as example
-      'longitude': 77.2090,
-      'accuracy': 10.0,
-      'timestamp': DateTime.now().toIso8601String(),
-      'village': 'Sample Village',
-      'district': 'Sample District',
-      'state': 'Sample State',
-      'pincode': '110001',
-      'country': 'India',
-    };
+      LocationData locationData = await _location.getLocation();
+
+      return {
+        'latitude': locationData.latitude,
+        'longitude': locationData.longitude,
+        'accuracy': locationData.accuracy ?? 0.0,
+        'timestamp': DateTime.now().toIso8601String(),
+        'village': '', // Will be filled by reverse geocoding if implemented
+        'subLocality': '', // Will be filled by reverse geocoding if implemented
+        'subAdministrativeArea': '', // Will be filled by reverse geocoding if implemented
+        'administrativeArea': '', // Will be filled by reverse geocoding if implemented
+        'postalCode': '', // Will be filled by reverse geocoding if implemented
+        'country': 'India', // Default for India
+      };
+    } catch (e) {
+      print('Error getting complete location data: $e');
+      return null;
+    }
   }
 }

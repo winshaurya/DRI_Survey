@@ -47,10 +47,37 @@ CREATE TABLE IF NOT EXISTS family_survey_sessions (
     -- Audit fields
     created_by TEXT,
     updated_by TEXT,
-    
+
     -- Sync fields
     is_deleted BOOLEAN DEFAULT FALSE,
-    last_synced_at TIMESTAMPTZ
+    last_synced_at TIMESTAMPTZ,
+
+    -- Versioning fields
+    current_version INTEGER DEFAULT 1,
+    last_edited_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ===========================================
+-- FAMILY FORM HISTORY TABLE
+-- ===========================================
+CREATE TABLE IF NOT EXISTS family_form_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    -- Version metadata
+    edited_by TEXT,
+    edit_reason TEXT,
+    is_auto_save BOOLEAN DEFAULT FALSE,
+
+    -- Complete form data as JSON
+    form_data JSONB NOT NULL,
+
+    -- Change summary (optional)
+    changes_summary TEXT,
+
+    UNIQUE(phone_number, version)
 );
 
 -- ===========================================
@@ -81,32 +108,73 @@ CREATE TABLE IF NOT EXISTS family_members (
     income DECIMAL(10,2),
     awareness_about_village TEXT CHECK (awareness_about_village IN ('high', 'medium', 'low', 'none')),
     participate_gram_sabha TEXT CHECK (participate_gram_sabha IN ('regularly', 'sometimes', 'rarely', 'never')),
+    -- Insurance details
+    insured TEXT CHECK (insured IN ('yes', 'no')) DEFAULT 'no',
+    insurance_company TEXT,
 
     UNIQUE(phone_number, sr_no)
 );
 
 -- ===========================================
--- AGRICULTURE DATA TABLE (MERGED: land_holding, irrigation_facilities, fertilizer_usage)
+-- LAND HOLDING TABLE
 -- ===========================================
-CREATE TABLE IF NOT EXISTS agriculture_data (
+CREATE TABLE IF NOT EXISTS land_holding (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
 
-    -- Land holding data
     irrigated_area DECIMAL(8,2),
     cultivable_area DECIMAL(8,2),
-    orchard_plants_type TEXT,
+    unirrigated_area DECIMAL(8,2),
+    barren_land DECIMAL(8,2),
+    
+    -- Specific orchard plants
+    mango_trees INTEGER DEFAULT 0,
+    guava_trees INTEGER DEFAULT 0,
+    lemon_trees INTEGER DEFAULT 0,
+    pomegranate_trees INTEGER DEFAULT 0,
+    other_fruit_trees_name TEXT,
+    other_fruit_trees_count INTEGER DEFAULT 0,
 
-    -- Irrigation facilities data
+    UNIQUE(phone_number)
+);
+
+-- ===========================================
+-- IRRIGATION FACILITIES TABLE
+-- ===========================================
+CREATE TABLE IF NOT EXISTS irrigation_facilities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    primary_source TEXT,
+    
     canal TEXT,
     tube_well TEXT,
-    ponds TEXT,
+    river TEXT,
+    pond TEXT,
+    well TEXT,
+    hand_pump TEXT,
+    submersible TEXT,
+    rainwater_harvesting TEXT, 
+    check_dam TEXT,
     other_sources TEXT,
 
-    -- Fertilizer usage data
-    chemical_fertilizer TEXT,
+    UNIQUE(phone_number)
+);
+
+-- ===========================================
+-- FERTILIZER USAGE TABLE
+-- ===========================================
+CREATE TABLE IF NOT EXISTS fertilizer_usage (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    urea_fertilizer TEXT,
     organic_fertilizer TEXT,
+    fertilizer_types TEXT,
+    fertilizer_expenditure DECIMAL(10,2),
 
     UNIQUE(phone_number)
 );
@@ -157,16 +225,29 @@ CREATE TABLE IF NOT EXISTS agricultural_equipment (
     created_at TIMESTAMPTZ DEFAULT NOW(),
 
     tractor TEXT,
+    tractor_condition TEXT CHECK (tractor_condition IN ('good', 'average', 'bad')),
     thresher TEXT,
+    thresher_condition TEXT CHECK (thresher_condition IN ('good', 'average', 'bad')),
     seed_drill TEXT,
+    seed_drill_condition TEXT CHECK (seed_drill_condition IN ('good', 'average', 'bad')),
     sprayer TEXT,
+    sprayer_condition TEXT CHECK (sprayer_condition IN ('good', 'average', 'bad')),
     duster TEXT,
+    duster_condition TEXT CHECK (duster_condition IN ('good', 'average', 'bad')),
     diesel_engine TEXT,
+    diesel_engine_condition TEXT CHECK (diesel_engine_condition IN ('good', 'average', 'bad')),
     other_equipment TEXT,
-    other_specify TEXT,
 
     UNIQUE(phone_number)
 );
+
+-- Add condition columns for existing tables (migration)
+ALTER TABLE agricultural_equipment ADD COLUMN IF NOT EXISTS tractor_condition TEXT CHECK (tractor_condition IN ('good', 'average', 'bad'));
+ALTER TABLE agricultural_equipment ADD COLUMN IF NOT EXISTS thresher_condition TEXT CHECK (thresher_condition IN ('good', 'average', 'bad'));
+ALTER TABLE agricultural_equipment ADD COLUMN IF NOT EXISTS seed_drill_condition TEXT CHECK (seed_drill_condition IN ('good', 'average', 'bad'));
+ALTER TABLE agricultural_equipment ADD COLUMN IF NOT EXISTS sprayer_condition TEXT CHECK (sprayer_condition IN ('good', 'average', 'bad'));
+ALTER TABLE agricultural_equipment ADD COLUMN IF NOT EXISTS duster_condition TEXT CHECK (duster_condition IN ('good', 'average', 'bad'));
+ALTER TABLE agricultural_equipment ADD COLUMN IF NOT EXISTS diesel_engine_condition TEXT CHECK (diesel_engine_condition IN ('good', 'average', 'bad'));
 
 -- ===========================================
 -- ENTERTAINMENT FACILITIES TABLE
@@ -217,16 +298,28 @@ CREATE TABLE IF NOT EXISTS drinking_water_sources (
 
     hand_pumps TEXT,
     hand_pumps_distance DECIMAL(5,1),
+    hand_pumps_quality TEXT CHECK (hand_pumps_quality IN ('clean', 'dirty')),
     well TEXT,
     well_distance DECIMAL(5,1),
+    well_quality TEXT CHECK (well_quality IN ('clean', 'dirty')),
     tubewell TEXT,
     tubewell_distance DECIMAL(5,1),
+    tubewell_quality TEXT CHECK (tubewell_quality IN ('clean', 'dirty')),
     nal_jaal TEXT,
+    nal_jaal_quality TEXT CHECK (nal_jaal_quality IN ('clean', 'dirty')),
     other_source TEXT,
     other_distance DECIMAL(5,1),
+    other_sources_quality TEXT CHECK (other_sources_quality IN ('clean', 'dirty')),
 
     UNIQUE(phone_number)
 );
+
+-- Add water quality columns to existing tables (migration)
+ALTER TABLE drinking_water_sources ADD COLUMN IF NOT EXISTS hand_pumps_quality TEXT CHECK (hand_pumps_quality IN ('clean', 'dirty'));
+ALTER TABLE drinking_water_sources ADD COLUMN IF NOT EXISTS well_quality TEXT CHECK (well_quality IN ('clean', 'dirty'));
+ALTER TABLE drinking_water_sources ADD COLUMN IF NOT EXISTS tubewell_quality TEXT CHECK (tubewell_quality IN ('clean', 'dirty'));
+ALTER TABLE drinking_water_sources ADD COLUMN IF NOT EXISTS nal_jaal_quality TEXT CHECK (nal_jaal_quality IN ('clean', 'dirty'));
+ALTER TABLE drinking_water_sources ADD COLUMN IF NOT EXISTS other_sources_quality TEXT CHECK (other_sources_quality IN ('clean', 'dirty'));
 
 -- ===========================================
 -- MEDICAL TREATMENT TABLE
@@ -794,7 +887,6 @@ CREATE TABLE IF NOT EXISTS merged_govt_schemes (
     fasal_bima_beneficiary TEXT,
     fasal_bima_received TEXT,
     fasal_bima_details_correct TEXT,
-
     UNIQUE(phone_number)
 );
 
@@ -807,9 +899,11 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
     created_at TIMESTAMPTZ DEFAULT NOW(),
 
     sr_no INTEGER NOT NULL,
-    name TEXT,
-    have_account TEXT,
+    member_name TEXT,
+    account_number TEXT,
+    bank_name TEXT,
     details_correct TEXT,
+    incorrect_details TEXT,
 
     UNIQUE(phone_number, sr_no)
 );
@@ -817,49 +911,94 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
 -- ===========================================
 -- SOCIAL CONSCIOUSNESS SURVEY TABLE
 -- ===========================================
+-- Note: Replaced legacy schema with new fields (Feb 2026)
 CREATE TABLE IF NOT EXISTS social_consciousness (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Sync fields
+    is_deleted BOOLEAN DEFAULT FALSE,
 
-    buy_clothes_frequency TEXT,
-    food_waste TEXT,
-    food_waste_amount TEXT,
+    -- Environmental Consciousness
+    clothes_frequency TEXT,
     waste_disposal TEXT,
-    waste_segregation TEXT,
-    compost_pit TEXT,
-    recycle_items TEXT,
-    toilet_available TEXT,
+    separate_waste TEXT,
+    recycle_wet_waste TEXT,
+    recycle_method TEXT,
+    recycle_water TEXT,
+    water_recycle_usage TEXT,
+    rainwater_harvesting TEXT,
+
+    -- Household & Energy
+    have_toilet TEXT,
     toilet_in_use TEXT,
-    toilet_soak_pit TEXT,
+    soak_pit TEXT,
     led_lights TEXT,
     turn_off_devices TEXT,
     fix_leaks TEXT,
     avoid_plastics TEXT,
-    family_puja TEXT,
-    family_meditate TEXT,
-    meditate_who TEXT,
+
+    -- Spirituality & Community
+    family_prayers TEXT,
+    family_meditation TEXT,
+    meditation_members TEXT,
     family_yoga TEXT,
-    yoga_who TEXT,
+    yoga_members TEXT,
     community_activities TEXT,
-    activities_type TEXT,
+    community_activities_type TEXT,
     shram_sadhana TEXT,
-    shram_who TEXT,
+    shram_sadhana_members TEXT,
     spiritual_discourses TEXT,
-    discourses_who TEXT,
-    family_happy TEXT,
-    members_happy TEXT,
-    happy_who TEXT,
-    smoking TEXT,
-    drinking TEXT,
-    gudka TEXT,
-    gambling TEXT,
-    tobacco TEXT,
-    saving_habit TEXT,
-    saving_percentage TEXT,
+    discourses_members TEXT,
+
+    -- Well-being & Happiness
+    family_happiness TEXT,
+    personal_happiness TEXT,
+    unhappiness_reason TEXT,
+    financial_problems TEXT,
+    family_disputes TEXT,
+    illness_issues TEXT,
+    other_unhappiness_reason TEXT,
+    family_addictions TEXT,
+    addiction_details TEXT,
+
+    -- New Fields (Survey Update 2026)
+    clothes_other_specify TEXT,
+    food_waste_exists TEXT,
+    food_waste_amount TEXT,
+    waste_disposal_other TEXT,
+    compost_pit TEXT,
+    recycle_used_items TEXT,
+    happiness_family_who TEXT,
+    addiction_smoke TEXT,
+    addiction_drink TEXT,
+    addiction_gutka TEXT,
+    addiction_gamble TEXT,
+    addiction_tobacco TEXT,
+    savings_exists TEXT,
+    savings_percentage TEXT,
 
     UNIQUE(phone_number)
 );
+
+-- Migration for existing tables
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS clothes_other_specify TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS food_waste_exists TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS food_waste_amount TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS waste_disposal_other TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS compost_pit TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS recycle_used_items TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS happiness_family_who TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS addiction_smoke TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS addiction_drink TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS addiction_gutka TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS addiction_gamble TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS addiction_tobacco TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS savings_exists TEXT;
+ALTER TABLE social_consciousness ADD COLUMN IF NOT EXISTS savings_percentage TEXT;
+
 
 -- ===========================================
 -- TRIBAL FAMILIES ADDITIONAL QUESTIONS TABLE
@@ -888,6 +1027,8 @@ CREATE TABLE IF NOT EXISTS tribal_questions (
 CREATE INDEX IF NOT EXISTS idx_family_sessions_status ON family_survey_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_family_sessions_date ON family_survey_sessions(survey_date);
 CREATE INDEX IF NOT EXISTS idx_family_sessions_shine ON family_survey_sessions(shine_code);
+CREATE INDEX IF NOT EXISTS idx_family_form_history_session ON family_form_history(phone_number);
+CREATE INDEX IF NOT EXISTS idx_family_form_history_version ON family_form_history(phone_number, version);
 CREATE INDEX IF NOT EXISTS idx_family_members_session ON family_members(phone_number);
 CREATE INDEX IF NOT EXISTS idx_crop_productivity_session ON crop_productivity(phone_number);
 CREATE INDEX IF NOT EXISTS idx_animals_session ON animals(phone_number);
@@ -902,6 +1043,7 @@ CREATE INDEX IF NOT EXISTS idx_fpo_session ON fpo_members(phone_number);
 
 -- Enable RLS on all tables
 ALTER TABLE family_survey_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE family_form_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE family_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agriculture_data ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crop_productivity ENABLE ROW LEVEL SECURITY;
@@ -953,6 +1095,15 @@ ALTER TABLE tribal_questions ENABLE ROW LEVEL SECURITY;
 -- SECURE RLS Policies: Users can only access their own surveys based on surveyor_email
 CREATE POLICY "Users can access their own family surveys" ON family_survey_sessions
     FOR ALL USING (auth.jwt() ->> 'email' = surveyor_email);
+
+CREATE POLICY "Users can access family form history from their surveys" ON family_form_history
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM family_survey_sessions
+            WHERE phone_number = family_form_history.phone_number
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
 
 -- Child tables inherit the same restriction through foreign key relationships
 CREATE POLICY "Users can access family members from their surveys" ON family_members

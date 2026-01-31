@@ -76,23 +76,48 @@ class SurveyProgressBar extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          // Page Indicators
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              totalPages,
-              (index) => Container(
-                width: 8,
-                height: 8,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: index <= currentPage
-                      ? Colors.green
-                      : Colors.grey[300],
+          // Page Indicators - Show max 20 indicators or scale down
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final maxIndicators = totalPages > 20 ? 20 : totalPages;
+              final indicatorSize = totalPages > 20 ? 4.0 : 6.0;
+              final spacing = totalPages > 20 ? 1.0 : 2.0;
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  maxIndicators,
+                  (index) {
+                    // For large page counts, show representative indicators
+                    int actualIndex;
+                    if (totalPages <= 20) {
+                      actualIndex = index;
+                    } else {
+                      // Show first 10, last 10, but highlight current appropriately
+                      if (index < 9) {
+                        actualIndex = index;
+                      } else if (index == 9) {
+                        actualIndex = (currentPage / (totalPages - 1) * 19).round();
+                      } else {
+                        actualIndex = totalPages - (20 - index);
+                      }
+                    }
+
+                    return Container(
+                      width: indicatorSize,
+                      height: indicatorSize,
+                      margin: EdgeInsets.symmetric(horizontal: spacing),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: actualIndex <= currentPage
+                            ? Colors.green
+                            : Colors.grey[300],
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),

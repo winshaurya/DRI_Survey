@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../components/autocomplete_dropdown.dart';
 import '../../../l10n/app_localizations.dart';
 
 class CropProductivityPage extends StatefulWidget {
@@ -18,6 +19,35 @@ class CropProductivityPage extends StatefulWidget {
 
 class _CropProductivityPageState extends State<CropProductivityPage> {
   List<Map<String, dynamic>> _crops = [];
+  List<TextEditingController> _cropNameControllers = [];
+
+  // Crop options organized by season
+  final Map<String, List<String>> cropOptions = {
+    'Kharif': [
+      'Sorghum',
+      'Pearlmillet',
+      'Rice',
+      'Greengram',
+      'Blackgram',
+      'Pigeon pea',
+      'Sesame',
+      'Vegetables'
+    ],
+    'Rabi': [
+      'Wheat',
+      'Barley',
+      'Chickpea',
+      'Lentil',
+      'Mustard',
+      'Linseed',
+      'Vegetables'
+    ],
+    'Summer': [
+      'Greengram',
+      'Blackgram',
+      'Vegetables'
+    ]
+  };
 
   @override
   void initState() {
@@ -26,9 +56,23 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
     if (_crops.isEmpty) {
       _crops.add({
         'id': 1,
-        'name': 'Crop 1',
+        'season': 'Kharif',
+        'name': 'Rice',
+        'area': '',
+        'productivity': '',
+        'total_production': '',
+        'sold': ''
       });
+      _cropNameControllers.add(TextEditingController(text: 'Rice'));
     }
+  }
+
+  @override
+  void dispose() {
+    for (var controller in _cropNameControllers) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   void _addCrop() {
@@ -37,8 +81,14 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
         final newId = _crops.length + 1;
         _crops.add({
           'id': newId,
-          'name': 'Crop $newId',
+          'season': 'Kharif',
+          'name': 'Rice',
+          'area': '',
+          'productivity': '',
+          'total_production': '',
+          'sold': ''
         });
+        _cropNameControllers.add(TextEditingController(text: 'Rice'));
       });
     }
   }
@@ -47,8 +97,15 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
     if (_crops.length > 1) {
       setState(() {
         _crops.removeAt(index);
+        _cropNameControllers[index].dispose();
+        _cropNameControllers.removeAt(index);
       });
     }
+  }
+
+  void _updateCropData(int cropId, String field, String value) {
+    widget.pageData['crop_${cropId}_$field'] = value;
+    widget.onDataChanged(widget.pageData);
   }
 
   @override
@@ -58,70 +115,66 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          l10n.cropProductivity,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.green,
-          ),
+        // Header
+        Row(
+          children: [
+            Icon(Icons.grass, color: Colors.green[700], size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                l10n.cropProductivity,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         Text(
           'Please provide details about your crop production',
-          style: TextStyle(color: Colors.grey[600]),
+          style: TextStyle(color: Colors.grey[600], fontSize: 14),
         ),
         const SizedBox(height: 24),
 
-        // Header row for table
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.green[50],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Expanded(flex: 2, child: Text(l10n.cropName, style: TextStyle(fontWeight: FontWeight.bold))),
-              Expanded(flex: 1, child: Text('${l10n.areaAcres} (Acres)', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-              Expanded(flex: 1, child: Text('${l10n.productivity} (Qtl/Acre)', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-              Expanded(flex: 1, child: Text(l10n.totalProduction, style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-              Expanded(flex: 1, child: Text(l10n.quantitySold, style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Crop entries
+        // Crop entries - Mobile-friendly card layout
         ..._crops.asMap().entries.map((entry) {
           final index = entry.key;
           final crop = entry.value;
           return Column(
             children: [
-              _buildCropRow(crop['id'], l10n, _crops.length > 1 ? () => _removeCrop(index) : null),
-              const SizedBox(height: 8),
+              _buildCropCard(crop['id'], l10n, _crops.length > 1 ? () => _removeCrop(index) : null),
+              const SizedBox(height: 16),
             ],
           );
         }),
 
         const SizedBox(height: 16),
 
+        // Add crop button
         if (_crops.length < 10)
-          ElevatedButton.icon(
-            onPressed: _addCrop,
-            icon: const Icon(Icons.add),
-            label: const Text('Add Another Crop'),
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          Container(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _addCrop,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Another Crop'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
-        // Summary
+        // Summary Card
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -131,15 +184,29 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
           ),
           child: Row(
             children: [
-              Icon(Icons.grass, color: Colors.blue[700]),
+              Icon(Icons.analytics, color: Colors.blue[700]),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'Total crop types: ${_crops.length}',
-                  style: TextStyle(
-                    color: Colors.blue[700],
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Summary',
+                      style: TextStyle(
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Total crop types: ${_crops.length}',
+                      style: TextStyle(
+                        color: Colors.blue[700],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -149,144 +216,290 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
     );
   }
 
-  Widget _buildCropRow(int cropNumber, AppLocalizations l10n, VoidCallback? onRemove) {
+  Widget _buildCropCard(int cropNumber, AppLocalizations l10n, VoidCallback? onRemove) {
     return Card(
-      elevation: 2,
+      elevation: 3,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [Colors.white, Colors.green[50]!],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header with crop number and delete button
             Row(
               children: [
-                Text(
-                  'Crop ${cropNumber}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.green[100],
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Crop ${cropNumber}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green[800],
+                    ),
                   ),
                 ),
                 const Spacer(),
                 if (onRemove != null)
                   IconButton(
                     onPressed: onRemove,
-                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                    icon: const Icon(Icons.delete_forever, color: Colors.red),
                     tooltip: 'Remove Crop',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.red[50],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
               ],
             ),
+
+            const SizedBox(height: 20),
+
+            // Season Selection
+            Text(
+              'Season',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
             const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              child: DropdownButtonFormField<String>(
+                value: widget.pageData['crop_${cropNumber}_season'] ?? 'Kharif',
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.green[200]!),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.green[200]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.green[600]!, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
+                items: cropOptions.keys.map((season) {
+                  return DropdownMenuItem<String>(
+                    value: season,
+                    child: Text(
+                      season,
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    widget.pageData['crop_${cropNumber}_season'] = value;
+                    // Reset crop name when season changes
+                    final defaultCrop = cropOptions[value]!.first;
+                    widget.pageData['crop_${cropNumber}_name'] = defaultCrop;
+                    _cropNameControllers[cropNumber - 1].text = defaultCrop;
+                  });
+                  widget.onDataChanged(widget.pageData);
+                },
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Crop Selection
+            Text(
+              'Crop Type',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            AutocompleteDropdown(
+              label: 'Crop Type',
+              hintText: 'Type or select crop name',
+              options: cropOptions[widget.pageData['crop_${cropNumber}_season'] ?? 'Kharif'] ?? cropOptions['Kharif']!,
+              controller: _cropNameControllers[cropNumber - 1],
+              initialValue: widget.pageData['crop_${cropNumber}_name'] ?? cropOptions['Kharif']!.first,
+              onChanged: (value) {
+                widget.pageData['crop_${cropNumber}_name'] = value;
+                widget.onDataChanged(widget.pageData);
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            // Production Details - Two columns for mobile
+            Text(
+              'Production Details',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // First row: Area and Productivity
             Row(
               children: [
-Expanded(
-                  flex: 2,
-                  child: DropdownButtonFormField<String>(
-                    value: widget.pageData['crop_${cropNumber}_name'],
-                    decoration: InputDecoration(
-                      labelText: l10n.cropName,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Area (Acres)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'Sorghum', child: Text('Sorghum')),
-                      DropdownMenuItem(value: 'Pearlmillet', child: Text('Pearlmillet')),
-                      DropdownMenuItem(value: 'Rice', child: Text('Rice')),
-                      DropdownMenuItem(value: 'Greengram', child: Text('Greengram')),
-                      DropdownMenuItem(value: 'Blackgram', child: Text('Blackgram')),
-                      DropdownMenuItem(value: 'Pigeon pea', child: Text('Pigeon pea')),
-                      DropdownMenuItem(value: 'Sesame', child: Text('Sesame')),
-                      DropdownMenuItem(value: 'Vegetables', child: Text('Vegetables')),
-                      DropdownMenuItem(value: 'Wheat', child: Text('Wheat')),
-                      DropdownMenuItem(value: 'Barley', child: Text('Barley')),
-                      DropdownMenuItem(value: 'Chickpea', child: Text('Chickpea')),
-                      DropdownMenuItem(value: 'Lentil', child: Text('Lentil')),
-                      DropdownMenuItem(value: 'Mustard', child: Text('Mustard')),
-                      DropdownMenuItem(value: 'Linseed', child: Text('Linseed')),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        initialValue: widget.pageData['crop_${cropNumber}_area'],
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          widget.pageData['crop_${cropNumber}_area'] = value;
+                          widget.onDataChanged(widget.pageData);
+                        },
+                      ),
                     ],
-                    onChanged: (value) {
-                      widget.pageData['crop_${cropNumber}_name'] = value;
-                      widget.onDataChanged(widget.pageData);
-                    },
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 16),
                 Expanded(
-                  flex: 1,
-                  child: TextFormField(
-                    initialValue: widget.pageData['crop_${cropNumber}_area'],
-                    decoration: InputDecoration(
-                      labelText: '${l10n.areaAcres} (Acres)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Productivity (Qtl/Acre)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      widget.pageData['crop_${cropNumber}_area'] = value;
-                      widget.onDataChanged(widget.pageData);
-                    },
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        initialValue: widget.pageData['crop_${cropNumber}_productivity'],
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          widget.pageData['crop_${cropNumber}_productivity'] = value;
+                          widget.onDataChanged(widget.pageData);
+                        },
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 4),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // Second row: Total Production and Quantity Sold
+            Row(
+              children: [
                 Expanded(
-                  flex: 1,
-                  child: TextFormField(
-                    initialValue: widget.pageData['crop_${cropNumber}_productivity'],
-                    decoration: InputDecoration(
-                      labelText: '${l10n.productivity} (Qtl/Acre)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Total Production (Qtl)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      widget.pageData['crop_${cropNumber}_productivity'] = value;
-                      widget.onDataChanged(widget.pageData);
-                    },
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        initialValue: widget.pageData['crop_${cropNumber}_total_production'],
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          widget.pageData['crop_${cropNumber}_total_production'] = value;
+                          widget.onDataChanged(widget.pageData);
+                        },
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 16),
                 Expanded(
-                  flex: 1,
-                  child: TextFormField(
-                    initialValue: widget.pageData['crop_${cropNumber}_total_production'],
-                    decoration: InputDecoration(
-                      labelText: l10n.totalProduction,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Quantity Sold (Qtl)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      widget.pageData['crop_${cropNumber}_total_production'] = value;
-                      widget.onDataChanged(widget.pageData);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  flex: 1,
-                  child: TextFormField(
-                    initialValue: widget.pageData['crop_${cropNumber}_sold'],
-                    decoration: InputDecoration(
-                      labelText: l10n.quantitySold,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        initialValue: widget.pageData['crop_${cropNumber}_sold'],
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          widget.pageData['crop_${cropNumber}_sold'] = value;
+                          widget.onDataChanged(widget.pageData);
+                        },
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      widget.pageData['crop_${cropNumber}_sold'] = value;
-                      widget.onDataChanged(widget.pageData);
-                    },
+                    ],
                   ),
                 ),
               ],

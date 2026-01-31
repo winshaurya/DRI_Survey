@@ -7,12 +7,20 @@ import '../../../l10n/app_localizations.dart';
 import '../../../providers/font_size_provider.dart';
 import '../../../providers/survey_provider.dart';
 import '../pages/animals_page.dart';
+import '../pages/children_page.dart';
 import '../pages/crop_productivity_page.dart';
+import '../pages/equipment_page.dart';
 import '../pages/family_details_page.dart';
+import '../pages/fertilizer_page.dart';
+import '../pages/house_conditions_page.dart';
+import '../pages/irrigation_page.dart';
+import '../pages/land_holding_page.dart';
 import '../pages/location_page.dart';
 import '../pages/social_consciousness_page_1.dart';
 import '../pages/social_consciousness_page_2.dart';
 import '../pages/social_consciousness_page_3.dart';
+import '../../../services/xlsx_export_service.dart';
+import 'package:open_file/open_file.dart';
 
 class SurveyPage extends ConsumerStatefulWidget {
   final int pageIndex;
@@ -148,26 +156,50 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
           formKey: _formKey,
         );
       case 2:
-        return SocialConsciousnessPage1();
+        return SocialConsciousnessPage1(
+          pageData: _pageData,
+          onDataChanged: _mergePageData,
+        );
       case 3:
-        return SocialConsciousnessPage2();
+        return SocialConsciousnessPage2(
+          pageData: _pageData,
+          onDataChanged: _mergePageData,
+        );
       case 4:
-        return SocialConsciousnessPage3();
+        return SocialConsciousnessPage3(
+          pageData: _pageData,
+          onDataChanged: _mergePageData,
+        );
       case 5:
-        return _buildLandHoldingPage(l10n);
+        return LandHoldingPage(
+          pageData: _pageData,
+          onDataChanged: _mergePageData,
+        );
       case 6:
-        return _buildIrrigationPage(l10n);
+        return IrrigationPage(
+          pageData: _pageData,
+          onDataChanged: _mergePageData,
+        );
       case 7:
         return CropProductivityPage(
           pageData: _pageData,
           onDataChanged: _mergePageData,
         );
       case 8:
-        return _buildFertilizerPage(l10n);
+        return FertilizerPage(
+          pageData: _pageData,
+          onDataChanged: _mergePageData,
+        );
       case 9:
-        return AnimalsPage();
+        return AnimalsPage(
+          pageData: _pageData,
+          onDataChanged: _mergePageData,
+        );
       case 10:
-        return _buildEquipmentPage(l10n);
+        return EquipmentPage(
+          pageData: _pageData,
+          onDataChanged: _mergePageData,
+        );
       case 11:
         return _buildEntertainmentPage(l10n);
       case 12:
@@ -179,13 +211,19 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
       case 15:
         return _buildDisputesPage(l10n);
       case 16:
-        return _buildHouseConditionsPage(l10n);
+        return HouseConditionsPage(
+          pageData: _pageData,
+          onDataChanged: _mergePageData,
+        );
       case 17:
         return _buildDiseasesPage(l10n);
       case 18:
         return _buildGovernmentSchemesPage(l10n);
       case 19:
-        return _buildChildrenPage(l10n);
+        return ChildrenPage(
+          pageData: _pageData,
+          onDataChanged: _mergePageData,
+        );
       case 20:
         return _buildMigrationPage(l10n);
       case 21:
@@ -1662,7 +1700,7 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
             ),
             const SizedBox(height: 16),
 
-            TextFormField(
+            TextFormField(  
               initialValue: animalData?['animal_type'],
               decoration: InputDecoration(
                 labelText: l10n.animalType,
@@ -2456,7 +2494,7 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
         ),
         const SizedBox(height: 24),
 
-        _buildCheckboxField(l10n.chemical, 'chemical_fertilizer'),
+        _buildCheckboxField('Urea', 'urea_fertilizer'),
         _buildCheckboxField(l10n.organic, 'organic_fertilizer'),
 
         const SizedBox(height: 16),
@@ -3522,7 +3560,7 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
           ]),
 
           _buildPreviewSection('Fertilizer Usage', [
-            _buildPreviewField('Chemical Fertilizer', surveyData['chemical_fertilizer'] == true ? 'Yes' : 'No'),
+            _buildPreviewField('Urea Fertilizer', surveyData['urea_fertilizer'] == true ? 'Yes' : 'No'),
             _buildPreviewField('Organic Fertilizer', surveyData['organic_fertilizer'] == true ? 'Yes' : 'No'),
             _buildPreviewField('Fertilizer Types', surveyData['fertilizer_types']),
             _buildPreviewField('Fertilizer Expenditure (₹)', surveyData['fertilizer_expenditure']),
@@ -3697,6 +3735,53 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
           ]),
 
           const SizedBox(height: 32),
+          Center(
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.file_download),
+              label: const Text('Export as Excel'),
+              onPressed: () async {
+                final phone = ref.read(surveyProvider).phoneNumber;
+                if (phone == null || phone.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No session available to export')),
+                  );
+                  return;
+                }
+
+                final timestamp = DateTime.now().millisecondsSinceEpoch;
+                final fileName = 'survey_${phone}_$timestamp.xlsx';
+
+                try {
+                  final savedPath = await XlsxExportService().exportSurveyToXlsx(phone, fileName);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Exported to $savedPath'),
+                      action: SnackBarAction(
+                        label: 'Open',
+                        onPressed: () async {
+                          try {
+                            await OpenFile.open(savedPath);
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Could not open file: $e')),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Export failed: $e')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -23,7 +23,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 4,
+      version: 12,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -145,6 +145,211 @@ class DatabaseHelper {
         )
       ''');
     }
+    
+    // Version 5: Re-schema social_consciousness
+    if (oldVersion < 5) {
+      // Recreate social_consciousness table with correct schema
+      await db.execute('DROP TABLE IF EXISTS social_consciousness');
+      await db.execute('''
+        CREATE TABLE social_consciousness (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          survey_id INTEGER,
+          -- Sanitation
+          uses_toilet INTEGER CHECK (uses_toilet IN (0, 1)),
+          toilet_type TEXT,
+          waste_disposal TEXT,
+          segregates_waste INTEGER CHECK (segregates_waste IN (0, 1)),
+          -- Energy
+          energy_source_cooking TEXT,
+          energy_source_lighting TEXT,
+          uses_renewables INTEGER CHECK (uses_renewables IN (0, 1)),
+          -- Civic
+          has_voter_card INTEGER CHECK (has_voter_card IN (0, 1)),
+          gram_sabha_participation INTEGER CHECK (gram_sabha_participation IN (0, 1)),
+          rights_awareness TEXT,
+          -- Meta
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          remote_id TEXT,
+          is_deleted INTEGER DEFAULT 0,
+          FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
+        )
+      ''');
+    }
+
+    if (oldVersion < 6) {
+      // Update land_holding table
+      await db.execute('ALTER TABLE land_holding ADD COLUMN mango_trees INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE land_holding ADD COLUMN guava_trees INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE land_holding ADD COLUMN lemon_trees INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE land_holding ADD COLUMN banana_plants INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE land_holding ADD COLUMN papaya_trees INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE land_holding ADD COLUMN other_fruit_trees INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE land_holding ADD COLUMN other_orchard_plants TEXT');
+
+      // Update irrigation_facilities table
+      await db.execute('ALTER TABLE irrigation_facilities ADD COLUMN other_irrigation_specify TEXT');
+    }
+    if (oldVersion < 7) {
+      try {
+        await db.execute("ALTER TABLE family_details ADD COLUMN insured TEXT DEFAULT 'no'");
+      } catch (e) {
+        // ignore if exists
+      }
+      try {
+        await db.execute('ALTER TABLE family_details ADD COLUMN insurance_company TEXT');
+      } catch (e) {
+        // ignore if exists
+      }
+    }
+    
+    if (oldVersion < 8) {
+       // Add new social consciousness columns
+       final newColumns = [
+        'clothes_frequency TEXT',
+        'separate_waste TEXT',
+        'recycle_wet_waste TEXT',
+        'recycle_method TEXT',
+        'recycle_water TEXT',
+        'water_recycle_usage TEXT',
+        'rainwater_harvesting TEXT',
+        'have_toilet TEXT',
+        'toilet_in_use TEXT',
+        'soak_pit TEXT',
+        'led_lights TEXT',
+        'turn_off_devices TEXT',
+        'fix_leaks TEXT',
+        'avoid_plastics TEXT',
+        'family_prayers TEXT',
+        'family_meditation TEXT',
+        'meditation_members TEXT',
+        'family_yoga TEXT',
+        'yoga_members TEXT',
+        'community_activities TEXT',
+        'community_activities_type TEXT',
+        'shram_sadhana TEXT',
+        'shram_sadhana_members TEXT',
+        'spiritual_discourses TEXT',
+        'discourses_members TEXT',
+        'family_happiness TEXT',
+        'personal_happiness TEXT',
+        'unhappiness_reason TEXT',
+        'financial_problems TEXT',
+        'family_disputes TEXT',
+        'illness_issues TEXT',
+        'other_unhappiness_reason TEXT',
+        'family_addictions TEXT',
+        'addiction_details TEXT'
+      ];
+      
+      for (var column in newColumns) {
+         try {
+           await db.execute('ALTER TABLE social_consciousness ADD COLUMN $column');
+         } catch (e) {
+           // ignore if exists
+         }
+      }
+    }
+    
+    if (oldVersion < 9) {
+      // Add detailed social consciousness columns
+      final newColumnsV9 = [
+        'clothes_other_specify TEXT',
+        'food_waste_exists TEXT',
+        'food_waste_amount TEXT',
+        'waste_disposal_other TEXT',
+        'compost_pit TEXT',
+        'recycle_used_items TEXT',
+        'happiness_family_who TEXT',
+        'addiction_smoke TEXT',
+        'addiction_drink TEXT',
+        'addiction_gutka TEXT',
+        'addiction_gamble TEXT',
+        'addiction_tobacco TEXT',
+        'savings_exists TEXT',
+        'savings_percentage TEXT'
+      ];
+
+      for (var column in newColumnsV9) {
+         try {
+           await db.execute('ALTER TABLE social_consciousness ADD COLUMN $column');
+         } catch (e) {
+           // ignore if exists
+         }
+      }
+    }
+
+    if (oldVersion < 10) {
+      // Version 10: Update bank_accounts table for new requirements
+      var result = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='bank_accounts'");
+      if (result.isEmpty) {
+         await db.execute('''
+          CREATE TABLE bank_accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            survey_id INTEGER,
+            sr_no INTEGER,
+            member_name TEXT,
+            account_number TEXT,
+            bank_name TEXT,
+            details_correct TEXT,
+            incorrect_details TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
+          )
+        ''');
+      } else {
+         // Add columns if table exists
+         try {
+            await db.execute('ALTER TABLE bank_accounts ADD COLUMN account_number TEXT');
+         } catch (e) { /* ignore */ }
+         try {
+            await db.execute('ALTER TABLE bank_accounts ADD COLUMN details_correct TEXT');
+         } catch (e) { /* ignore */ }
+         try {
+            await db.execute('ALTER TABLE bank_accounts ADD COLUMN incorrect_details TEXT');
+         } catch (e) { /* ignore */ }
+      }
+    }
+
+    if (oldVersion < 11) {
+      // Version 11: Add condition columns for agricultural equipment
+      try {
+        await db.execute('ALTER TABLE agricultural_equipment ADD COLUMN tractor_condition TEXT');
+      } catch (e) { /* ignore */ }
+      try {
+        await db.execute('ALTER TABLE agricultural_equipment ADD COLUMN thresher_condition TEXT');
+      } catch (e) { /* ignore */ }
+      try {
+        await db.execute('ALTER TABLE agricultural_equipment ADD COLUMN seed_drill_condition TEXT');
+      } catch (e) { /* ignore */ }
+      try {
+        await db.execute('ALTER TABLE agricultural_equipment ADD COLUMN sprayer_condition TEXT');
+      } catch (e) { /* ignore */ }
+      try {
+        await db.execute('ALTER TABLE agricultural_equipment ADD COLUMN duster_condition TEXT');
+      } catch (e) { /* ignore */ }
+      try {
+        await db.execute('ALTER TABLE agricultural_equipment ADD COLUMN diesel_engine_condition TEXT');
+      } catch (e) { /* ignore */ }
+    }
+
+    if (oldVersion < 12) {
+      // Version 12: Add water quality columns to drinking_water_sources table
+      try {
+        await db.execute('ALTER TABLE drinking_water_sources ADD COLUMN hand_pumps_quality TEXT');
+      } catch (e) { /* ignore */ }
+      try {
+        await db.execute('ALTER TABLE drinking_water_sources ADD COLUMN well_quality TEXT');
+      } catch (e) { /* ignore */ }
+      try {
+        await db.execute('ALTER TABLE drinking_water_sources ADD COLUMN tubewell_quality TEXT');
+      } catch (e) { /* ignore */ }
+      try {
+        await db.execute('ALTER TABLE drinking_water_sources ADD COLUMN nal_jaal_quality TEXT');
+      } catch (e) { /* ignore */ }
+      try {
+        await db.execute('ALTER TABLE drinking_water_sources ADD COLUMN other_sources_quality TEXT');
+      } catch (e) { /* ignore */ }
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -189,6 +394,8 @@ class DatabaseHelper {
         income REAL,
         awareness_about_village TEXT,
         participate_gram_sabha TEXT,
+        insured TEXT DEFAULT 'no',
+        insurance_company TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         is_deleted INTEGER DEFAULT 0,
         FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
@@ -203,6 +410,13 @@ class DatabaseHelper {
         irrigated_area REAL,
         cultivable_area REAL,
         orchard_plants TEXT,
+        mango_trees INTEGER DEFAULT 0,
+        guava_trees INTEGER DEFAULT 0,
+        lemon_trees INTEGER DEFAULT 0,
+        banana_plants INTEGER DEFAULT 0,
+        papaya_trees INTEGER DEFAULT 0,
+        other_fruit_trees INTEGER DEFAULT 0,
+        other_orchard_plants TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
       )
@@ -217,6 +431,7 @@ class DatabaseHelper {
         tube_well INTEGER DEFAULT 0,
         ponds INTEGER DEFAULT 0,
         other_facilities TEXT,
+        other_irrigation_specify TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
       )
@@ -272,11 +487,17 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         survey_id INTEGER,
         tractor INTEGER DEFAULT 0,
+        tractor_condition TEXT,
         thresher INTEGER DEFAULT 0,
+        thresher_condition TEXT,
         seed_drill INTEGER DEFAULT 0,
+        seed_drill_condition TEXT,
         sprayer INTEGER DEFAULT 0,
+        sprayer_condition TEXT,
         duster INTEGER DEFAULT 0,
+        duster_condition TEXT,
         diesel_engine INTEGER DEFAULT 0,
+        diesel_engine_condition TEXT,
         other_equipment TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
@@ -324,13 +545,18 @@ class DatabaseHelper {
         survey_id INTEGER,
         hand_pumps INTEGER DEFAULT 0,
         hand_pumps_distance REAL,
+        hand_pumps_quality TEXT,
         well INTEGER DEFAULT 0,
         well_distance REAL,
+        well_quality TEXT,
         tubewell INTEGER DEFAULT 0,
         tubewell_distance REAL,
+        tubewell_quality TEXT,
         nal_jaal INTEGER DEFAULT 0,
+        nal_jaal_quality TEXT,
         other_sources TEXT,
         other_distance REAL,
+        other_sources_quality TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
       )
@@ -613,9 +839,70 @@ class DatabaseHelper {
       CREATE TABLE social_consciousness (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         survey_id INTEGER,
-        question_number INTEGER,
-        response TEXT,
+        
+        -- Environmental Consciousness
+        clothes_frequency TEXT,
+        waste_disposal TEXT,
+        separate_waste TEXT,
+        recycle_wet_waste TEXT,
+        recycle_method TEXT,
+        recycle_water TEXT,
+        water_recycle_usage TEXT,
+        rainwater_harvesting TEXT,
+
+        -- Household & Energy
+        have_toilet TEXT,
+        toilet_in_use TEXT,
+        soak_pit TEXT,
+        led_lights TEXT,
+        turn_off_devices TEXT,
+        fix_leaks TEXT,
+        avoid_plastics TEXT,
+
+        -- Spirituality & Community
+        family_prayers TEXT,
+        family_meditation TEXT,
+        meditation_members TEXT,
+        family_yoga TEXT,
+        yoga_members TEXT,
+        community_activities TEXT,
+        community_activities_type TEXT,
+        shram_sadhana TEXT,
+        shram_sadhana_members TEXT,
+        spiritual_discourses TEXT,
+        discourses_members TEXT,
+
+        -- Well-being & Happiness
+        family_happiness TEXT,
+        personal_happiness TEXT,
+        unhappiness_reason TEXT,
+        financial_problems TEXT,
+        family_disputes TEXT,
+        illness_issues TEXT,
+        other_unhappiness_reason TEXT,
+        family_addictions TEXT,
+        addiction_details TEXT,
+
+        -- New Columns (Version 9)
+        clothes_other_specify TEXT,
+        food_waste_exists TEXT,
+        food_waste_amount TEXT,
+        waste_disposal_other TEXT,
+        compost_pit TEXT,
+        recycle_used_items TEXT,
+        happiness_family_who TEXT,
+        addiction_smoke TEXT,
+        addiction_drink TEXT,
+        addiction_gutka TEXT,
+        addiction_gamble TEXT,
+        addiction_tobacco TEXT,
+        savings_exists TEXT,
+        savings_percentage TEXT,
+
+        -- Meta
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        remote_id TEXT,
+        is_deleted INTEGER DEFAULT 0,
         FOREIGN KEY (survey_id) REFERENCES surveys (id) ON DELETE CASCADE
       )
     ''');
@@ -867,6 +1154,53 @@ class DatabaseHelper {
         }
       }
     });
+  }
+
+  // Bank Account & Family Member Helpers
+  Future<List<String>> getFamilyMembers(int surveyId) async {
+    Database db = await database;
+    List<Map<String, dynamic>> results = await db.query(
+      'family_details',
+      columns: ['name'],
+      where: 'survey_id = ?',
+      whereArgs: [surveyId],
+      orderBy: 'id ASC',
+    );
+    return results.map((e) => e['name'] as String).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getBankAccounts(int surveyId) async {
+    Database db = await database;
+    return await db.query(
+      'bank_accounts',
+      where: 'survey_id = ?',
+      whereArgs: [surveyId],
+      orderBy: 'sr_no ASC',
+    );
+  }
+
+  Future<int> insertBankAccount(Map<String, dynamic> account) async {
+    Database db = await database;
+    return await db.insert('bank_accounts', account);
+  }
+
+  Future<int> updateBankAccount(Map<String, dynamic> account) async {
+    Database db = await database;
+    return await db.update(
+      'bank_accounts',
+      account,
+      where: 'id = ?',
+      whereArgs: [account['id']],
+    );
+  }
+
+  Future<int> deleteBankAccount(int id) async {
+    Database db = await database;
+    return await db.delete(
+      'bank_accounts',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   // Close database

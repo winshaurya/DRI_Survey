@@ -23,15 +23,17 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     setState(() => _isExporting = true);
 
     try {
+      final exportService = DataExportService();
+
       switch (exportType) {
         case 'all_surveys':
-          await DataExportService.exportAllSurveysToCSV();
+          await exportService.exportAllSurveysToExcel();
           break;
         case 'summary_report':
-          await DataExportService.generateSurveySummaryReport();
+          await exportService.generateSurveySummaryReport();
           break;
         case 'json_backup':
-          // await DataExportService.exportDataAsJSON();
+          await exportService.exportDataAsJSON();
           break;
       }
 

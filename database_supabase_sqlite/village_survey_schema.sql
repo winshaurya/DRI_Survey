@@ -45,7 +45,34 @@ CREATE TABLE IF NOT EXISTS village_survey_sessions (
 
     -- Sync fields
     is_deleted BOOLEAN DEFAULT FALSE,
-    last_synced_at TIMESTAMPTZ
+    last_synced_at TIMESTAMPTZ,
+
+    -- Versioning fields
+    current_version INTEGER DEFAULT 1,
+    last_edited_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ===========================================
+-- VILLAGE FORM HISTORY TABLE
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_form_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    -- Version metadata
+    edited_by TEXT,
+    edit_reason TEXT,
+    is_auto_save BOOLEAN DEFAULT FALSE,
+
+    -- Complete form data as JSON
+    form_data JSONB NOT NULL,
+
+    -- Change summary (optional)
+    changes_summary TEXT,
+
+    UNIQUE(session_id, version)
 );
 
 -- ===========================================
@@ -536,6 +563,8 @@ CREATE TABLE IF NOT EXISTS village_unemployment (
 CREATE INDEX IF NOT EXISTS idx_village_sessions_status ON village_survey_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_village_sessions_date ON village_survey_sessions(survey_date);
 CREATE INDEX IF NOT EXISTS idx_village_sessions_shine ON village_survey_sessions(shine_code);
+CREATE INDEX IF NOT EXISTS idx_village_form_history_session ON village_form_history(session_id);
+CREATE INDEX IF NOT EXISTS idx_village_form_history_version ON village_form_history(session_id, version);
 CREATE INDEX IF NOT EXISTS idx_village_population_session ON village_population(session_id);
 CREATE INDEX IF NOT EXISTS idx_village_farm_families_session ON village_farm_families(session_id);
 CREATE INDEX IF NOT EXISTS idx_village_housing_session ON village_housing(session_id);
@@ -546,6 +575,7 @@ CREATE INDEX IF NOT EXISTS idx_village_animals_session ON village_animals(sessio
 -- RLS POLICIES (Supabase specific)
 -- ===========================================
 ALTER TABLE village_survey_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_form_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_population ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_farm_families ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_housing ENABLE ROW LEVEL SECURITY;
@@ -572,6 +602,15 @@ ALTER TABLE village_unemployment ENABLE ROW LEVEL SECURITY;
 -- SECURE RLS Policies: Users can only access their own village surveys based on surveyor_email
 CREATE POLICY "Users can access their own village surveys" ON village_survey_sessions
     FOR ALL USING (auth.jwt() ->> 'email' = surveyor_email);
+
+CREATE POLICY "Users can access village form history from their surveys" ON village_form_history
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_form_history.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
 
 -- Child tables inherit the same restriction through foreign key relationships
 CREATE POLICY "Users can access village population from their surveys" ON village_population

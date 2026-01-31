@@ -507,10 +507,11 @@ class SideNavigation extends ConsumerWidget {
                             value: 'preview',
                             child: Text('Preview'),
                           ),
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: Text('Delete'),
-                          ),
+                      // Delete functionality removed for data protection
+                      // const PopupMenuItem(
+                      //       value: 'delete',
+                      //       child: Text('Delete'),
+                      //     ),
                         ],
                       ),
                     ),
@@ -872,6 +873,7 @@ class SideNavigation extends ConsumerWidget {
         title: const Text('Survey History'),
         content: SizedBox(
           width: double.maxFinite,
+          height: 400,
           child: FutureBuilder<List<Map<String, dynamic>>>(
             future: DatabaseService().getAllSurveySessions(),
             builder: (context, snapshot) {
@@ -885,23 +887,95 @@ class SideNavigation extends ConsumerWidget {
               if (sessions.isEmpty) {
                 return const Text('No survey history found.');
               }
+
+              // Show all surveys (completed and in-progress)
+              if (sessions.isEmpty) {
+                return const Text('No surveys found.');
+              }
+
               return ListView.builder(
-                shrinkWrap: true,
                 itemCount: sessions.length,
                 itemBuilder: (context, index) {
                   final session = sessions[index];
-                  return ListTile(
-                    title: Text(session['phone_number'] ?? 'Unknown Phone'),
-                    subtitle: Text(
-                      'Village: ${session['village_name'] ?? 'N/A'}\nDate: ${session['survey_date'] ?? 'N/A'}\nStatus: ${session['status'] ?? 'Unknown'}',
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.download),
-                    onPressed: () {
-                      Navigator.pop(context); // Close dialog
-                      // Navigate to final page (preview) with this session data
-                      _navigateToSurveyPreview(context, session['phone_number']);
-                    },
+                  final phoneNumber = session['phone_number'] ?? 'Unknown Phone';
+                  final villageName = session['village_name'] ?? 'N/A';
+                  final surveyDate = session['survey_date'] ?? session['created_at'] ?? 'N/A';
+                  final status = session['status'] ?? 'in_progress';
+                  final isCompleted = status == 'completed';
+                  final isSynced = session['last_synced_at'] != null;
+
+                  // Determine status color and icon
+                  Color statusColor;
+                  IconData statusIcon;
+                  String statusText;
+
+                  if (isCompleted && isSynced) {
+                    statusColor = Colors.green;
+                    statusIcon = Icons.check_circle;
+                    statusText = 'Completed & Synced';
+                  } else if (isCompleted && !isSynced) {
+                    statusColor = Colors.blue;
+                    statusIcon = Icons.check;
+                    statusText = 'Completed (Pending Sync)';
+                  } else {
+                    statusColor = Colors.orange;
+                    statusIcon = Icons.edit;
+                    statusText = 'In Progress';
+                  }
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: statusColor,
+                        child: Icon(
+                          statusIcon,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        phoneNumber,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Village: $villageName'),
+                          Text(
+                            'Date: ${surveyDate.toString().split('T').first}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                          Text(
+                            statusText,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: statusColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(isCompleted ? Icons.visibility : Icons.edit),
+                        tooltip: isCompleted ? 'View Survey Details' : 'Continue Survey',
+                        onPressed: () {
+                          Navigator.pop(context); // Close dialog
+                          if (isCompleted) {
+                            _navigateToSurveyPreview(context, phoneNumber);
+                          } else {
+                            _navigateToContinueSurvey(context, phoneNumber);
+                          }
+                        },
+                      ),
+                      onTap: () {
+                        Navigator.pop(context); // Close dialog
+                        if (isCompleted) {
+                          _navigateToSurveyPreview(context, phoneNumber);
+                        } else {
+                          _navigateToContinueSurvey(context, phoneNumber);
+                        }
+                      },
                     ),
                   );
                 },
@@ -1289,6 +1363,15 @@ class SideNavigation extends ConsumerWidget {
       context,
       '/survey',
       arguments: {'previewSessionId': sessionId},
+    );
+  }
+
+  void _navigateToContinueSurvey(BuildContext context, String sessionId) {
+    // Navigate to survey screen and load the existing session to continue
+    Navigator.pushNamed(
+      context,
+      '/survey',
+      arguments: {'continueSessionId': sessionId},
     );
   }
 }

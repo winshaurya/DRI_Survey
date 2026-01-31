@@ -1,5 +1,5 @@
 {
-  "appTitle": "DRI Survey App",
+  "appTitle": "DRI PRA App",
   "startFamilyQuiz": "Start Family Quiz",
   "villageName": "Village Name",
   "panchayat": "Panchayat",
@@ -115,6 +115,7 @@
   "biogas": "Biogas",
   "solarCooking": "Solar Cooking",
   "electricConnection": "Electric Connection",
+  "electricalConnection": "Electrical Connection",
   "nutritionalGarden": "Nutritional Kitchen Garden",
   "seriousDiseases": "Serious Diseases",
   "diseaseName": "Disease Name",
@@ -440,5 +441,7 @@
   "river": "River",
   "selectedFacilities": "Selected Facilities",
   "step6": "Step 6",
-  "seedClubs": "Seed Clubs"
+  "seedClubs": "Seed Clubs",
+  "locationCoordinates": "Location Coordinates",
+  "captureGpsCoordinates": "Capture GPS Coordinates"
 }

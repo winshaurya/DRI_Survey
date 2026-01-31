@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:location/location.dart';
 import '../../l10n/app_localizations.dart';
 import '../../data/india_states_districts.dart';
 import '../../data/shine_villages.dart';
@@ -34,6 +37,12 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
   bool _isLoadingLocation = false;
   bool _locationFetched = false;
 
+  // Map state
+  MapController _mapController = MapController();
+  LatLng _currentLocation = LatLng(28.6139, 77.2090); // Default to Delhi
+  Location _location = Location();
+  bool _locationLoaded = false;
+
   // State/district options (loaded from static map)
   Map<String, List<String>> stateDistrictData = {};
   List<String> availableDistricts = [];
@@ -43,6 +52,29 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
   void initState() {
     super.initState();
     _loadStateDistrictData();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await _location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await _location.requestService();
+        if (!serviceEnabled) return;
+      }
+      PermissionStatus permissionGranted = await _location.hasPermission();
+      if (permissionGranted == PermissionStatus.denied) {
+        permissionGranted = await _location.requestPermission();
+        if (permissionGranted != PermissionStatus.granted) return;
+      }
+      LocationData locationData = await _location.getLocation();
+      setState(() {
+        _currentLocation = LatLng(locationData.latitude!, locationData.longitude!);
+        _locationLoaded = true;
+      });
+    } catch (e) {
+      // Handle error
+    }
   }
 
   void _loadStateDistrictData() {
@@ -183,12 +215,100 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
-        // 1. Coordinates (First Question)
+        // 1. Location with Map (First Question)
         QuestionCard(
           question: l10n.locationCoordinates,
           description: l10n.captureGpsCoordinates,
           child: Column(
             children: [
+              // OpenStreetMap Widget (16:9 aspect ratio)
+              Container(
+                height: MediaQuery.of(context).size.width * 9 / 16, // 16:9 aspect ratio
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    children: [
+                      FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          center: _currentLocation,
+                          zoom: 15.0,
+                          interactiveFlags: InteractiveFlag.none, // Disable all map interactions
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.example.edu_survey_new',
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              if (_locationLoaded)
+                                Marker(
+                                  point: _currentLocation,
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    child: Stack(
+                                      children: [
+                                        Icon(Icons.location_on, color: Colors.red, size: 40),
+                                        Positioned(
+                                          top: 5,
+                                          left: 13,
+                                          child: Container(
+                                            width: 14,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(color: Colors.red, width: 2),
+                                            ),
+                                            child: Icon(Icons.my_location, color: Colors.red, size: 8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      // Floating Action Button for centering map to current location
+                      Positioned(
+                        bottom: 16,
+                        right: 16,
+                        child: FloatingActionButton(
+                          onPressed: () {
+                            if (_locationLoaded) {
+                              _mapController.move(_currentLocation, 15.0);
+                            } else {
+                              _getCurrentLocation().then((_) {
+                                if (_locationLoaded) {
+                                  _mapController.move(_currentLocation, 15.0);
+                                }
+                              });
+                            }
+                          },
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.blue,
+                          elevation: 4,
+                          mini: true,
+                          child: const Icon(Icons.my_location),
+                          tooltip: 'Center to my location',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Location Coordinates Display
               if (_locationFetched && _latitude != null && _longitude != null)
                 Container(
                   margin: EdgeInsets.only(bottom: 12),
@@ -219,9 +339,11 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
                     ],
                   ),
                 ),
+
+              // Capture Location Button
               ElevatedButton.icon(
                 onPressed: _isLoadingLocation ? null : _fetchLocation,
-                icon: _isLoadingLocation 
+                icon: _isLoadingLocation
                     ? SizedBox(
                         width: 20,
                         height: 20,

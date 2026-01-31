@@ -1,5 +1,5 @@
 {
-  "appTitle": "डीआरआई सर्वे ऐप",
+  "appTitle": "डीआरआई पीआरए ऐप",
   "startFamilyQuiz": "परिवार प्रश्नोत्तरी शुरू करें",
   "villageName": "गाँव का नाम",
   "panchayat": "पंचायत",
@@ -115,6 +115,7 @@
   "biogas": "बायोगैस",
   "solarCooking": "सोलर कुकिंग",
   "electricConnection": "बिजली कनेक्शन",
+  "electricalConnection": "बिजली कनेक्शन",
   "nutritionalGarden": "पोषण किचन गार्डन",
   "seriousDiseases": "गंभीर बीमारियाँ",
   "diseaseName": "बीमारी का नाम",
@@ -627,5 +628,7 @@
   "river": "नदी",
   "selectedFacilities": "चयनित सुविधाएँ",
   "step6": "चरण 6",
-  "seedClubs": "बीज क्लब"
+  "seedClubs": "बीज क्लब",
+  "locationCoordinates": "स्थान निर्देशांक",
+  "captureGpsCoordinates": "GPS निर्देशांक कैप्चर करें"
 }

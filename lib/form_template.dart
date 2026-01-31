@@ -39,6 +39,7 @@ class FormTemplateScreen extends StatefulWidget {
 
 class _FormTemplateScreenState extends State<FormTemplateScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Color get _primaryColor => widget.primaryColor ?? Color(0xFF800080);
   Color get _backgroundColor => widget.backgroundColor ?? Color(0xFFF5F5F5);
 
@@ -104,8 +105,25 @@ class _FormTemplateScreenState extends State<FormTemplateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: _backgroundColor,
       drawer: widget.drawer,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startTop,
+      floatingActionButton: widget.drawer != null
+          ? Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: FloatingActionButton(
+                mini: true,
+                backgroundColor: Colors.white,
+                foregroundColor: _primaryColor,
+                elevation: 4,
+                onPressed: () {
+                  _scaffoldKey.currentState?.openDrawer();
+                },
+                child: Icon(Icons.menu),
+              ),
+            )
+          : null,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,

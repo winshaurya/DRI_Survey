@@ -121,6 +121,8 @@ class FamilyMember extends Equatable {
   final String? relation;
   final String? education;
   final String? occupation;
+  final String? insured;
+  final String? insuranceCompany;
   final String createdAt;
 
   const FamilyMember({
@@ -132,6 +134,8 @@ class FamilyMember extends Equatable {
     this.relation,
     this.education,
     this.occupation,
+    this.insured,
+    this.insuranceCompany,
     required this.createdAt,
   });
 
@@ -145,6 +149,8 @@ class FamilyMember extends Equatable {
       relation: map['relation'],
       education: map['education'],
       occupation: map['occupation'],
+      insured: map['insured'],
+      insuranceCompany: map['insurance_company'],
       createdAt: map['created_at'],
     );
   }
@@ -159,6 +165,8 @@ class FamilyMember extends Equatable {
       'relation': relation,
       'education': education,
       'occupation': occupation,
+      'insured': insured,
+      'insurance_company': insuranceCompany,
       'created_at': createdAt,
     };
   }
@@ -173,6 +181,8 @@ class FamilyMember extends Equatable {
         relation,
         education,
         occupation,
+        insured,
+        insuranceCompany,
         createdAt,
       ];
 }
@@ -1084,17 +1094,23 @@ class BeneficiaryProgram extends Equatable {
 class BankAccount extends Equatable {
   final int? id;
   final int surveyId;
+  final int? srNo;
   final String? memberName;
-  final bool hasAccount;
-  final bool detailsCorrect;
+  final String? accountNumber;
+  final String? bankName;
+  final String? detailsCorrect;
+  final String? incorrectDetails;
   final String createdAt;
 
   const BankAccount({
     this.id,
     required this.surveyId,
+    this.srNo,
     this.memberName,
-    required this.hasAccount,
-    required this.detailsCorrect,
+    this.accountNumber,
+    this.bankName,
+    this.detailsCorrect,
+    this.incorrectDetails,
     required this.createdAt,
   });
 
@@ -1102,9 +1118,12 @@ class BankAccount extends Equatable {
     return BankAccount(
       id: map['id'],
       surveyId: map['survey_id'],
+      srNo: map['sr_no'],
       memberName: map['member_name'],
-      hasAccount: map['has_account'] == 1,
-      detailsCorrect: map['details_correct'] == 1,
+      accountNumber: map['account_number'],
+      bankName: map['bank_name'],
+      detailsCorrect: map['details_correct']?.toString(),
+      incorrectDetails: map['incorrect_details'],
       createdAt: map['created_at'],
     );
   }
@@ -1113,20 +1132,50 @@ class BankAccount extends Equatable {
     return {
       'id': id,
       'survey_id': surveyId,
+      'sr_no': srNo,
       'member_name': memberName,
-      'has_account': hasAccount ? 1 : 0,
-      'details_correct': detailsCorrect ? 1 : 0,
+      'account_number': accountNumber,
+      'bank_name': bankName,
+      'details_correct': detailsCorrect,
+      'incorrect_details': incorrectDetails,
       'created_at': createdAt,
     };
+  }
+
+  BankAccount copyWith({
+    int? id,
+    int? surveyId,
+    int? srNo,
+    String? memberName,
+    String? accountNumber,
+    String? bankName,
+    String? detailsCorrect,
+    String? incorrectDetails,
+    String? createdAt,
+  }) {
+    return BankAccount(
+      id: id ?? this.id,
+      surveyId: surveyId ?? this.surveyId,
+      srNo: srNo ?? this.srNo,
+      memberName: memberName ?? this.memberName,
+      accountNumber: accountNumber ?? this.accountNumber,
+      bankName: bankName ?? this.bankName,
+      detailsCorrect: detailsCorrect ?? this.detailsCorrect,
+      incorrectDetails: incorrectDetails ?? this.incorrectDetails,
+      createdAt: createdAt ?? this.createdAt,
+    );
   }
 
   @override
   List<Object?> get props => [
         id,
         surveyId,
+        srNo,
         memberName,
-        hasAccount,
+        accountNumber,
+        bankName,
         detailsCorrect,
+        incorrectDetails,
         createdAt,
       ];
 }

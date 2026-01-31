@@ -141,7 +141,7 @@ class LandingScreen extends ConsumerWidget {
                           shadowColor: Colors.black.withOpacity(0.2),
                         ),
                         child: const Text(
-                          'DRI PRA',
+                          'Village Survey',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -169,7 +169,7 @@ class LandingScreen extends ConsumerWidget {
                           ),
                         ),
                         child: const Text(
-                          'DRI Family Survey',
+                          'Family Survey',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
