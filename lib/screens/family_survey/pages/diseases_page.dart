@@ -22,6 +22,47 @@ class _DiseasesPageState extends ConsumerState<DiseasesPage> {
   Map<String, dynamic> _diseasesData = {};
   List<String> _familyMemberNames = [];
 
+  static const List<String> _diseaseList = [
+    'Vatrog (Arthritis)',
+    'Charmrog (Skin Disease)',
+    'Dhaturog (Sexual Problem)',
+    'Madhumeh (Diabetes)',
+    'Bavasheer (Piles)',
+    'Hradayrog (Heart Disease)',
+    'Dama (Bronchitis)',
+    'Jiran Pratisyah (Acidity)',
+    'Udar-rog (Stomach Problem)',
+    'Karanrog (Ear Disease)',
+    'Mutrasay rog (UTI)',
+    'Anemia (Anaemia)',
+    'Piliya (Jaundice)',
+    'Sirshul (Headache)',
+    'Mukhrog (Mouth Disease)',
+    'Aundvraddhi (Hydrocele)',
+    'Hathipanv (Filariasis)',
+    'Shukrakshay (Male Infertility)',
+    'Mashtishkrog (Mental Disorder)',
+    'Aant-Utarna (Hernia)',
+    'Pakshaghat (Paralysis)',
+    'Pathari (Stone)',
+    'Ulti-dust (Vomiting/Loose Motions)',
+    'Kushtharog (Leprosy)',
+    'Jwar + Khansi (Fever + Cold & Cough)',
+    'Cancer',
+    'Chhayrog (TB)',
+    'Kati Shool (Lower Back Pain)',
+    'Liver Abscess',
+    'Pneumonia',
+    'Psoriasis',
+    'Vibandha (Constipation)',
+    'Miragee (Epileptic disease)',
+    'Bhagandar (Fistula)',
+    'White spot (Vitiligo)',
+    'Aam vaat (Gout)',
+    'Lakwa (Paralysis)',
+    'Other',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +117,7 @@ class _DiseasesPageState extends ConsumerState<DiseasesPage> {
           showReceived: false,
           showDays: false,
           showDiseaseName: true,
+          diseaseOptions: _diseaseList,
           showSufferingSince: true,
           showTreatmentTaken: true,
           showTreatmentFromWhen: true,

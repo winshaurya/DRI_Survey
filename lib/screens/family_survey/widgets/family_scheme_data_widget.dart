@@ -25,6 +25,9 @@ class FamilySchemeDataWidget extends StatefulWidget {
   final bool showTreatmentFromWhere;
   final bool showTreatmentTakenFrom;
 
+  // Optional list for disease autocomplete
+  final List<String>? diseaseOptions;
+
   const FamilySchemeDataWidget({
     Key? key,
     required this.title,
@@ -44,6 +47,7 @@ class FamilySchemeDataWidget extends StatefulWidget {
     this.showTreatmentFromWhen = false,
     this.showTreatmentFromWhere = false,
     this.showTreatmentTakenFrom = false,
+    this.diseaseOptions,
   }) : super(key: key);
 
   @override
@@ -352,23 +356,68 @@ class _FamilySchemeDataWidgetState extends State<FamilySchemeDataWidget> {
 
             // Disease Name (if enabled)
             if (widget.showDiseaseName) ...[
-              TextFormField(
-                initialValue: member['disease_name'] ?? '',
-                decoration: InputDecoration(
-                  labelText: 'Disease Name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              if (widget.diseaseOptions != null && widget.diseaseOptions!.isNotEmpty)
+                Autocomplete<String>(
+                  initialValue: TextEditingValue(text: member['disease_name'] ?? ''),
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text == '') {
+                      return widget.diseaseOptions!;
+                    }
+                    return widget.diseaseOptions!.where((String option) {
+                      return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                    });
+                  },
+                  onSelected: (String selection) {
+                    member['disease_name'] = selection;
+                    _notifyChange();
+                  },
+                  fieldViewBuilder: (BuildContext context, TextEditingController textEditingController, FocusNode focusNode, VoidCallback onFieldSubmitted) {
+                    return TextFormField(
+                      controller: textEditingController,
+                      focusNode: focusNode,
+                      decoration: InputDecoration(
+                        labelText: 'Disease Name',
+                        hintText: 'Select or type disease',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.medical_services),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.arrow_drop_down),
+                          onPressed: () {
+                            // Can't easily force open from here without complex RawAutocomplete
+                            // But usually focus does it if we hack it, but standard Autocomplete is fine
+                          },
+                        ),
+                        filled: true,
+                        fillColor: colorScheme.surface,
+                      ),
+                      onChanged: (val) {
+                        member['disease_name'] = val;
+                        _notifyChange();
+                      },
+                      style: theme.textTheme.bodyLarge,
+                    );
+                  },
+                )
+              else
+                TextFormField(
+                  initialValue: member['disease_name'] ?? '',
+                  decoration: InputDecoration(
+                    labelText: 'Disease Name',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.medical_services),
+                    filled: true,
+                    fillColor: colorScheme.surface,
                   ),
-                  prefixIcon: const Icon(Icons.medical_services),
-                  filled: true,
-                  fillColor: colorScheme.surface,
+                  onChanged: (val) {
+                    member['disease_name'] = val;
+                    _notifyChange();
+                  },
+                  style: theme.textTheme.bodyLarge,
                 ),
-                onChanged: (val) {
-                  member['disease_name'] = val;
-                  _notifyChange();
-                },
-                style: theme.textTheme.bodyLarge,
-              ),
               const SizedBox(height: 16),
             ],
 
