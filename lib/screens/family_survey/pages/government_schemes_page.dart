@@ -121,7 +121,7 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
 
   Widget _buildSchemeMemberSection(
     String title,
-    String icon,
+    IconData icon,
     Color color,
     List<Map<String, dynamic>> members,
     Function() onAddMember,
@@ -143,7 +143,7 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
                     color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(icon, style: const TextStyle(fontSize: 20)),
+                  child: Icon(icon, color: color, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -393,7 +393,7 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
             delay: const Duration(milliseconds: 200),
             child: _buildSchemeMemberSection(
               'Aadhaar Scheme',
-              '🆔',
+              Icons.badge, // Replaced '🆔' with Icons.badge
               Colors.blue,
               _aadhaarMembers,
               _addAadhaarMember,
@@ -405,10 +405,10 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
             delay: const Duration(milliseconds: 300),
             child: _buildSchemeMemberSection(
               'Ayushman Card',
-              '💳',
+              Icons.health_and_safety,
               Colors.teal,
-              _aadhaarMembers, // Replace with Ayushman members list
-              _addAadhaarMember, // Replace with Ayushman add member function
+              _aadhaarMembers, 
+              _addAadhaarMember,
             ),
           ),
 
@@ -417,10 +417,10 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
             delay: const Duration(milliseconds: 400),
             child: _buildSchemeMemberSection(
               'Family ID',
-              '🏠',
+              Icons.family_restroom,
               Colors.brown,
-              _aadhaarMembers, // Replace with Family ID members list
-              _addAadhaarMember, // Replace with Family ID add member function
+              _aadhaarMembers, 
+              _addAadhaarMember, 
             ),
           ),
 
@@ -429,10 +429,10 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
             delay: const Duration(milliseconds: 500),
             child: _buildSchemeMemberSection(
               'Ration Card',
-              '🍚',
+              Icons.shopping_basket,
               Colors.red,
-              _aadhaarMembers, // Replace with Ration Card members list
-              _addAadhaarMember, // Replace with Ration Card add member function
+              _aadhaarMembers, 
+              _addAadhaarMember, 
             ),
           ),
 
@@ -441,10 +441,10 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
             delay: const Duration(milliseconds: 600),
             child: _buildSchemeMemberSection(
               'Samagra ID',
-              '📜',
+              Icons.featured_play_list,
               Colors.purple,
-              _aadhaarMembers, // Replace with Samagra ID members list
-              _addAadhaarMember, // Replace with Samagra ID add member function
+              _aadhaarMembers, 
+              _addAadhaarMember, 
             ),
           ),
 
@@ -453,10 +453,10 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
             delay: const Duration(milliseconds: 700),
             child: _buildSchemeMemberSection(
               'Handicapped Allowance',
-              '♿',
+              Icons.accessible,
               Colors.orange,
-              _aadhaarMembers, // Replace with Handicapped Allowance members list
-              _addAadhaarMember, // Replace with Handicapped Allowance add member function
+              _aadhaarMembers, 
+              _addAadhaarMember, 
             ),
           ),
 
@@ -465,7 +465,7 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
             delay: const Duration(milliseconds: 300),
             child: _buildSchemeMemberSection(
               'Tribal Card Scheme',
-              '🏹',
+              Icons.forest,
               Colors.orange,
               _tribalMembers,
               _addTribalMember,
@@ -477,7 +477,7 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
             delay: const Duration(milliseconds: 400),
             child: _buildSchemeMemberSection(
               'Pension Allowance',
-              '👴',
+              Icons.elderly,
               Colors.green,
               _pensionMembers,
               _addPensionMember,
@@ -489,69 +489,10 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
             delay: const Duration(milliseconds: 500),
             child: _buildSchemeMemberSection(
               'Widow Allowance',
-              '👩',
+              Icons.person,
               Colors.purple,
               _widowMembers,
               _addWidowMember,
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Information Text
-          FadeInUp(
-            delay: const Duration(milliseconds: 600),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.indigo[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.indigo[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.account_balance, color: Colors.indigo[700]),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Government schemes provide essential support to rural families. Please provide detailed information about scheme enrollment and benefits received.',
-                      style: TextStyle(
-                        color: Colors.indigo[700],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Optional Note
-          FadeInUp(
-            delay: const Duration(milliseconds: 700),
-            child: Container(
-              margin: const EdgeInsets.only(top: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info, color: Colors.grey[600], size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'If your family is not enrolled in any government schemes, you can proceed without adding any members.',
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 14,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ],

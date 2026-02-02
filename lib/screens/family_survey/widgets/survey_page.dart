@@ -25,6 +25,8 @@ import '../pages/water_sources_page.dart';
 import '../pages/medical_page.dart';
 import '../pages/disputes_page.dart';
 import '../pages/diseases_page.dart';
+import '../pages/folklore_medicine_page.dart';
+import '../pages/health_programme_page.dart';
 import '../pages/migration_page.dart';
 import '../pages/training_page.dart';
 import '../pages/final_page.dart';
@@ -127,7 +129,7 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
                           ),
                         ),
                         child: Text(
-                          widget.pageIndex == 22 ? l10n.submit : l10n.next,
+                          widget.pageIndex == 24 ? l10n.submit : l10n.next,
                           style: const TextStyle(fontSize: 16),
                         ),
                       ),
@@ -183,12 +185,16 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
       case 18:
         return GovernmentSchemesPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
       case 19:
-        return ChildrenPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return FolkloreMedicinePage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
       case 20:
-        return MigrationPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return HealthProgrammePage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
       case 21:
-        return TrainingPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return ChildrenPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
       case 22:
+        return MigrationPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+      case 23:
+        return TrainingPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+      case 24:
         return FinalPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
       default:
         return const Center(child: Text('Page not found'));

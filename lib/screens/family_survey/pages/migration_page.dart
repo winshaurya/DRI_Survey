@@ -1,10 +1,12 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../../providers/survey_provider.dart';
 
-class MigrationPage extends StatefulWidget {
+class MigrationPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> pageData;
   final Function(Map<String, dynamic>) onDataChanged;
 
@@ -15,61 +17,67 @@ class MigrationPage extends StatefulWidget {
   });
 
   @override
-  State<MigrationPage> createState() => _MigrationPageState();
+  ConsumerState<MigrationPage> createState() => _MigrationPageState();
 }
 
-class _MigrationPageState extends State<MigrationPage> {
-  late bool _noMigration;
-  late bool _seasonalMigration;
-  late bool _permanentMigration;
-
-  late TextEditingController _seasonalMigrantsController;
-  late TextEditingController _permanentMigrantsController;
-  late TextEditingController _migrationReasonController;
+class _MigrationPageState extends ConsumerState<MigrationPage> {
+  List<Map<String, dynamic>> _migratedMembers = [];
+  List<String> _familyMemberNames = [];
+  bool _noMigration = false;
 
   @override
   void initState() {
     super.initState();
-    _noMigration = widget.pageData['no_migration'] ?? false;
-    _seasonalMigration = widget.pageData['seasonal_migration'] ?? false;
-    _permanentMigration = widget.pageData['permanent_migration'] ?? false;
-
-    _seasonalMigrantsController = TextEditingController(
-      text: widget.pageData['seasonal_migrants']?.toString() ?? '',
-    );
-    _permanentMigrantsController = TextEditingController(
-      text: widget.pageData['permanent_migrants']?.toString() ?? '',
-    );
-    _migrationReasonController = TextEditingController(
-      text: widget.pageData['migration_reason'] ?? '',
-    );
+    _loadFamilyMembers();
+    _initializeData();
   }
 
-  @override
-  void dispose() {
-    _seasonalMigrantsController.dispose();
-    _permanentMigrantsController.dispose();
-    _migrationReasonController.dispose();
-    super.dispose();
+  void _loadFamilyMembers() {
+    final surveyState = ref.read(surveyProvider);
+    final familyMembers = surveyState.surveyData['family_members'] as List<dynamic>? ?? [];
+    _familyMemberNames = familyMembers.map((member) => member['name'] as String? ?? '').where((name) => name.isNotEmpty).toList();
+  }
+
+  void _initializeData() {
+    _noMigration = widget.pageData['no_migration'] ?? false;
+    final existingData = widget.pageData['migrated_members'] as List<dynamic>?;
+    if (existingData != null) {
+      _migratedMembers = existingData.map((item) => Map<String, dynamic>.from(item)).toList();
+    }
   }
 
   void _updateData() {
     final data = {
       'no_migration': _noMigration,
-      'seasonal_migration': _seasonalMigration,
-      'permanent_migration': _permanentMigration,
-      'seasonal_migrants': int.tryParse(_seasonalMigrantsController.text),
-      'permanent_migrants': int.tryParse(_permanentMigrantsController.text),
-      if (_migrationReasonController.text.isNotEmpty)
-        'migration_reason': _migrationReasonController.text,
+      'migrated_members': _migratedMembers,
     };
     widget.onDataChanged(data);
   }
 
+  void _addMigratedMember() {
+    setState(() {
+      _migratedMembers.add({
+        'member_name': '',
+        'permanent_distance': '',
+        'permanent_job': '',
+        'seasonal_distance': '',
+        'seasonal_job': '',
+        'need_based_distance': '',
+        'need_based_job': '',
+      });
+    });
+    _updateData();
+  }
+
+  void _removeMember(int index) {
+    setState(() {
+      _migratedMembers.removeAt(index);
+    });
+    _updateData();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -88,7 +96,7 @@ class _MigrationPageState extends State<MigrationPage> {
           FadeInDown(
             delay: const Duration(milliseconds: 100),
             child: Text(
-              'Select migration patterns of your family members',
+              'Details of family members who have migrated for employment',
               style: TextStyle(
                 color: Colors.grey[600],
                 fontSize: 16,
@@ -97,7 +105,7 @@ class _MigrationPageState extends State<MigrationPage> {
           ),
           const SizedBox(height: 24),
 
-          // No Migration
+          // No Migration Checkbox
           FadeInLeft(
             delay: const Duration(milliseconds: 200),
             child: Card(
@@ -107,10 +115,10 @@ class _MigrationPageState extends State<MigrationPage> {
               ),
               child: CheckboxListTile(
                 title: const Text(
-                  'No Migration',
+                  'No Family Member has Migrated',
                   style: TextStyle(fontWeight: FontWeight.w500),
                 ),
-                subtitle: const Text('All family members live in the village'),
+                subtitle: const Text('All family members live and work in the village'),
                 secondary: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -121,7 +129,12 @@ class _MigrationPageState extends State<MigrationPage> {
                 ),
                 value: _noMigration,
                 onChanged: (value) {
-                  setState(() => _noMigration = value ?? false);
+                  setState(() {
+                    _noMigration = value ?? false;
+                    if (_noMigration) {
+                      _migratedMembers.clear();
+                    }
+                  });
                   _updateData();
                 },
                 activeColor: Colors.green,
@@ -131,245 +144,187 @@ class _MigrationPageState extends State<MigrationPage> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
-
-          // Seasonal Migration
-          FadeInLeft(
-            delay: const Duration(milliseconds: 300),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  CheckboxListTile(
-                    title: const Text(
-                      'Seasonal Migration',
-                      style: TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    subtitle: const Text('Family members migrate seasonally for work'),
-                    secondary: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.repeat, color: Colors.blue),
-                    ),
-                    value: _seasonalMigration,
-                    onChanged: (value) {
-                      setState(() => _seasonalMigration = value ?? false);
-                      _updateData();
-                    },
-                    activeColor: Colors.green,
-                  ),
-                  if (_seasonalMigration)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: TextFormField(
-                        controller: _seasonalMigrantsController,
-                        decoration: InputDecoration(
-                          labelText: 'Number of Seasonal Migrants',
-                          hintText: 'Enter number',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        onChanged: (value) => _updateData(),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Permanent Migration
-          FadeInLeft(
-            delay: const Duration(milliseconds: 400),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  CheckboxListTile(
-                    title: const Text(
-                      'Permanent Migration',
-                      style: TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    subtitle: const Text('Family members have permanently moved away'),
-                    secondary: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.red[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.move_up, color: Colors.red),
-                    ),
-                    value: _permanentMigration,
-                    onChanged: (value) {
-                      setState(() => _permanentMigration = value ?? false);
-                      _updateData();
-                    },
-                    activeColor: Colors.green,
-                  ),
-                  if (_permanentMigration)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: TextFormField(
-                        controller: _permanentMigrantsController,
-                        decoration: InputDecoration(
-                          labelText: 'Number of Permanent Migrants',
-                          hintText: 'Enter number',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        onChanged: (value) => _updateData(),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Migration Reason
-          FadeInUp(
-            delay: const Duration(milliseconds: 500),
-            child: TextFormField(
-              controller: _migrationReasonController,
-              maxLines: 4,
-              decoration: InputDecoration(
-                labelText: 'Reason for Migration (if applicable)',
-                hintText: 'Describe why family members migrated (e.g., employment, education, marriage)...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.green, width: 2),
-                ),
-                prefixIcon: const Icon(Icons.description, color: Colors.blue),
-                helperText: 'Optional: Leave blank if no migration',
-                helperStyle: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 12,
-                ),
-              ),
-              onChanged: (value) => _updateData(),
-            ),
-          ),
           const SizedBox(height: 24),
 
-          // Information Text
-          FadeInUp(
-            delay: const Duration(milliseconds: 600),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.purple[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.purple[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.travel_explore, color: Colors.purple[700]),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Migration patterns indicate economic opportunities and challenges in rural areas. This data helps understand workforce mobility.',
-                      style: TextStyle(
-                        color: Colors.purple[700],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          if (!_noMigration) ...[
+            ..._migratedMembers.asMap().entries.map((entry) {
+              final index = entry.key;
+              final member = entry.value;
+              return FadeInUp(
+                delay: Duration(milliseconds: 100 * (index + 1)),
+                child: _buildMemberCard(index, member),
+              );
+            }),
 
-          // Common Reasons
-          FadeInUp(
-            delay: const Duration(milliseconds: 700),
-            child: Container(
-              margin: const EdgeInsets.only(top: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange[200]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.info, color: Colors.orange[700]),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Common Migration Reasons:',
-                        style: TextStyle(
-                          color: Colors.orange[700],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '• Employment opportunities\n• Agricultural work in other areas\n• Education\n• Marriage\n• Better living conditions',
-                    style: TextStyle(
-                      color: Colors.orange[700],
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Validation Message
-          if (!_noMigration && !_seasonalMigration && !_permanentMigration)
             FadeInUp(
-              delay: const Duration(milliseconds: 800),
-              child: Container(
-                margin: const EdgeInsets.only(top: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.orange[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Please select at least one migration option to continue.',
-                        style: TextStyle(
-                          color: Colors.orange[700],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
+              delay: const Duration(milliseconds: 300),
+              child: ElevatedButton.icon(
+                onPressed: _addMigratedMember,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Family Member Migration Details'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildMemberCard(int index, Map<String, dynamic> member) {
+    return Card(
+      elevation: 3,
+      margin: const EdgeInsets.only(bottom: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Migrated Member ${index + 1}',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => _removeMember(index),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 12),
+
+            // Family Member Name
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Name of Family Member Who Has Migrated',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person),
+              ),
+              value: member['member_name']?.isNotEmpty == true ? member['member_name'] : null,
+              items: _familyMemberNames.map((name) {
+                return DropdownMenuItem<String>(
+                  value: name,
+                  child: Text(name),
+                );
+              }).toList(),
+              onChanged: (value) {
+                member['member_name'] = value ?? '';
+                _updateData();
+              },
+            ),
+            const SizedBox(height: 24),
+
+            // Permanent Migration
+            _buildMigrationRow(
+              'Permanent',
+              'permanent_distance',
+              'permanent_job',
+              member,
+              Icons.domain,
+              Colors.red,
+            ),
+            const Divider(height: 32),
+
+            // Seasonal Migration
+            _buildMigrationRow(
+              'Seasonal',
+              'seasonal_distance',
+              'seasonal_job',
+              member,
+              Icons.wb_sunny,
+              Colors.orange,
+            ),
+            const Divider(height: 32),
+
+            // According to Need Migration
+            _buildMigrationRow(
+              'According to Need',
+              'need_based_distance',
+              'need_based_job',
+              member,
+              Icons.handshake,
+              Colors.blue,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMigrationRow(
+    String title,
+    String distanceKey,
+    String jobKey,
+    Map<String, dynamic> member,
+    IconData icon,
+    Color color,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: TextFormField(
+                decoration: const InputDecoration(
+                  labelText: 'Distance',
+                  hintText: 'e.g. 50 km',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                initialValue: member[distanceKey] ?? '',
+                onChanged: (value) {
+                  member[distanceKey] = value;
+                  _updateData();
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 3,
+              child: TextFormField(
+                decoration: const InputDecoration(
+                  labelText: 'Job Description',
+                  hintText: 'e.g. Labor, Driver',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                initialValue: member[jobKey] ?? '',
+                onChanged: (value) {
+                  member[jobKey] = value;
+                  _updateData();
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

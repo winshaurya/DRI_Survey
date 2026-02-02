@@ -405,62 +405,7 @@ class _HealthProgrammePageState extends State<HealthProgrammePage> {
             ),
           ),
 
-          // Information Cards
-          const SizedBox(height: 24),
-          FadeInUp(
-            delay: const Duration(milliseconds: 600),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.health_and_safety, color: Colors.blue[700]),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Vaccination and family planning programmes are crucial for maternal and child health.',
-                      style: TextStyle(
-                        color: Colors.blue[700],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 16),
-
-          FadeInUp(
-            delay: const Duration(milliseconds: 700),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.green[700]),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Complete vaccination schedules help prevent serious childhood diseases.',
-                      style: TextStyle(
-                        color: Colors.green[700],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );

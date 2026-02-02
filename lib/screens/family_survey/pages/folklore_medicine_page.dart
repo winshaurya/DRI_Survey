@@ -291,16 +291,6 @@ class _FolkloreMedicinePageState extends State<FolkloreMedicinePage> {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: _addFolkloreMedicine,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Folklore Medicine'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
                       onPressed: () {
                         setState(() {
                           _folkloreMedicines.add({
@@ -324,35 +314,7 @@ class _FolkloreMedicinePageState extends State<FolkloreMedicinePage> {
             ),
           ),
 
-          // Information Cards
           const SizedBox(height: 24),
-          FadeInUp(
-            delay: const Duration(milliseconds: 400),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.eco, color: Colors.green[700]),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Traditional medicine knowledge is valuable for community health and biodiversity conservation.',
-                      style: TextStyle(
-                        color: Colors.green[700],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
 
         ],
       ),
