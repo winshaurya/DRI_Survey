@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import 'package:provider/provider.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import 'cadastral_map_screen.dart'; // Import the previous screen
 import 'biodiversity_register_screen.dart';
 
@@ -18,19 +23,53 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
   TextEditingController conservationStatusController = TextEditingController();
   TextEditingController remarksController = TextEditingController();
 
-  void _submitForm() {
-    // Navigate directly to next screen without showing dialog
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => BiodiversityRegisterScreen()),
-    );
+  Future<void> _submitForm() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final sessionId = databaseService.currentSessionId;
+
+    if (sessionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: No active session found')),
+      );
+      return;
+    }
+
+    final data = {
+      'id': const Uuid().v4(),
+      'session_id': sessionId,
+      'forest_area': forestAreaController.text,
+      'forest_types': forestTypesController.text,
+      'forest_resources': forestResourcesController.text,
+      'conservation_status': conservationStatusController.text,
+      'remarks': remarksController.text,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await DatabaseHelper().insert('village_forest_maps', data);
+      await supabaseService.saveVillageData('village_forest_maps', data);
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => BiodiversityRegisterScreen()),
+        );
+      }
+    } catch (e) {
+      print('Error saving data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving data: $e')),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {
-    // Navigate back to CadastralMapScreen
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => CadastralMapScreen()),
+      MaterialPageRoute(builder: (context) => const CadastralMapScreen()),
     );
   }
 

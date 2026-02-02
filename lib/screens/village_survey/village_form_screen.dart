@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:uuid/uuid.dart';
+import 'package:provider/provider.dart';
+import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../data/india_states_districts.dart';
 import '../../data/shine_villages.dart';
 import '../../form_template.dart';
 import '../../services/location_service.dart';
-import 'infrastructure_screen.dart';
 import '../family_survey/widgets/side_navigation.dart';
+import 'infrastructure_screen.dart';
 
 class VillageFormScreen extends StatefulWidget {
   const VillageFormScreen({super.key});
@@ -31,6 +35,8 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
   // Location Data
   double? _latitude;
   double? _longitude;
+  double? _accuracy;
+  String? _locationTimestamp;
 
   String selectedState = '';
   String selectedDistrict = '';
@@ -52,7 +58,8 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
   void initState() {
     super.initState();
     _loadStateDistrictData();
-    _getCurrentLocation();
+
+    _initializeLocation();
   }
 
   Future<void> _getCurrentLocation() async {
@@ -77,6 +84,44 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
     }
   }
 
+  Future<void> _initializeLocation() async {
+    // Get current location for map display
+    await _getCurrentLocation();
+
+    // Automatically fetch and save location data without user interaction
+    try {
+      final locationData = await LocationService.getCompleteLocationData();
+
+      if (locationData != null && mounted) {
+        setState(() {
+          _latitude = locationData['latitude'];
+          _longitude = locationData['longitude'];
+          _accuracy = locationData['accuracy'];
+          _locationTimestamp = locationData['timestamp'];
+
+          // Auto-fill address fields
+          if (locationData['village']?.isNotEmpty == true) {
+            villageNameController.text = locationData['village'];
+          }
+          if (locationData['subLocality']?.isNotEmpty == true) {
+            panchayatController.text = locationData['subLocality'];
+          }
+          if (locationData['subAdministrativeArea']?.isNotEmpty == true) {
+            blockController.text = locationData['subAdministrativeArea'];
+            tehsilController.text = locationData['subAdministrativeArea'];
+          }
+          if (locationData['administrativeArea']?.isNotEmpty == true) {
+            selectedDistrict = locationData['administrativeArea'];
+          }
+
+          _locationFetched = true;
+        });
+      }
+    } catch (e) {
+      // Silently handle error - location will be fetched manually if needed
+    }
+  }
+
   void _loadStateDistrictData() {
     stateDistrictData = Map<String, List<String>>.from(indiaStatesDistricts);
     stateOptions = stateDistrictData.keys.toList()..sort();
@@ -97,11 +142,78 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
     });
   }
 
-  void _submitForm() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => InfrastructureScreen()),
+  Future<void> _submitForm() async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(child: CircularProgressIndicator());
+      },
     );
+
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    
+    // Create a new session ID
+    final sessionId = const Uuid().v4();
+    
+    final sessionData = {
+      'session_id': sessionId,
+      'village_name': villageNameController.text.isEmpty ? 'Unknown Village' : villageNameController.text,
+      'village_code': villageCodeController.text,
+      'state': selectedState,
+      'district': selectedDistrict,
+      'block': blockController.text,
+      'panchayat': panchayatController.text,
+      'tehsil': tehsilController.text,
+      'ldg_code': ldgCodeController.text,
+      'shine_code': shineCodeController.text,
+      'latitude': _latitude,
+      'longitude': _longitude,
+      'location_accuracy': _accuracy,
+      'location_timestamp': _locationTimestamp,
+      'status': 'in_progress',
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      // 1. Save to SQLite and set current session
+      await databaseService.createNewVillageSurveySession(sessionData); // This sets _currentSessionId
+      
+      // 2. Save to Supabase (with timeout to prevent hanging)
+      try {
+        await supabaseService.saveVillageData('village_survey_sessions', sessionData).timeout(const Duration(seconds: 5));
+      } catch (e) {
+        print('Supabase sync warning: $e');
+        // Continue navigation even if sync fails
+      }
+
+      if (mounted) {
+        // Close loading dialog
+        Navigator.pop(context);
+        
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => InfrastructureScreen()),
+        );
+      }
+    } catch (e) {
+      print('Error saving session: $e');
+      if (mounted) {
+        // Close loading dialog
+        Navigator.pop(context);
+
+        // Even if save fails, try to navigate if we have a session ID locally set (which we might not if createNewVillageSurveySession failed)
+        // Ideally we should navigate anyway for "no blocking" policy, but without session subsequent screens might fail.
+        // Let's assume database failure is critical, but we can try to proceed if it's just sync error.
+         Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => InfrastructureScreen()),
+        );
+      }
+    }
   }
 
   // SIMPLE BACK FUNCTION
@@ -171,6 +283,8 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
   Future<void> _fetchLocation() async {
     if (_locationFetched) return;
 
+    final l10n = AppLocalizations.of(context)!;
+
     setState(() {
       _isLoadingLocation = true;
     });
@@ -180,15 +294,32 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
 
       if (locationData != null && mounted) {
         setState(() {
-          _locationFetched = true;
           _latitude = locationData['latitude'];
           _longitude = locationData['longitude'];
+          _accuracy = locationData['accuracy'];
+          _locationTimestamp = locationData['timestamp'];
 
+          // Auto-fill address fields
+          if (locationData['village']?.isNotEmpty == true) {
+            villageNameController.text = locationData['village'];
+          }
+          if (locationData['subLocality']?.isNotEmpty == true) {
+            panchayatController.text = locationData['subLocality'];
+          }
+          if (locationData['subAdministrativeArea']?.isNotEmpty == true) {
+            blockController.text = locationData['subAdministrativeArea'];
+            tehsilController.text = locationData['subAdministrativeArea'];
+          }
+          if (locationData['administrativeArea']?.isNotEmpty == true) {
+            selectedDistrict = locationData['administrativeArea'];
+          }
+
+          _locationFetched = true;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Location coordinates captured successfully'),
+          SnackBar(
+            content: Text(l10n.locationDetectedSuccessfully),
             backgroundColor: Colors.green,
           ),
         );
@@ -197,7 +328,7 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to get location: $e'),
+            content: Text(l10n.failedToGetLocation(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -235,9 +366,8 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
                       FlutterMap(
                         mapController: _mapController,
                         options: MapOptions(
-                          center: _currentLocation,
-                          zoom: 15.0,
-                          interactiveFlags: InteractiveFlag.none, // Disable all map interactions
+                          initialCenter: _currentLocation,
+                          initialZoom: 15.0,
                         ),
                         children: [
                           TileLayer(
@@ -307,6 +437,28 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
               ),
 
               const SizedBox(height: 16),
+
+              // Location Success Indicator
+              if (_locationFetched)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16, top: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green[700]),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Location detected successfully',
+                        style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
 
               // Location Coordinates Display
               if (_locationFetched && _latitude != null && _longitude != null)

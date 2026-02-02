@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import 'package:provider/provider.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import 'social_map_screen.dart';
 import 'detailed_map_screen.dart';
 
@@ -12,7 +17,7 @@ class SurveyDetailsScreen extends StatefulWidget {
 class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
   
-  // Categories with remarks controllers
+  // Categories with details controllers
   final List<Map<String, dynamic>> surveyCategories = [
     {'category': 'Forest', 'controller': TextEditingController(), 'icon': Icons.park},
     {'category': 'Wasteland', 'controller': TextEditingController(), 'icon': Icons.landscape},
@@ -28,12 +33,60 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
     {'category': 'Special Features', 'controller': TextEditingController(), 'icon': Icons.star},
   ];
 
-  void _submitForm() {
-    // Navigate directly to next screen without showing dialog
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => DetailedMapScreen()),
-    );
+  Future<void> _submitForm() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final sessionId = databaseService.currentSessionId;
+
+    if (sessionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: No active session found')),
+      );
+      return;
+    }
+
+    // Helper to get text from controller found in list of maps
+    String getDetails(String category) {
+      final item = surveyCategories.firstWhere((element) => element['category'] == category, orElse: () => {'controller': TextEditingController()});
+      return (item['controller'] as TextEditingController).text;
+    }
+
+    final data = {
+      'id': const Uuid().v4(),
+      'session_id': sessionId,
+      'forest_details': getDetails('Forest'),
+      'wasteland_details': getDetails('Wasteland'),
+      'garden_details': getDetails('Garden/Orchard'),
+      'burial_ground_details': getDetails('Burial Ground'),
+      'crop_plants_details': getDetails('Crop Plants'),
+      'vegetables_details': getDetails('Vegetables'),
+      'fruit_trees_details': getDetails('Fruit Trees'),
+      'animals_details': getDetails('Animals'),
+      'birds_details': getDetails('Birds'),
+      'local_biodiversity_details': getDetails('Local Biodiversity'),
+      'traditional_knowledge_details': getDetails('Traditional Knowledge'),
+      'special_features_details': getDetails('Special Features'),
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await DatabaseHelper().insert('village_survey_details', data);
+      await supabaseService.saveVillageData('village_survey_details', data);
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => DetailedMapScreen()),
+        );
+      }
+    } catch (e) {
+      print('Error saving data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving data: $e')),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {
@@ -84,14 +137,14 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
             ),
           ),
           
-          // Remarks Input
+          // Details Input
           Padding(
             padding: EdgeInsets.all(8),
             child: TextFormField(
               controller: controller,
               decoration: InputDecoration(
-                labelText: 'Remarks',
-                hintText: 'Enter remarks (optional)',
+                labelText: 'Details',
+                hintText: 'Enter details (optional)',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -160,7 +213,7 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
                         SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Add optional remarks for each category. Leave blank if no remarks.',
+                            'Fill multiple entries comma separated',
                             style: TextStyle(fontSize: 11, color: Colors.blue.shade800),
                           ),
                         ),

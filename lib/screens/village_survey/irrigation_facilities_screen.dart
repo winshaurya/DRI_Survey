@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import 'package:provider/provider.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import 'seed_clubs_screen.dart';
@@ -19,11 +24,57 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
   bool? _hasRiver;
   bool? _hasWell;
 
-  void _submitForm() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => SeedClubsScreen()),
-    );
+  Future<void> _submitForm() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final sessionId = databaseService.currentSessionId;
+
+    if (sessionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: No active session found')),
+      );
+      return;
+    }
+
+    final data = {
+      'id': const Uuid().v4(),
+      'session_id': sessionId,
+      'has_canal': _hasCanal == true ? 1 : 0,
+      'has_tube_well': _hasTubeWell == true ? 1 : 0,
+      'has_ponds': _hasPonds == true ? 1 : 0,
+      'has_river': _hasRiver == true ? 1 : 0,
+      'has_well': _hasWell == true ? 1 : 0,
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      // 1. Save to SQLite
+      await DatabaseHelper().insert('village_irrigation_facilities', data);
+      print('Saved irrigation facilities to SQLite');
+
+      // 2. Save to Supabase (Non-blocking)
+      try {
+        await supabaseService.saveVillageData('village_irrigation_facilities', data);
+        print('Saved irrigation facilities to Supabase');
+      } catch (e) {
+        print('Supabase sync warning: $e');
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => SeedClubsScreen()),
+        );
+      }
+    } catch (e) {
+      print('Error saving data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving data: $e')),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {

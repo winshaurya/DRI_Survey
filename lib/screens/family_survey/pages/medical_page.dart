@@ -22,300 +22,232 @@ class _MedicalPageState extends State<MedicalPage> {
   late bool _ayurvedic;
   late bool _homeopathy;
   late bool _traditional;
-  late bool _jhadPhook;
+  late bool _otherTreatment;
+  late String _preferredTreatment;
 
   @override
   void initState() {
     super.initState();
-    _allopathic = widget.pageData['allopathic'] ?? false;
-    _ayurvedic = widget.pageData['ayurvedic'] ?? false;
-    _homeopathy = widget.pageData['homeopathy'] ?? false;
-    _traditional = widget.pageData['traditional'] ?? false;
-    _jhadPhook = widget.pageData['jhad_phook'] ?? false;
+    _initializeData();
+  }
+
+  void _initializeData() {
+    _allopathic = widget.pageData['allopathic'] == 1 || widget.pageData['allopathic'] == true || widget.pageData['allopathic'] == '1';
+    _ayurvedic = widget.pageData['ayurvedic'] == 1 || widget.pageData['ayurvedic'] == true || widget.pageData['ayurvedic'] == '1';
+    _homeopathy = widget.pageData['homeopathy'] == 1 || widget.pageData['homeopathy'] == true || widget.pageData['homeopathy'] == '1';
+    _traditional = widget.pageData['traditional'] == 1 || widget.pageData['traditional'] == true || widget.pageData['traditional'] == '1';
+    _otherTreatment = widget.pageData['other_treatment'] == 1 || widget.pageData['other_treatment'] == true || widget.pageData['other_treatment'] == '1';
+    _preferredTreatment = widget.pageData['preferred_treatment'] ?? '';
+  }
+
+  @override
+  void didUpdateWidget(MedicalPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      _initializeData();
+    }
   }
 
   void _updateData() {
     final data = {
-      'allopathic': _allopathic,
-      'ayurvedic': _ayurvedic,
-      'homeopathy': _homeopathy,
-      'traditional': _traditional,
-      'jhad_phook': _jhadPhook,
+      'allopathic': _allopathic ? 1 : 0,
+      'ayurvedic': _ayurvedic ? 1 : 0,
+      'homeopathy': _homeopathy ? 1 : 0,
+      'traditional': _traditional ? 1 : 0,
+      'other_treatment': _otherTreatment ? 1 : 0,
+      'preferred_treatment': _preferredTreatment,
     };
     widget.onDataChanged(data);
+  }
+
+  Widget _buildMedicalOptionRow(
+      String key, String label, String subtitle, IconData icon, Color iconColor, int delay) {
+    bool value = false;
+    switch (key) {
+      case 'allopathic':
+        value = _allopathic;
+        break;
+      case 'ayurvedic':
+        value = _ayurvedic;
+        break;
+      case 'homeopathy':
+        value = _homeopathy;
+        break;
+      case 'traditional':
+        value = _traditional;
+        break;
+      case 'other_treatment':
+        value = _otherTreatment;
+        break;
+    }
+
+    return Card(
+        elevation: 2,
+        margin: const EdgeInsets.only(bottom: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: CheckboxListTile(
+          title: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+          subtitle: Text(subtitle),
+          secondary: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: iconColor),
+          ),
+          value: value,
+          onChanged: (val) {
+            setState(() {
+              switch (key) {
+                case 'allopathic':
+                  _allopathic = val ?? false;
+                  break;
+                case 'ayurvedic':
+                  _ayurvedic = val ?? false;
+                  break;
+                case 'homeopathy':
+                  _homeopathy = val ?? false;
+                  break;
+                case 'traditional':
+                  _traditional = val ?? false;
+                  break;
+                case 'other_treatment':
+                  _otherTreatment = val ?? false;
+                  break;
+              }
+            });
+            _updateData();
+          },
+          activeColor: Colors.green,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          FadeInDown(
-            child: Text(
-              'Medical Treatment Options',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green[800],
-                  ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          FadeInDown(
-            delay: const Duration(milliseconds: 125),
-            child: Text(
-              'Select medical treatment systems used by your family',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 16,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
+    final List<Map<String, dynamic>> treatmentOptions = [
+      {'value': 'allopathic', 'label': l10n.allopathic ?? 'Allopathic Medicine', 'subtitle': 'Modern medicine from qualified doctors', 'icon': Icons.local_hospital, 'color': Colors.blue},
+      {'value': 'ayurvedic', 'label': l10n.ayurvedic ?? 'Ayurvedic Medicine', 'subtitle': 'Traditional Indian medicine system', 'icon': Icons.spa, 'color': Colors.green},
+      {'value': 'homeopathy', 'label': l10n.homeopathy ?? 'Homeopathy', 'subtitle': 'Alternative medicine system', 'icon': Icons.healing, 'color': Colors.purple},
+      {'value': 'traditional', 'label': l10n.traditional ?? 'Traditional Healing', 'subtitle': 'Local traditional healers and remedies', 'icon': Icons.eco, 'color': Colors.orange},
+      {'value': 'other_treatment', 'label': l10n.other ?? 'Other Treatment', 'subtitle': 'Other medical treatment systems including traditional practices', 'icon': Icons.accessibility, 'color': Colors.red},
+    ];
 
-          // Allopathic
-          FadeInLeft(
-            delay: const Duration(milliseconds: 200),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'Allopathic Medicine',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Modern medicine from qualified doctors'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.local_hospital, color: Colors.blue),
-                ),
-                value: _allopathic,
-                onChanged: (value) {
-                  setState(() => _allopathic = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
+    // Validate preferred treatment value
+    String? preferredValue;
+    if (_preferredTreatment.isNotEmpty && treatmentOptions.any((element) => element['value'] == _preferredTreatment)) {
+      preferredValue = _preferredTreatment;
+    }
 
-          // Ayurvedic
-          FadeInLeft(
-            delay: const Duration(milliseconds: 300),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+    // SIMPLIFIED UI: No internal scrolling, no animations, simple Column
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min, // Important for being inside another ScrollView
+      children: [
+        Text(
+          l10n.medicalTreatment ?? 'Medical Treatment Options',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.green[800],
               ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'Ayurvedic Medicine',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Traditional Indian medicine system'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.green[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.spa, color: Colors.green),
-                ),
-                value: _ayurvedic,
-                onChanged: (value) {
-                  setState(() => _ayurvedic = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Select medical treatment systems used by your family',
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 16,
           ),
-          const SizedBox(height: 12),
+        ),
+        const SizedBox(height: 24),
 
-          // Homeopathy
-          FadeInLeft(
-            delay: const Duration(milliseconds: 400),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'Homeopathy',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Alternative medicine system'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.purple[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.healing, color: Colors.purple),
-                ),
-                value: _homeopathy,
-                onChanged: (value) {
-                  setState(() => _homeopathy = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
+        // Medical Treatment Checkboxes
+        _buildMedicalOptionRow('allopathic', l10n.allopathic ?? 'Allopathic Medicine', 'Modern medicine from qualified doctors', Icons.local_hospital, Colors.blue, 0),
+        _buildMedicalOptionRow('ayurvedic', l10n.ayurvedic ?? 'Ayurvedic Medicine', 'Traditional Indian medicine system', Icons.spa, Colors.green, 0),
+        _buildMedicalOptionRow('homeopathy', l10n.homeopathy ?? 'Homeopathy', 'Alternative medicine system', Icons.healing, Colors.purple, 0),
+        _buildMedicalOptionRow('traditional', l10n.traditional ?? 'Traditional Healing', 'Local traditional healers and remedies', Icons.eco, Colors.orange, 0),
+        _buildMedicalOptionRow('other_treatment', l10n.other ?? 'Other Treatment', 'Other medical treatment systems', Icons.accessibility, Colors.red, 0),
+
+        const SizedBox(height: 24),
+
+        // Preferred Medical Treatment Dropdown
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(height: 12),
-
-          // Traditional
-          FadeInLeft(
-            delay: const Duration(milliseconds: 500),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'Traditional Healing',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Local traditional healers and remedies'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange[100],
-                    borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Preferred Medical Treatment',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[800],
                   ),
-                  child: const Icon(Icons.eco, color: Colors.orange),
                 ),
-                value: _traditional,
-                onChanged: (value) {
-                  setState(() => _traditional = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Jhad-Phook
-          FadeInLeft(
-            delay: const Duration(milliseconds: 600),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'Jhad-Phook',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Traditional bone-setting and massage'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.red[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.accessibility, color: Colors.red),
-                ),
-                value: _jhadPhook,
-                onChanged: (value) {
-                  setState(() => _jhadPhook = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Information Text
-          FadeInUp(
-            delay: const Duration(milliseconds: 700),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.medical_services, color: Colors.red[700]),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Healthcare access is vital for rural communities. Select all medical systems your family uses for treatment.',
-                      style: TextStyle(
-                        color: Colors.red[700],
-                        fontSize: 14,
-                      ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: preferredValue,
+                  isExpanded: true, // Ensures it doesn't overflow horizontally
+                  decoration: InputDecoration(
+                    hintText: 'Select preferred medical treatment',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
-                ],
-              ),
+                  items: treatmentOptions.map((option) {
+                    return DropdownMenuItem<String>(
+                      value: option['value'],
+                      child: Row(
+                        children: [
+                           Icon(
+                              option['icon'] as IconData,
+                              color: option['color'] as Color,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded( // Use Expanded to handle long text safely
+                              child: Text(
+                                option['label'],
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _preferredTreatment = value ?? '');
+                    _updateData();
+                  },
+                ),
+              ],
             ),
           ),
+        ),
 
-          // Validation Message
-          if (!_allopathic && !_ayurvedic && !_homeopathy && !_traditional && !_jhadPhook)
-            FadeInUp(
-              delay: const Duration(milliseconds: 800),
-              child: Container(
-                margin: const EdgeInsets.only(top: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.orange[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Please select at least one medical treatment option to continue.',
-                        style: TextStyle(
-                          color: Colors.orange[700],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
+        const SizedBox(height: 24),
+      ],
     );
   }
-}
+} // End of class

@@ -298,28 +298,33 @@ CREATE TABLE IF NOT EXISTS drinking_water_sources (
 
     hand_pumps TEXT,
     hand_pumps_distance DECIMAL(5,1),
-    hand_pumps_quality TEXT CHECK (hand_pumps_quality IN ('clean', 'dirty')),
+    hand_pumps_quality TEXT CHECK (hand_pumps_quality IN ('good', 'average', 'bad')),
     well TEXT,
     well_distance DECIMAL(5,1),
-    well_quality TEXT CHECK (well_quality IN ('clean', 'dirty')),
+    well_quality TEXT CHECK (well_quality IN ('good', 'average', 'bad')),
     tubewell TEXT,
     tubewell_distance DECIMAL(5,1),
-    tubewell_quality TEXT CHECK (tubewell_quality IN ('clean', 'dirty')),
+    tubewell_quality TEXT CHECK (tubewell_quality IN ('good', 'average', 'bad')),
     nal_jaal TEXT,
-    nal_jaal_quality TEXT CHECK (nal_jaal_quality IN ('clean', 'dirty')),
-    other_source TEXT,
+    nal_jaal_quality TEXT CHECK (nal_jaal_quality IN ('good', 'average', 'bad')),
+    other_sources TEXT,
     other_distance DECIMAL(5,1),
-    other_sources_quality TEXT CHECK (other_sources_quality IN ('clean', 'dirty')),
+    other_sources_quality TEXT CHECK (other_sources_quality IN ('good', 'average', 'bad')),
 
     UNIQUE(phone_number)
 );
 
 -- Add water quality columns to existing tables (migration)
-ALTER TABLE drinking_water_sources ADD COLUMN IF NOT EXISTS hand_pumps_quality TEXT CHECK (hand_pumps_quality IN ('clean', 'dirty'));
-ALTER TABLE drinking_water_sources ADD COLUMN IF NOT EXISTS well_quality TEXT CHECK (well_quality IN ('clean', 'dirty'));
-ALTER TABLE drinking_water_sources ADD COLUMN IF NOT EXISTS tubewell_quality TEXT CHECK (tubewell_quality IN ('clean', 'dirty'));
-ALTER TABLE drinking_water_sources ADD COLUMN IF NOT EXISTS nal_jaal_quality TEXT CHECK (nal_jaal_quality IN ('clean', 'dirty'));
-ALTER TABLE drinking_water_sources ADD COLUMN IF NOT EXISTS other_sources_quality TEXT CHECK (other_sources_quality IN ('clean', 'dirty'));
+ALTER TABLE drinking_water_sources DROP CONSTRAINT IF EXISTS drinking_water_sources_hand_pumps_quality_check;
+ALTER TABLE drinking_water_sources ADD CONSTRAINT drinking_water_sources_hand_pumps_quality_check CHECK (hand_pumps_quality IN ('good', 'average', 'bad'));
+ALTER TABLE drinking_water_sources DROP CONSTRAINT IF EXISTS drinking_water_sources_well_quality_check;
+ALTER TABLE drinking_water_sources ADD CONSTRAINT drinking_water_sources_well_quality_check CHECK (well_quality IN ('good', 'average', 'bad'));
+ALTER TABLE drinking_water_sources DROP CONSTRAINT IF EXISTS drinking_water_sources_tubewell_quality_check;
+ALTER TABLE drinking_water_sources ADD CONSTRAINT drinking_water_sources_tubewell_quality_check CHECK (tubewell_quality IN ('good', 'average', 'bad'));
+ALTER TABLE drinking_water_sources DROP CONSTRAINT IF EXISTS drinking_water_sources_nal_jaal_quality_check;
+ALTER TABLE drinking_water_sources ADD CONSTRAINT drinking_water_sources_nal_jaal_quality_check CHECK (nal_jaal_quality IN ('good', 'average', 'bad'));
+ALTER TABLE drinking_water_sources DROP CONSTRAINT IF EXISTS drinking_water_sources_other_sources_quality_check;
+ALTER TABLE drinking_water_sources ADD CONSTRAINT drinking_water_sources_other_sources_quality_check CHECK (other_sources_quality IN ('good', 'average', 'bad'));
 
 -- ===========================================
 -- MEDICAL TREATMENT TABLE
@@ -333,9 +338,8 @@ CREATE TABLE IF NOT EXISTS medical_treatment (
     ayurvedic TEXT,
     homeopathy TEXT,
     traditional TEXT,
-    jhad_phook TEXT,
     other_treatment TEXT,
-    preference_order TEXT, -- JSON array of preferences
+    preferred_treatment TEXT CHECK (preferred_treatment IN ('allopathic', 'ayurvedic', 'homeopathy', 'traditional', 'other_treatment')),
 
     UNIQUE(phone_number)
 );
@@ -391,6 +395,7 @@ CREATE TABLE IF NOT EXISTS house_facilities (
 
     toilet TEXT,
     toilet_in_use TEXT,
+    toilet_condition TEXT,
     drainage TEXT,
     soak_pit TEXT,
     cattle_shed TEXT,
@@ -1093,9 +1098,11 @@ ALTER TABLE social_consciousness ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tribal_questions ENABLE ROW LEVEL SECURITY;
 
 -- SECURE RLS Policies: Users can only access their own surveys based on surveyor_email
+DROP POLICY IF EXISTS "Users can access their own family surveys" ON family_survey_sessions;
 CREATE POLICY "Users can access their own family surveys" ON family_survey_sessions
     FOR ALL USING (auth.jwt() ->> 'email' = surveyor_email);
 
+DROP POLICY IF EXISTS "Users can access family form history from their surveys" ON family_form_history;
 CREATE POLICY "Users can access family form history from their surveys" ON family_form_history
     FOR ALL USING (
         EXISTS (
@@ -1106,6 +1113,7 @@ CREATE POLICY "Users can access family form history from their surveys" ON famil
     );
 
 -- Child tables inherit the same restriction through foreign key relationships
+DROP POLICY IF EXISTS "Users can access family members from their surveys" ON family_members;
 CREATE POLICY "Users can access family members from their surveys" ON family_members
     FOR ALL USING (
         EXISTS (
@@ -1115,6 +1123,7 @@ CREATE POLICY "Users can access family members from their surveys" ON family_mem
         )
     );
 
+DROP POLICY IF EXISTS "Users can access agriculture data from their surveys" ON agriculture_data;
 CREATE POLICY "Users can access agriculture data from their surveys" ON agriculture_data
     FOR ALL USING (
         EXISTS (
@@ -1124,6 +1133,7 @@ CREATE POLICY "Users can access agriculture data from their surveys" ON agricult
         )
     );
 
+DROP POLICY IF EXISTS "Users can access crop productivity from their surveys" ON crop_productivity;
 CREATE POLICY "Users can access crop productivity from their surveys" ON crop_productivity
     FOR ALL USING (
         EXISTS (
@@ -1133,6 +1143,7 @@ CREATE POLICY "Users can access crop productivity from their surveys" ON crop_pr
         )
     );
 
+DROP POLICY IF EXISTS "Users can access animals from their surveys" ON animals;
 CREATE POLICY "Users can access animals from their surveys" ON animals
     FOR ALL USING (
         EXISTS (
@@ -1142,6 +1153,7 @@ CREATE POLICY "Users can access animals from their surveys" ON animals
         )
     );
 
+DROP POLICY IF EXISTS "Users can access agricultural equipment from their surveys" ON agricultural_equipment;
 CREATE POLICY "Users can access agricultural equipment from their surveys" ON agricultural_equipment
     FOR ALL USING (
         EXISTS (
@@ -1151,6 +1163,7 @@ CREATE POLICY "Users can access agricultural equipment from their surveys" ON ag
         )
     );
 
+DROP POLICY IF EXISTS "Users can access entertainment facilities from their surveys" ON entertainment_facilities;
 CREATE POLICY "Users can access entertainment facilities from their surveys" ON entertainment_facilities
     FOR ALL USING (
         EXISTS (
@@ -1160,6 +1173,7 @@ CREATE POLICY "Users can access entertainment facilities from their surveys" ON 
         )
     );
 
+DROP POLICY IF EXISTS "Users can access transport facilities from their surveys" ON transport_facilities;
 CREATE POLICY "Users can access transport facilities from their surveys" ON transport_facilities
     FOR ALL USING (
         EXISTS (
@@ -1169,6 +1183,7 @@ CREATE POLICY "Users can access transport facilities from their surveys" ON tran
         )
     );
 
+DROP POLICY IF EXISTS "Users can access drinking water sources from their surveys" ON drinking_water_sources;
 CREATE POLICY "Users can access drinking water sources from their surveys" ON drinking_water_sources
     FOR ALL USING (
         EXISTS (
@@ -1178,6 +1193,7 @@ CREATE POLICY "Users can access drinking water sources from their surveys" ON dr
         )
     );
 
+DROP POLICY IF EXISTS "Users can access medical treatment from their surveys" ON medical_treatment;
 CREATE POLICY "Users can access medical treatment from their surveys" ON medical_treatment
     FOR ALL USING (
         EXISTS (
@@ -1187,6 +1203,7 @@ CREATE POLICY "Users can access medical treatment from their surveys" ON medical
         )
     );
 
+DROP POLICY IF EXISTS "Users can access disputes from their surveys" ON disputes;
 CREATE POLICY "Users can access disputes from their surveys" ON disputes
     FOR ALL USING (
         EXISTS (
@@ -1196,6 +1213,7 @@ CREATE POLICY "Users can access disputes from their surveys" ON disputes
         )
     );
 
+DROP POLICY IF EXISTS "Users can access house conditions from their surveys" ON house_conditions;
 CREATE POLICY "Users can access house conditions from their surveys" ON house_conditions
     FOR ALL USING (
         EXISTS (
@@ -1205,6 +1223,7 @@ CREATE POLICY "Users can access house conditions from their surveys" ON house_co
         )
     );
 
+DROP POLICY IF EXISTS "Users can access house facilities from their surveys" ON house_facilities;
 CREATE POLICY "Users can access house facilities from their surveys" ON house_facilities
     FOR ALL USING (
         EXISTS (
@@ -1214,6 +1233,7 @@ CREATE POLICY "Users can access house facilities from their surveys" ON house_fa
         )
     );
 
+DROP POLICY IF EXISTS "Users can access diseases from their surveys" ON diseases;
 CREATE POLICY "Users can access diseases from their surveys" ON diseases
     FOR ALL USING (
         EXISTS (
@@ -1223,6 +1243,7 @@ CREATE POLICY "Users can access diseases from their surveys" ON diseases
         )
     );
 
+DROP POLICY IF EXISTS "Users can access aadhaar info from their surveys" ON aadhaar_info;
 CREATE POLICY "Users can access aadhaar info from their surveys" ON aadhaar_info
     FOR ALL USING (
         EXISTS (
@@ -1232,6 +1253,7 @@ CREATE POLICY "Users can access aadhaar info from their surveys" ON aadhaar_info
         )
     );
 
+DROP POLICY IF EXISTS "Users can access aadhaar members from their surveys" ON aadhaar_members;
 CREATE POLICY "Users can access aadhaar members from their surveys" ON aadhaar_members
     FOR ALL USING (
         EXISTS (
@@ -1241,6 +1263,7 @@ CREATE POLICY "Users can access aadhaar members from their surveys" ON aadhaar_m
         )
     );
 
+DROP POLICY IF EXISTS "Users can access ayushman card from their surveys" ON ayushman_card;
 CREATE POLICY "Users can access ayushman card from their surveys" ON ayushman_card
     FOR ALL USING (
         EXISTS (
@@ -1250,6 +1273,7 @@ CREATE POLICY "Users can access ayushman card from their surveys" ON ayushman_ca
         )
     );
 
+DROP POLICY IF EXISTS "Users can access ayushman members from their surveys" ON ayushman_members;
 CREATE POLICY "Users can access ayushman members from their surveys" ON ayushman_members
     FOR ALL USING (
         EXISTS (
@@ -1259,6 +1283,7 @@ CREATE POLICY "Users can access ayushman members from their surveys" ON ayushman
         )
     );
 
+DROP POLICY IF EXISTS "Users can access family id from their surveys" ON family_id;
 CREATE POLICY "Users can access family id from their surveys" ON family_id
     FOR ALL USING (
         EXISTS (
@@ -1268,6 +1293,7 @@ CREATE POLICY "Users can access family id from their surveys" ON family_id
         )
     );
 
+DROP POLICY IF EXISTS "Users can access family id members from their surveys" ON family_id_members;
 CREATE POLICY "Users can access family id members from their surveys" ON family_id_members
     FOR ALL USING (
         EXISTS (
@@ -1277,6 +1303,7 @@ CREATE POLICY "Users can access family id members from their surveys" ON family_
         )
     );
 
+DROP POLICY IF EXISTS "Users can access ration card from their surveys" ON ration_card;
 CREATE POLICY "Users can access ration card from their surveys" ON ration_card
     FOR ALL USING (
         EXISTS (
@@ -1286,6 +1313,7 @@ CREATE POLICY "Users can access ration card from their surveys" ON ration_card
         )
     );
 
+DROP POLICY IF EXISTS "Users can access ration card members from their surveys" ON ration_card_members;
 CREATE POLICY "Users can access ration card members from their surveys" ON ration_card_members
     FOR ALL USING (
         EXISTS (
@@ -1295,6 +1323,7 @@ CREATE POLICY "Users can access ration card members from their surveys" ON ratio
         )
     );
 
+DROP POLICY IF EXISTS "Users can access samagra id from their surveys" ON samagra_id;
 CREATE POLICY "Users can access samagra id from their surveys" ON samagra_id
     FOR ALL USING (
         EXISTS (
@@ -1304,6 +1333,7 @@ CREATE POLICY "Users can access samagra id from their surveys" ON samagra_id
         )
     );
 
+DROP POLICY IF EXISTS "Users can access samagra children from their surveys" ON samagra_children;
 CREATE POLICY "Users can access samagra children from their surveys" ON samagra_children
     FOR ALL USING (
         EXISTS (
@@ -1313,6 +1343,7 @@ CREATE POLICY "Users can access samagra children from their surveys" ON samagra_
         )
     );
 
+DROP POLICY IF EXISTS "Users can access tribal card from their surveys" ON tribal_card;
 CREATE POLICY "Users can access tribal card from their surveys" ON tribal_card
     FOR ALL USING (
         EXISTS (
@@ -1322,6 +1353,7 @@ CREATE POLICY "Users can access tribal card from their surveys" ON tribal_card
         )
     );
 
+DROP POLICY IF EXISTS "Users can access tribal card members from their surveys" ON tribal_card_members;
 CREATE POLICY "Users can access tribal card members from their surveys" ON tribal_card_members
     FOR ALL USING (
         EXISTS (
@@ -1331,6 +1363,7 @@ CREATE POLICY "Users can access tribal card members from their surveys" ON triba
         )
     );
 
+DROP POLICY IF EXISTS "Users can access handicapped allowance from their surveys" ON handicapped_allowance;
 CREATE POLICY "Users can access handicapped allowance from their surveys" ON handicapped_allowance
     FOR ALL USING (
         EXISTS (
@@ -1340,6 +1373,7 @@ CREATE POLICY "Users can access handicapped allowance from their surveys" ON han
         )
     );
 
+DROP POLICY IF EXISTS "Users can access handicapped members from their surveys" ON handicapped_members;
 CREATE POLICY "Users can access handicapped members from their surveys" ON handicapped_members
     FOR ALL USING (
         EXISTS (
@@ -1349,6 +1383,7 @@ CREATE POLICY "Users can access handicapped members from their surveys" ON handi
         )
     );
 
+DROP POLICY IF EXISTS "Users can access pension allowance from their surveys" ON pension_allowance;
 CREATE POLICY "Users can access pension allowance from their surveys" ON pension_allowance
     FOR ALL USING (
         EXISTS (
@@ -1358,6 +1393,7 @@ CREATE POLICY "Users can access pension allowance from their surveys" ON pension
         )
     );
 
+DROP POLICY IF EXISTS "Users can access pension members from their surveys" ON pension_members;
 CREATE POLICY "Users can access pension members from their surveys" ON pension_members
     FOR ALL USING (
         EXISTS (
@@ -1367,6 +1403,7 @@ CREATE POLICY "Users can access pension members from their surveys" ON pension_m
         )
     );
 
+DROP POLICY IF EXISTS "Users can access widow allowance from their surveys" ON widow_allowance;
 CREATE POLICY "Users can access widow allowance from their surveys" ON widow_allowance
     FOR ALL USING (
         EXISTS (
@@ -1376,6 +1413,7 @@ CREATE POLICY "Users can access widow allowance from their surveys" ON widow_all
         )
     );
 
+DROP POLICY IF EXISTS "Users can access widow members from their surveys" ON widow_members;
 CREATE POLICY "Users can access widow members from their surveys" ON widow_members
     FOR ALL USING (
         EXISTS (
@@ -1385,6 +1423,7 @@ CREATE POLICY "Users can access widow members from their surveys" ON widow_membe
         )
     );
 
+DROP POLICY IF EXISTS "Users can access folklore medicine from their surveys" ON folklore_medicine;
 CREATE POLICY "Users can access folklore medicine from their surveys" ON folklore_medicine
     FOR ALL USING (
         EXISTS (
@@ -1394,6 +1433,7 @@ CREATE POLICY "Users can access folklore medicine from their surveys" ON folklor
         )
     );
 
+DROP POLICY IF EXISTS "Users can access health programmes from their surveys" ON health_programmes;
 CREATE POLICY "Users can access health programmes from their surveys" ON health_programmes
     FOR ALL USING (
         EXISTS (
@@ -1403,6 +1443,7 @@ CREATE POLICY "Users can access health programmes from their surveys" ON health_
         )
     );
 
+DROP POLICY IF EXISTS "Users can access children data from their surveys" ON children_data;
 CREATE POLICY "Users can access children data from their surveys" ON children_data
     FOR ALL USING (
         EXISTS (
@@ -1412,6 +1453,7 @@ CREATE POLICY "Users can access children data from their surveys" ON children_da
         )
     );
 
+DROP POLICY IF EXISTS "Users can access malnutrition data from their surveys" ON malnutrition_data;
 CREATE POLICY "Users can access malnutrition data from their surveys" ON malnutrition_data
     FOR ALL USING (
         EXISTS (
@@ -1421,6 +1463,7 @@ CREATE POLICY "Users can access malnutrition data from their surveys" ON malnutr
         )
     );
 
+DROP POLICY IF EXISTS "Users can access migration data from their surveys" ON migration_data;
 CREATE POLICY "Users can access migration data from their surveys" ON migration_data
     FOR ALL USING (
         EXISTS (
@@ -1430,6 +1473,7 @@ CREATE POLICY "Users can access migration data from their surveys" ON migration_
         )
     );
 
+DROP POLICY IF EXISTS "Users can access training data from their surveys" ON training_data;
 CREATE POLICY "Users can access training data from their surveys" ON training_data
     FOR ALL USING (
         EXISTS (
@@ -1439,6 +1483,7 @@ CREATE POLICY "Users can access training data from their surveys" ON training_da
         )
     );
 
+DROP POLICY IF EXISTS "Users can access self help groups from their surveys" ON self_help_groups;
 CREATE POLICY "Users can access self help groups from their surveys" ON self_help_groups
     FOR ALL USING (
         EXISTS (
@@ -1448,6 +1493,7 @@ CREATE POLICY "Users can access self help groups from their surveys" ON self_hel
         )
     );
 
+DROP POLICY IF EXISTS "Users can access fpo members from their surveys" ON fpo_members;
 CREATE POLICY "Users can access fpo members from their surveys" ON fpo_members
     FOR ALL USING (
         EXISTS (
@@ -1457,6 +1503,7 @@ CREATE POLICY "Users can access fpo members from their surveys" ON fpo_members
         )
     );
 
+DROP POLICY IF EXISTS "Users can access vb gram from their surveys" ON vb_gram;
 CREATE POLICY "Users can access vb gram from their surveys" ON vb_gram
     FOR ALL USING (
         EXISTS (
@@ -1466,6 +1513,7 @@ CREATE POLICY "Users can access vb gram from their surveys" ON vb_gram
         )
     );
 
+DROP POLICY IF EXISTS "Users can access vb gram members from their surveys" ON vb_gram_members;
 CREATE POLICY "Users can access vb gram members from their surveys" ON vb_gram_members
     FOR ALL USING (
         EXISTS (
@@ -1475,6 +1523,7 @@ CREATE POLICY "Users can access vb gram members from their surveys" ON vb_gram_m
         )
     );
 
+DROP POLICY IF EXISTS "Users can access pm kisan nidhi from their surveys" ON pm_kisan_nidhi;
 CREATE POLICY "Users can access pm kisan nidhi from their surveys" ON pm_kisan_nidhi
     FOR ALL USING (
         EXISTS (
@@ -1484,6 +1533,7 @@ CREATE POLICY "Users can access pm kisan nidhi from their surveys" ON pm_kisan_n
         )
     );
 
+DROP POLICY IF EXISTS "Users can access pm kisan members from their surveys" ON pm_kisan_members;
 CREATE POLICY "Users can access pm kisan members from their surveys" ON pm_kisan_members
     FOR ALL USING (
         EXISTS (
@@ -1493,42 +1543,7 @@ CREATE POLICY "Users can access pm kisan members from their surveys" ON pm_kisan
         )
     );
 
-CREATE POLICY "Users can access pm kisan samman from their surveys" ON pm_kisan_samman
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM family_survey_sessions
-            WHERE phone_number = pm_kisan_samman.phone_number
-            AND surveyor_email = auth.jwt() ->> 'email'
-        )
-    );
-
-CREATE POLICY "Users can access kisan credit card from their surveys" ON kisan_credit_card
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM family_survey_sessions
-            WHERE phone_number = kisan_credit_card.phone_number
-            AND surveyor_email = auth.jwt() ->> 'email'
-        )
-    );
-
-CREATE POLICY "Users can access swachh bharat from their surveys" ON swachh_bharat
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM family_survey_sessions
-            WHERE phone_number = swachh_bharat.phone_number
-            AND surveyor_email = auth.jwt() ->> 'email'
-        )
-    );
-
-CREATE POLICY "Users can access fasal bima from their surveys" ON fasal_bima
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM family_survey_sessions
-            WHERE phone_number = fasal_bima.phone_number
-            AND surveyor_email = auth.jwt() ->> 'email'
-        )
-    );
-
+DROP POLICY IF EXISTS "Users can access merged govt schemes from their surveys" ON merged_govt_schemes;
 CREATE POLICY "Users can access merged govt schemes from their surveys" ON merged_govt_schemes
     FOR ALL USING (
         EXISTS (
@@ -1538,6 +1553,7 @@ CREATE POLICY "Users can access merged govt schemes from their surveys" ON merge
         )
     );
 
+DROP POLICY IF EXISTS "Users can access bank accounts from their surveys" ON bank_accounts;
 CREATE POLICY "Users can access bank accounts from their surveys" ON bank_accounts
     FOR ALL USING (
         EXISTS (
@@ -1547,6 +1563,7 @@ CREATE POLICY "Users can access bank accounts from their surveys" ON bank_accoun
         )
     );
 
+DROP POLICY IF EXISTS "Users can access social consciousness from their surveys" ON social_consciousness;
 CREATE POLICY "Users can access social consciousness from their surveys" ON social_consciousness
     FOR ALL USING (
         EXISTS (
@@ -1556,6 +1573,7 @@ CREATE POLICY "Users can access social consciousness from their surveys" ON soci
         )
     );
 
+DROP POLICY IF EXISTS "Users can access tribal questions from their surveys" ON tribal_questions;
 CREATE POLICY "Users can access tribal questions from their surveys" ON tribal_questions
     FOR ALL USING (
         EXISTS (
@@ -1565,7 +1583,7 @@ CREATE POLICY "Users can access tribal questions from their surveys" ON tribal_q
         )
     );
 
--- ===========================================
+-- ============ l===============================
 -- UPDATED AT TRIGGER FUNCTION (Supabase specific)
 -- ===========================================
 CREATE OR REPLACE FUNCTION update_updated_at_column()

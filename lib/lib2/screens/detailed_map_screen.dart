@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'survey_details_screen.dart';
-import 'cadastral_map_screen.dart';
+import 'forest_map_screen.dart';
 
 class DetailedMapScreen extends StatefulWidget {
   const DetailedMapScreen({super.key});
@@ -47,7 +47,7 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
     // Navigate directly to next screen without showing dialog
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => CadastralMapScreen()),
+      MaterialPageRoute(builder: (context) => ForestMapScreen()),
     );
   }
 

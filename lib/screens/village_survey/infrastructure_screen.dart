@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
-import '../../form_template.dart'; // Import the form template
+import '../../form_template.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import 'infrastructure_availability_screen.dart';
-import 'village_form_screen.dart'; // Import the previous screen
 
 class InfrastructureScreen extends StatefulWidget {
   const InfrastructureScreen({super.key});
@@ -35,19 +39,63 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
   String? _selectedApproachCondition;
   String? _selectedInternalCondition;
 
-  void _submitForm() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => InfrastructureAvailabilityScreen()),
-    );
+  Future<void> _submitForm() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final sessionId = databaseService.currentSessionId;
+
+    if (sessionId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: No active session found')),
+        );
+      }
+      return;
+    }
+
+    final data = {
+      'id': const Uuid().v4(),
+      'session_id': sessionId,
+      'approach_roads_available': _hasApproachRoads ? 1 : 0,
+      'num_approach_roads': int.tryParse(_numApproachRoads),
+      'approach_condition': _approachCondition,
+      'approach_remarks': _approachRemarks,
+      'internal_lanes_available': _hasInternalLanes ? 1 : 0,
+      'num_internal_lanes': int.tryParse(_numInternalLanes),
+      'internal_condition': _internalCondition,
+      'internal_remarks': _internalRemarks,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await DatabaseHelper().insert('village_infrastructure', data);
+      
+      try {
+        await supabaseService.saveVillageData('village_infrastructure', data);
+      } catch (e) {
+        print('Supabase sync warning: $e');
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => InfrastructureAvailabilityScreen()),
+        );
+      }
+    } catch (e) {
+      print('Error saving infrastructure data: $e');
+      if (mounted) {
+        // Proceed even on error to not block user
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => InfrastructureAvailabilityScreen()),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {
-    // Navigate back to VillageFormScreen
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => VillageFormScreen()),
-    );
+    Navigator.pop(context);
   }
 
   Widget _buildInfrastructureContent() {

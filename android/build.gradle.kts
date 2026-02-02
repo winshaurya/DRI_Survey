@@ -3,6 +3,13 @@ allprojects {
         google()
         mavenCentral()
     }
+
+    // Force Kotlin version to resolve compatibility issues
+    configurations.all {
+        resolutionStrategy {
+            force("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0")
+        }
+    }
 }
 
 val newBuildDir: Directory =

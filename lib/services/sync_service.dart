@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'database_service.dart';
 import 'supabase_service.dart';
+import 'file_upload_service.dart';
 
 class SyncService {
   static final SyncService _instance = SyncService._internal();
@@ -11,8 +12,9 @@ class SyncService {
 
   final DatabaseService _databaseService = DatabaseService();
   final SupabaseService _supabaseService = SupabaseService.instance;
+  final FileUploadService _fileUploadService = FileUploadService.instance;
 
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
   Timer? _syncTimer;
   bool _isOnline = false;
 
@@ -27,8 +29,7 @@ class SyncService {
   void _initializeConnectivityMonitoring() {
     // Monitor connectivity changes
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
-      (List<ConnectivityResult> results) {
-        final result = results.isNotEmpty ? results.first : ConnectivityResult.none;
+      (ConnectivityResult result) {
         final wasOnline = _isOnline;
         _isOnline = result != ConnectivityResult.none;
 
@@ -44,8 +45,7 @@ class SyncService {
     );
 
     // Check initial connectivity
-    Connectivity().checkConnectivity().then((results) {
-      final result = results.isNotEmpty ? results.first : ConnectivityResult.none;
+    Connectivity().checkConnectivity().then((ConnectivityResult result) {
       _isOnline = result != ConnectivityResult.none;
       if (_isOnline) {
         _startPeriodicSync();
@@ -74,6 +74,15 @@ class SyncService {
       for (final survey in pendingSurveys) {
         await _syncSurveyToSupabase(survey);
       }
+
+      // Sync all pending village surveys
+      final pendingVillageSurveys = await _getPendingVillageSurveys();
+      for (final survey in pendingVillageSurveys) {
+        await _syncVillageSurveyToSupabase(survey);
+      }
+
+      // Process pending file uploads
+      await _fileUploadService.processPendingUploads();
 
       // Process any queued sync operations
       await _processSyncQueue();
@@ -104,6 +113,26 @@ class SyncService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> _getPendingVillageSurveys() async {
+    try {
+      final allSurveys = await _databaseService.getAllVillageSurveySessions();
+      final pendingSurveys = <Map<String, dynamic>>[];
+
+      for (final survey in allSurveys) {
+        // Check if survey exists in Supabase
+        final existsInSupabase = await _checkVillageSurveyExistsInSupabase(survey['session_id']);
+        if (!existsInSupabase) {
+          pendingSurveys.add(survey);
+        }
+      }
+
+      return pendingSurveys;
+    } catch (e) {
+      debugPrint('Error getting pending village surveys: $e');
+      return [];
+    }
+  }
+
   Future<bool> _checkSurveyExistsInSupabase(String phoneNumber) async {
     if (!_isOnline) return false;
 
@@ -112,6 +141,22 @@ class SyncService {
           .from('family_survey_sessions')
           .select('phone_number')
           .eq('phone_number', phoneNumber)
+          .limit(1);
+
+      return response.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> _checkVillageSurveyExistsInSupabase(String sessionId) async {
+    if (!_isOnline) return false;
+
+    try {
+      final response = await _supabaseService.client
+          .from('village_survey_sessions')
+          .select('session_id')
+          .eq('session_id', sessionId)
           .limit(1);
 
       return response.isNotEmpty;
@@ -147,6 +192,105 @@ class SyncService {
     }
   }
 
+  Future<void> _syncVillageSurveyToSupabase(Map<String, dynamic> survey) async {
+    if (!_isOnline) return;
+
+    try {
+      final sessionId = survey['session_id'];
+
+      // Collect all survey data
+      final surveyData = await _collectCompleteVillageSurveyData(sessionId);
+
+      // Sync to Supabase
+      await _supabaseService.syncVillageSurveyToSupabase(sessionId, surveyData);
+
+      // Not marking as synced locally in separate field for now as we just check existence, 
+      // but ideally we should update a synced flag. Or simply rely on existence check.
+      debugPrint('Successfully synced village survey: $sessionId');
+
+    } catch (e) {
+      debugPrint('Failed to sync village survey ${survey['session_id']}: $e');
+      // Queue for retry - reusing queueSyncOperation which might need adjustment or a new type
+      // await queueSyncOperation('sync_village_survey', survey); 
+    }
+  }
+
+  Future<Map<String, dynamic>> _collectCompleteVillageSurveyData(String sessionId) async {
+    final db = await _databaseService.database;
+
+    // Get main session data
+    final sessions = await db.query(
+      'village_survey_sessions',
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+    );
+
+    if (sessions.isEmpty) {
+      throw Exception('Village survey session not found: $sessionId');
+    }
+
+    final surveyData = Map<String, dynamic>.from(sessions.first);
+
+    // List of related tables
+    final tables = [
+      'village_population',
+      'village_farm_families',
+      'village_housing',
+      'village_agricultural_implements',
+      'village_crop_productivity',
+      'village_animals',
+      'village_irrigation_facilities',
+      'village_drinking_water',
+      'village_transport',
+      'village_entertainment',
+      'village_medical_treatment',
+      'village_disputes',
+      'village_educational_facilities',
+      'village_social_consciousness',
+      'village_children_data',
+      'village_malnutrition_data',
+      'village_bpl_families',
+      'village_kitchen_gardens',
+      'village_seed_clubs',
+      'village_biodiversity_register',
+      'village_traditional_occupations',
+      'village_drainage_waste',
+      'village_signboards',
+    ];
+
+    for (final table in tables) {
+      try {
+        final data = await db.query(
+          table,
+          where: 'session_id = ?',
+          whereArgs: [sessionId],
+        );
+
+        if (data.isNotEmpty) {
+          if (_isOneToManyVillageTable(table)) {
+            surveyData[table] = data;
+          } else {
+            surveyData[table] = data.first;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error collecting data for table $table: $e');
+      }
+    }
+
+    return surveyData;
+  }
+
+  bool _isOneToManyVillageTable(String tableName) {
+    const oneToManyTables = {
+      'village_crop_productivity',
+      'village_animals',
+      'village_malnutrition_data',
+      'village_traditional_occupations',
+    };
+    return oneToManyTables.contains(tableName);
+  }
+
   Future<Map<String, dynamic>> _collectCompleteSurveyData(String phoneNumber) async {
     final surveyData = <String, dynamic>{};
 
@@ -175,14 +319,16 @@ class SyncService {
       'diseases': 'diseases',
       'social_consciousness': 'social_consciousness',
       'children_data': 'children_data',
+      'malnourished_children_data': 'malnourished_children_data',
+      'child_diseases': 'child_diseases',
+      'folklore_medicine': 'folklore_medicine',
+      'health_programmes': 'health_programmes',
       'malnutrition_data': 'malnutrition_data',
       'migration_data': 'migration',
       'training_data': 'training',
       'self_help_groups': 'self_help_groups',
       'fpo_members': 'fpo_membership',
       'bank_accounts': 'bank_accounts',
-      'health_programmes': 'health_programmes',
-      'folklore_medicine': 'folklore_medicine',
       'tulsi_plants': 'tulsi_plants',
       'nutritional_garden': 'nutritional_garden',
     };

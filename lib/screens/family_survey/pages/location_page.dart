@@ -348,11 +348,11 @@ class _LocationPageState extends State<LocationPage> {
               children: [
                       FlutterMap(
                         mapController: _mapController,
-                        options: MapOptions(
-                          center: _currentLocation,
-                          zoom: 15.0,
-                          interactiveFlags: InteractiveFlag.none, // Disable all map interactions
-                        ),
+options: MapOptions(
+  initialCenter: _currentLocation,
+  initialZoom: 15.0,
+  // Removed interactiveFlags as it is not supported in the current version
+),
                   children: [
                     TileLayer(
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -622,7 +622,7 @@ class _LocationPageState extends State<LocationPage> {
 
         // District Dropdown
         DropdownButtonFormField<String>(
-          value: selectedDistrict.isNotEmpty ? selectedDistrict : null,
+          initialValue: selectedDistrict.isNotEmpty ? selectedDistrict : null,
           decoration: InputDecoration(
             labelText: l10n.district,
             border: OutlineInputBorder(
@@ -643,7 +643,7 @@ class _LocationPageState extends State<LocationPage> {
 
         // State Dropdown
         DropdownButtonFormField<String>(
-          value: selectedState.isNotEmpty ? selectedState : null,
+          initialValue: selectedState.isNotEmpty ? selectedState : null,
           decoration: InputDecoration(
             labelText: 'State',
             border: OutlineInputBorder(

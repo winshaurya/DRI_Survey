@@ -29,7 +29,6 @@ import 'screens/social_consciousness_screen.dart';
 import 'screens/social_map_screen.dart';
 import 'screens/survey_details_screen.dart';
 import 'screens/detailed_map_screen.dart';
-import 'screens/cadastral_map_screen.dart';
 import 'screens/forest_map_screen.dart';
 import 'screens/biodiversity_register_screen.dart';
 
@@ -119,7 +118,6 @@ class VillageDataCollectionApp extends StatelessWidget {
         '/social-map': (context) => SocialMapScreen(),
         '/survey-details': (context) => SurveyDetailsScreen(),
         '/detailed-map': (context) => DetailedMapScreen(),
-        '/cadastral-map': (context) => CadastralMapScreen(),
         '/forest-map': (context) => ForestMapScreen(),
         '/biodiversity-register': (context) => BiodiversityRegisterScreen(),
         '/completion': (context) => CompletionScreen(),
@@ -129,7 +127,7 @@ class VillageDataCollectionApp extends StatelessWidget {
       builder: (context, child) {
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaleFactor: 1.0, // Prevent text scaling issues
+            textScaler: TextScaler.linear(1.0), // Prevent text scaling issues
           ),
           child: child!,
         );

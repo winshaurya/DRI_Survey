@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../database/database_helper.dart';
-import '../../../models/survey_models.dart';
+import '../widgets/family_scheme_data_widget.dart';
 
 class BankAccountPage extends StatefulWidget {
   final int surveyId;
@@ -13,8 +13,8 @@ class BankAccountPage extends StatefulWidget {
 
 class _BankAccountPageState extends State<BankAccountPage> {
   final _dbHelper = DatabaseHelper();
-  List<BankAccount> _accounts = [];
   List<String> _familyMembers = [];
+  Map<String, dynamic> _bankData = {};
   bool _isLoading = true;
 
   @override
@@ -27,14 +27,46 @@ class _BankAccountPageState extends State<BankAccountPage> {
     try {
       final members = await _dbHelper.getFamilyMembers(widget.surveyId);
       final accountsData = await _dbHelper.getBankAccounts(widget.surveyId);
-      final accounts = accountsData.map((e) => BankAccount.fromMap(e)).toList();
+
+      // Convert database data to widget format
+      List<Map<String, dynamic>> membersData = [];
+      if (accountsData.isNotEmpty) {
+        // Group accounts by member
+        Map<String, List<Map<String, dynamic>>> memberAccounts = {};
+
+        for (var account in accountsData) {
+          String memberName = account['member_name'] ?? '';
+          if (!memberAccounts.containsKey(memberName)) {
+            memberAccounts[memberName] = [];
+          }
+          memberAccounts[memberName]!.add({
+            'bank_name': account['bank_name'],
+            'account_number': account['account_number'],
+            'ifsc_code': account['ifsc_code'],
+            'branch_name': account['branch_name'],
+            'account_type': account['account_type'],
+            'has_account': account['has_account'] == 1,
+            'details_correct': account['details_correct'] == 1,
+            'incorrect_details': account['incorrect_details'],
+          });
+        }
+
+        // Convert to widget format
+        memberAccounts.forEach((memberName, accounts) {
+          membersData.add({
+            'sr_no': membersData.length + 1,
+            'name': memberName,
+            'bank_accounts': accounts,
+          });
+        });
+      }
 
       setState(() {
         _familyMembers = members;
-        _accounts = accounts;
-        if (_accounts.isEmpty) {
-          _addAccount();
-        }
+        _bankData = {
+          'is_beneficiary': membersData.isNotEmpty,
+          'members': membersData,
+        };
         _isLoading = false;
       });
     } catch (e) {
@@ -43,191 +75,84 @@ class _BankAccountPageState extends State<BankAccountPage> {
     }
   }
 
-  void _addAccount() {
-    setState(() {
-      _accounts.add(BankAccount(
-        surveyId: widget.surveyId,
-        srNo: _accounts.length + 1,
-        createdAt: DateTime.now().toIso8601String(),
-        detailsCorrect: 'yes', // Default
-      ));
-    });
-  }
-  
-  Future<void> _saveAll() async {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saving...')));
-      for(var account in _accounts) {
-          if (account.id != null) {
-              await _dbHelper.updateBankAccount(account.toMap());
-          } else {
-              int id = await _dbHelper.insertBankAccount(account.toMap());
-              // Update object with new ID (optional, but good practice if staying on page)
-              int index = _accounts.indexOf(account);
-              if(index != -1) {
-                  setState(() {
-                      _accounts[index] = account.copyWith(id: id);
-                  });
-              }
-          }
+  Future<void> _saveData() async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saving bank account data...'))
+      );
+
+      // Clear existing bank accounts for this survey
+      await _dbHelper.deleteBankAccountsBySurveyId(widget.surveyId);
+
+      // Save new data
+      final members = _bankData['members'] as List? ?? [];
+      for (var member in members) {
+        final bankAccounts = member['bank_accounts'] as List? ?? [];
+        for (var account in bankAccounts) {
+          final bankAccount = {
+            'survey_id': widget.surveyId,
+            'member_name': member['name'],
+            'bank_name': account['bank_name'],
+            'account_number': account['account_number'],
+            'ifsc_code': account['ifsc_code'],
+            'branch_name': account['branch_name'],
+            'account_type': account['account_type'],
+            'has_account': account['has_account'] == true ? 1 : 0,
+            'details_correct': account['details_correct'] == true ? 1 : 0,
+            'incorrect_details': account['incorrect_details'],
+            'created_at': DateTime.now().toIso8601String(),
+          };
+          await _dbHelper.insertBankAccount(bankAccount);
+        }
       }
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved Successfully')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bank account data saved successfully'))
+        );
       }
-  }
-
-  void _updateAccount(int index, BankAccount account) {
-      setState(() {
-          _accounts[index] = account;
-      });
-  }
-
-  void _deleteAccount(int index) async {
-      final account = _accounts[index];
-      if (account.id != null) {
-          await _dbHelper.deleteBankAccount(account.id!);
+    } catch (e) {
+      debugPrint('Error saving data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error saving data'))
+        );
       }
-      setState(() {
-          _accounts.removeAt(index);
-      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator())
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bank Details'),
+        title: const Text('Bank Account Details'),
         actions: [
-             IconButton(
-                icon: const Icon(Icons.save),
-                onPressed: _saveAll,
-            )
+          IconButton(
+            icon: const Icon(Icons.save),
+            onPressed: _saveData,
+            tooltip: 'Save bank account data',
+          ),
         ],
       ),
-      body: ListView.builder(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        itemCount: _accounts.length,
-        itemBuilder: (context, index) {
-          return _buildAccountCard(index);
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-          child: const Icon(Icons.add),
-          onPressed: _addAccount,
-      ),
-    );
-  }
-
-  Widget _buildAccountCard(int index) {
-    final account = _accounts[index];
-    
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                    Text('Account #${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteAccount(index),
-                    )
-                ],
-            ),
-            const Divider(),
-            
-            // 1. Member Name (Dropdown)
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: '1. Member Name',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)
-              ),
-              value: _familyMembers.contains(account.memberName) ? account.memberName : null,
-              items: _familyMembers.map((name) {
-                return DropdownMenuItem(value: name, child: Text(name));
-              }).toList(),
-              onChanged: (val) {
-                _updateAccount(index, account.copyWith(memberName: val));
-              },
-            ),
-            const SizedBox(height: 12),
-            
-            // 2. Account Number
-            TextFormField(
-              decoration: const InputDecoration(
-                labelText: '2. Account Number',
-                border: OutlineInputBorder(),
-              ),
-              initialValue: account.accountNumber,
-              keyboardType: TextInputType.number,
-              onChanged: (val) {
-                 _updateAccount(index, account.copyWith(accountNumber: val));
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // 3. Bank Name
-            TextFormField(
-              decoration: const InputDecoration(
-                labelText: '3. Bank Name',
-                border: OutlineInputBorder(),
-              ),
-              initialValue: account.bankName,
-              onChanged: (val) {
-                 _updateAccount(index, account.copyWith(bankName: val));
-              },
-            ),
-
-            const SizedBox(height: 12),
-            // 4. Details Correct (Yes/No)
-            const Text('4. Details Correct?', style: TextStyle(fontWeight: FontWeight.w500)),
-            Row(
-              children: [
-                Expanded(
-                  child: RadioListTile<String>(
-                    title: const Text('Yes'),
-                    value: 'yes',
-                    groupValue: account.detailsCorrect,
-                    contentPadding: EdgeInsets.zero,
-                    onChanged: (val) {
-                       _updateAccount(index, account.copyWith(detailsCorrect: val));
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: RadioListTile<String>(
-                    title: const Text('No'),
-                    value: 'no',
-                    groupValue: account.detailsCorrect,
-                    contentPadding: EdgeInsets.zero,
-                    onChanged: (val) {
-                       _updateAccount(index, account.copyWith(detailsCorrect: val));
-                    },
-                  ),
-                ),
-              ],
-            ),
-
-            // 5. If No -> Incorrect Details
-            if (account.detailsCorrect == 'no')
-              TextFormField(
-                decoration: const InputDecoration(
-                    labelText: "5. What's incorrect?",
-                    border: OutlineInputBorder(),
-                ),
-                initialValue: account.incorrectDetails,
-                onChanged: (val) {
-                   _updateAccount(index, account.copyWith(incorrectDetails: val));
-                },
-              ),
-          ],
+        child: FamilySchemeDataWidget(
+          title: 'Bank Account Information',
+          familyMemberNames: _familyMembers,
+          data: _bankData,
+          showBankAccounts: true,
+          showBeneficiaryCheck: false, // Always show since it's bank accounts
+          onDataChanged: (data) {
+            setState(() {
+              _bankData = data;
+            });
+          },
         ),
       ),
     );

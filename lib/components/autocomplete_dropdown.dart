@@ -40,6 +40,13 @@ class _AutocompleteDropdownState extends State<AutocompleteDropdown> {
 
     if (widget.initialValue != null) {
       _localController.text = widget.initialValue!;
+      // Initialize filtered options without setState since we're in initState
+      final text = widget.initialValue!.toLowerCase();
+      _filteredOptions = widget.options
+          .where((option) => option.toLowerCase().contains(text))
+          .toList();
+    } else {
+      _filteredOptions = widget.options;
     }
   }
 

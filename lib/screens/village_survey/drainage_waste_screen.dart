@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import 'educational_facilities_screen.dart';
 import 'irrigation_facilities_screen.dart';
 
@@ -14,10 +19,24 @@ class DrainageWasteScreen extends StatefulWidget {
 class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
   final TextEditingController drainageRemarksController = TextEditingController();
   final TextEditingController wasteRemarksController = TextEditingController();
+  final TextEditingController drainIntoController = TextEditingController();
 
-  String? _selectedDrainageType;
+  Map<String, bool> _selectedDrainageTypes = {};
   bool _hasWasteCollection = false;
   bool _hasWasteSegregation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize drainage types map
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final l10n = AppLocalizations.of(context)!;
+      final options = _getDrainageOptions(l10n);
+      setState(() {
+        _selectedDrainageTypes = {for (var option in options) option: false};
+      });
+    });
+  }
 
   List<String> _getDrainageOptions(AppLocalizations l10n) {
     return [
@@ -29,11 +48,80 @@ class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
     ];
   }
 
-  void _submitForm() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const IrrigationFacilitiesScreen()),
-    );
+  Future<void> _submitForm() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final sessionId = databaseService.currentSessionId;
+
+    if (sessionId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: No active session found. Please start from Village Form.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Prepare drainage data
+      final drainageData = {
+        'id': const Uuid().v4(),
+        'session_id': sessionId,
+        'earthen_drain': _selectedDrainageTypes[_getDrainageOptions(AppLocalizations.of(context)!) [0]] ?? false ? 1 : 0,
+        'masonry_drain': _selectedDrainageTypes[_getDrainageOptions(AppLocalizations.of(context)!) [1]] ?? false ? 1 : 0,
+        'covered_drain': _selectedDrainageTypes[_getDrainageOptions(AppLocalizations.of(context)!) [2]] ?? false ? 1 : 0,
+        'open_channel': _selectedDrainageTypes[_getDrainageOptions(AppLocalizations.of(context)!) [3]] ?? false ? 1 : 0,
+        'no_drainage_system': _selectedDrainageTypes[_getDrainageOptions(AppLocalizations.of(context)!) [4]] ?? false ? 1 : 0,
+        'drainage_destination': drainIntoController.text.trim(),
+        'drainage_remarks': drainageRemarksController.text.trim(),
+        'waste_collected_regularly': _hasWasteCollection ? 1 : 0,
+        'waste_segregated': _hasWasteSegregation ? 1 : 0,
+        'waste_remarks': wasteRemarksController.text.trim(),
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      // 1. Save to SQLite
+      await DatabaseHelper().insert('village_drainage_waste', drainageData);
+      
+      // 2. Save to Supabase (Non-blocking)
+      try {
+        await supabaseService.saveVillageData('village_drainage_waste', drainageData);
+      } catch (e) {
+        print('Supabase sync warning: $e');
+        // Continue flow even if sync fails (e.g. offline or table missing)
+      }
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Drainage data saved successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      // Navigate to next screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const IrrigationFacilitiesScreen()),
+      );
+    } catch (e) {
+      print('Critical error saving drainage data: $e');
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving drainage data locally: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {
@@ -45,42 +133,51 @@ class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
 
   void _resetForm() {
     setState(() {
-      _selectedDrainageType = null;
+      _selectedDrainageTypes.updateAll((key, value) => false);
       _hasWasteCollection = false;
       _hasWasteSegregation = false;
     });
     drainageRemarksController.clear();
     wasteRemarksController.clear();
+    drainIntoController.clear();
   }
 
   Widget _buildDrainageContent() {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
-        QuestionCard(
-          question: l10n.typeOfDrainageSystem,
+        CheckboxList(
+          label: l10n.typeOfDrainageSystem,
           description: l10n.selectTheDrainageSystemAvailableInTheVillage,
-          child: Column(
-            children: [
-              DropdownInput(
-                label: l10n.drainageSystemType,
-                value: _selectedDrainageType,
-                items: _getDrainageOptions(l10n),
-                prefixIcon: Icons.water_damage_outlined,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedDrainageType = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 15),
-              TextInput(
-                label: l10n.remarksOptional,
-                controller: drainageRemarksController,
-                prefixIcon: Icons.note_alt_outlined,
-                isRequired: false,
-              ),
-            ],
+          items: _selectedDrainageTypes,
+          onChanged: (selected) {
+            setState(() {
+              _selectedDrainageTypes = selected;
+            });
+          },
+        ),
+
+        const SizedBox(height: 15),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: TextInput(
+            label: l10n.remarksOptional,
+            controller: drainageRemarksController,
+            prefixIcon: Icons.note_alt_outlined,
+            isRequired: false,
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        QuestionCard(
+          question: 'Where does the drainage drain into?',
+          description: 'Specify the destination of the drainage system',
+          child: TextInput(
+            label: 'Drainage destination',
+            controller: drainIntoController,
+            prefixIcon: Icons.location_on_outlined,
+            isRequired: false,
           ),
         ),
 
@@ -147,6 +244,7 @@ class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
   void dispose() {
     drainageRemarksController.dispose();
     wasteRemarksController.dispose();
+    drainIntoController.dispose();
     super.dispose();
   }
 }

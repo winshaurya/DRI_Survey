@@ -1,9 +1,9 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../providers/survey_provider.dart';
 
-import '../../../l10n/app_localizations.dart';
-
-class GovernmentSchemesPage extends StatefulWidget {
+class GovernmentSchemesPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> pageData;
   final Function(Map<String, dynamic>) onDataChanged;
 
@@ -14,44 +14,353 @@ class GovernmentSchemesPage extends StatefulWidget {
   });
 
   @override
-  State<GovernmentSchemesPage> createState() => _GovernmentSchemesPageState();
+  ConsumerState<GovernmentSchemesPage> createState() => _GovernmentSchemesPageState();
 }
 
-class _GovernmentSchemesPageState extends State<GovernmentSchemesPage> {
-  late bool _pds;
-  late bool _mnrega;
-  late bool _ayushmanBharat;
-  late bool _pmKisan;
-  late bool _swachhBharat;
-  late bool _otherSchemes;
+class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
+  // Aadhaar Scheme Members
+  List<Map<String, dynamic>> _aadhaarMembers = [];
+  // Tribal Scheme Members
+  List<Map<String, dynamic>> _tribalMembers = [];
+  // Pension Scheme Members
+  List<Map<String, dynamic>> _pensionMembers = [];
+  // Widow Scheme Members
+  List<Map<String, dynamic>> _widowMembers = [];
+
+  List<String> _familyMemberNames = [];
 
   @override
   void initState() {
     super.initState();
-    _pds = widget.pageData['pds'] ?? false;
-    _mnrega = widget.pageData['mnrega'] ?? false;
-    _ayushmanBharat = widget.pageData['ayushman_bharat'] ?? false;
-    _pmKisan = widget.pageData['pm_kisan'] ?? false;
-    _swachhBharat = widget.pageData['swachh_bharat'] ?? false;
-    _otherSchemes = widget.pageData['other_schemes'] ?? false;
+    _loadExistingData();
+    _loadFamilyMembers();
+  }
+
+  void _loadExistingData() {
+    _aadhaarMembers = List<Map<String, dynamic>>.from(widget.pageData['aadhaar_scheme_members'] ?? []);
+    _tribalMembers = List<Map<String, dynamic>>.from(widget.pageData['tribal_scheme_members'] ?? []);
+    _pensionMembers = List<Map<String, dynamic>>.from(widget.pageData['pension_scheme_members'] ?? []);
+    _widowMembers = List<Map<String, dynamic>>.from(widget.pageData['widow_scheme_members'] ?? []);
+  }
+
+  void _loadFamilyMembers() {
+    final surveyState = ref.read(surveyProvider);
+    final familyMembers = surveyState.surveyData['family_members'] as List<dynamic>? ?? [];
+    _familyMemberNames = familyMembers.map((member) => member['name'] as String? ?? '').where((name) => name.isNotEmpty).toList();
   }
 
   void _updateData() {
     final data = {
-      'pds': _pds,
-      'mnrega': _mnrega,
-      'ayushman_bharat': _ayushmanBharat,
-      'pm_kisan': _pmKisan,
-      'swachh_bharat': _swachhBharat,
-      'other_schemes': _otherSchemes,
+      'aadhaar_scheme_members': _aadhaarMembers,
+      'tribal_scheme_members': _tribalMembers,
+      'pension_scheme_members': _pensionMembers,
+      'widow_scheme_members': _widowMembers,
     };
     widget.onDataChanged(data);
   }
 
+  void _addAadhaarMember() {
+    setState(() {
+      _aadhaarMembers.add({
+        'sr_no': _aadhaarMembers.length + 1,
+        'family_member_name': '',
+        'have_card': null,
+        'card_number': '',
+        'details_correct': null,
+        'what_incorrect': '',
+        'benefits_received': null,
+      });
+    });
+    _updateData();
+  }
+
+  void _addTribalMember() {
+    setState(() {
+      _tribalMembers.add({
+        'sr_no': _tribalMembers.length + 1,
+        'family_member_name': '',
+        'have_card': null,
+        'card_number': '',
+        'details_correct': null,
+        'what_incorrect': '',
+        'benefits_received': null,
+      });
+    });
+    _updateData();
+  }
+
+  void _addPensionMember() {
+    setState(() {
+      _pensionMembers.add({
+        'sr_no': _pensionMembers.length + 1,
+        'family_member_name': '',
+        'have_card': null,
+        'card_number': '',
+        'details_correct': null,
+        'what_incorrect': '',
+        'benefits_received': null,
+      });
+    });
+    _updateData();
+  }
+
+  void _addWidowMember() {
+    setState(() {
+      _widowMembers.add({
+        'sr_no': _widowMembers.length + 1,
+        'family_member_name': '',
+        'have_card': null,
+        'card_number': '',
+        'details_correct': null,
+        'what_incorrect': '',
+        'benefits_received': null,
+      });
+    });
+    _updateData();
+  }
+
+  Widget _buildSchemeMemberSection(
+    String title,
+    String icon,
+    Color color,
+    List<Map<String, dynamic>> members,
+    Function() onAddMember,
+  ) {
+    return Card(
+      elevation: 3,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(icon, style: const TextStyle(fontSize: 20)),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...members.asMap().entries.map((entry) {
+              final index = entry.key;
+              final member = entry.value;
+              return _buildMemberForm(member, index, members, () => _updateData());
+            }),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: onAddMember,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Another Family Member'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMemberForm(Map<String, dynamic> member, int index, List<Map<String, dynamic>> members, VoidCallback onUpdate) {
+    return Card(
+      elevation: 1,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Member ${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+
+            // Family Member Name Dropdown
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Family Member Name',
+                border: OutlineInputBorder(),
+              ),
+              initialValue: member['family_member_name']?.isNotEmpty == true ? member['family_member_name'] : null,
+              items: _familyMemberNames.map((name) {
+                return DropdownMenuItem<String>(
+                  value: name,
+                  child: Text(name),
+                );
+              }).toList(),
+              onChanged: (value) {
+                member['family_member_name'] = value ?? '';
+                onUpdate();
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Have Card Radio Buttons
+            const Text('Have Card?', style: TextStyle(fontWeight: FontWeight.w500)),
+            Row(
+              children: [
+                Expanded(
+                  child: RadioListTile<bool>(
+                    title: const Text('Yes'),
+                    value: true,
+                    groupValue: member['have_card'],
+                    onChanged: (value) {
+                      setState(() {
+                        member['have_card'] = value;
+                        if (value == false) {
+                          member['card_number'] = '';
+                          member['details_correct'] = null;
+                          member['what_incorrect'] = '';
+                          member['benefits_received'] = null;
+                        }
+                      });
+                      onUpdate();
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: RadioListTile<bool>(
+                    title: const Text('No'),
+                    value: false,
+                    groupValue: member['have_card'],
+                    onChanged: (value) {
+                      setState(() {
+                        member['have_card'] = value;
+                        if (value == false) {
+                          member['card_number'] = '';
+                          member['details_correct'] = null;
+                          member['what_incorrect'] = '';
+                          member['benefits_received'] = null;
+                        }
+                      });
+                      onUpdate();
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            // Card Number (only if have_card is true)
+            if (member['have_card'] == true) ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                decoration: const InputDecoration(
+                  labelText: 'Card Number',
+                  border: OutlineInputBorder(),
+                ),
+                initialValue: member['card_number'] ?? '',
+                onChanged: (value) {
+                  member['card_number'] = value;
+                  onUpdate();
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Details Correct Radio Buttons
+              const Text('Details Correct?', style: TextStyle(fontWeight: FontWeight.w500)),
+              Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<bool>(
+                      title: const Text('Yes'),
+                      value: true,
+                      groupValue: member['details_correct'],
+                      onChanged: (value) {
+                        setState(() {
+                          member['details_correct'] = value;
+                          if (value == true) {
+                            member['what_incorrect'] = '';
+                          }
+                        });
+                        onUpdate();
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<bool>(
+                      title: const Text('No'),
+                      value: false,
+                      groupValue: member['details_correct'],
+                      onChanged: (value) {
+                        setState(() {
+                          member['details_correct'] = value;
+                          if (value == true) {
+                            member['what_incorrect'] = '';
+                          }
+                        });
+                        onUpdate();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              // What is incorrect (only if details_correct is false)
+              if (member['details_correct'] == false) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'What is incorrect?',
+                    border: OutlineInputBorder(),
+                  ),
+                  initialValue: member['what_incorrect'] ?? '',
+                  onChanged: (value) {
+                    member['what_incorrect'] = value;
+                    onUpdate();
+                  },
+                ),
+              ],
+
+              const SizedBox(height: 12),
+
+              // Benefits Received Radio Buttons
+              const Text('Benefits Received?', style: TextStyle(fontWeight: FontWeight.w500)),
+              Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<bool>(
+                      title: const Text('Yes'),
+                      value: true,
+                      groupValue: member['benefits_received'],
+                      onChanged: (value) {
+                        member['benefits_received'] = value;
+                        onUpdate();
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<bool>(
+                      title: const Text('No'),
+                      value: false,
+                      groupValue: member['benefits_received'],
+                      onChanged: (value) {
+                        member['benefits_received'] = value;
+                        onUpdate();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -70,7 +379,7 @@ class _GovernmentSchemesPageState extends State<GovernmentSchemesPage> {
           FadeInDown(
             delay: const Duration(milliseconds: 100),
             child: Text(
-              'Select government schemes your family is enrolled in or benefits from',
+              'Detailed information about government scheme enrollment and benefits received',
               style: TextStyle(
                 color: Colors.grey[600],
                 fontSize: 16,
@@ -79,225 +388,119 @@ class _GovernmentSchemesPageState extends State<GovernmentSchemesPage> {
           ),
           const SizedBox(height: 24),
 
-          // PDS (Public Distribution System)
+          // Aadhaar Scheme Section
           FadeInLeft(
             delay: const Duration(milliseconds: 200),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'PDS (Public Distribution System)',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Ration card for subsidized food grains'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.restaurant, color: Colors.orange),
-                ),
-                value: _pds,
-                onChanged: (value) {
-                  setState(() => _pds = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            child: _buildSchemeMemberSection(
+              'Aadhaar Scheme',
+              '🆔',
+              Colors.blue,
+              _aadhaarMembers,
+              _addAadhaarMember,
             ),
           ),
-          const SizedBox(height: 12),
 
-          // MGNREGA
+          // Ayushman Card Section
           FadeInLeft(
             delay: const Duration(milliseconds: 300),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'MGNREGA',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Mahatma Gandhi National Rural Employment Guarantee Act'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.work, color: Colors.blue),
-                ),
-                value: _mnrega,
-                onChanged: (value) {
-                  setState(() => _mnrega = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            child: _buildSchemeMemberSection(
+              'Ayushman Card',
+              '💳',
+              Colors.teal,
+              _aadhaarMembers, // Replace with Ayushman members list
+              _addAadhaarMember, // Replace with Ayushman add member function
             ),
           ),
-          const SizedBox(height: 12),
 
-          // Ayushman Bharat
+          // Family ID Section
           FadeInLeft(
             delay: const Duration(milliseconds: 400),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'Ayushman Bharat / PMJAY',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Pradhan Mantri Jan Arogya Yojana health insurance'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.red[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.health_and_safety, color: Colors.red),
-                ),
-                value: _ayushmanBharat,
-                onChanged: (value) {
-                  setState(() => _ayushmanBharat = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            child: _buildSchemeMemberSection(
+              'Family ID',
+              '🏠',
+              Colors.brown,
+              _aadhaarMembers, // Replace with Family ID members list
+              _addAadhaarMember, // Replace with Family ID add member function
             ),
           ),
-          const SizedBox(height: 12),
 
-          // PM Kisan
+          // Ration Card Section
           FadeInLeft(
             delay: const Duration(milliseconds: 500),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'PM Kisan Samman Nidhi',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Income support for farmers'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.green[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.agriculture, color: Colors.green),
-                ),
-                value: _pmKisan,
-                onChanged: (value) {
-                  setState(() => _pmKisan = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            child: _buildSchemeMemberSection(
+              'Ration Card',
+              '🍚',
+              Colors.red,
+              _aadhaarMembers, // Replace with Ration Card members list
+              _addAadhaarMember, // Replace with Ration Card add member function
             ),
           ),
-          const SizedBox(height: 12),
 
-          // Swachh Bharat
+          // Samagra ID Section
           FadeInLeft(
             delay: const Duration(milliseconds: 600),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'Swachh Bharat Mission',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Clean India initiative, toilets, sanitation'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.teal[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.cleaning_services, color: Colors.teal),
-                ),
-                value: _swachhBharat,
-                onChanged: (value) {
-                  setState(() => _swachhBharat = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            child: _buildSchemeMemberSection(
+              'Samagra ID',
+              '📜',
+              Colors.purple,
+              _aadhaarMembers, // Replace with Samagra ID members list
+              _addAadhaarMember, // Replace with Samagra ID add member function
             ),
           ),
-          const SizedBox(height: 12),
 
-          // Other Schemes
+          // Handicapped Allowance Section
           FadeInLeft(
             delay: const Duration(milliseconds: 700),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'Other Government Schemes',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('Pension schemes, housing schemes, etc.'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.purple[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.more_horiz, color: Colors.purple),
-                ),
-                value: _otherSchemes,
-                onChanged: (value) {
-                  setState(() => _otherSchemes = value ?? false);
-                  _updateData();
-                },
-                activeColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            child: _buildSchemeMemberSection(
+              'Handicapped Allowance',
+              '♿',
+              Colors.orange,
+              _aadhaarMembers, // Replace with Handicapped Allowance members list
+              _addAadhaarMember, // Replace with Handicapped Allowance add member function
             ),
           ),
+
+          // Tribal Card Scheme Section
+          FadeInLeft(
+            delay: const Duration(milliseconds: 300),
+            child: _buildSchemeMemberSection(
+              'Tribal Card Scheme',
+              '🏹',
+              Colors.orange,
+              _tribalMembers,
+              _addTribalMember,
+            ),
+          ),
+
+          // Pension Allowance Scheme Section
+          FadeInLeft(
+            delay: const Duration(milliseconds: 400),
+            child: _buildSchemeMemberSection(
+              'Pension Allowance',
+              '👴',
+              Colors.green,
+              _pensionMembers,
+              _addPensionMember,
+            ),
+          ),
+
+          // Widow Allowance Scheme Section
+          FadeInLeft(
+            delay: const Duration(milliseconds: 500),
+            child: _buildSchemeMemberSection(
+              'Widow Allowance',
+              '👩',
+              Colors.purple,
+              _widowMembers,
+              _addWidowMember,
+            ),
+          ),
+
           const SizedBox(height: 24),
 
           // Information Text
           FadeInUp(
-            delay: const Duration(milliseconds: 800),
+            delay: const Duration(milliseconds: 600),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -311,7 +514,7 @@ class _GovernmentSchemesPageState extends State<GovernmentSchemesPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Government schemes provide essential support to rural families. Select all schemes your family is enrolled in or benefits from.',
+                      'Government schemes provide essential support to rural families. Please provide detailed information about scheme enrollment and benefits received.',
                       style: TextStyle(
                         color: Colors.indigo[700],
                         fontSize: 14,
@@ -325,7 +528,7 @@ class _GovernmentSchemesPageState extends State<GovernmentSchemesPage> {
 
           // Optional Note
           FadeInUp(
-            delay: const Duration(milliseconds: 900),
+            delay: const Duration(milliseconds: 700),
             child: Container(
               margin: const EdgeInsets.only(top: 16),
               padding: const EdgeInsets.all(12),
@@ -339,7 +542,7 @@ class _GovernmentSchemesPageState extends State<GovernmentSchemesPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'If your family is not enrolled in any government schemes, you can proceed without selecting any options.',
+                      'If your family is not enrolled in any government schemes, you can proceed without adding any members.',
                       style: TextStyle(
                         color: Colors.grey[700],
                         fontSize: 14,

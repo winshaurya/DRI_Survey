@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import 'package:provider/provider.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import '../../form_template.dart';
 import 'irrigation_facilities_screen.dart'; // Import the previous screen
 
@@ -19,8 +24,45 @@ class _TransportationScreenState extends State<TransportationScreen> {
     'Pick-up/Truck': TextEditingController(),
   };
 
-  void _submitForm() {
-    Navigator.pop(context);
+  Future<void> _submitForm() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final sessionId = databaseService.currentSessionId;
+
+    if (sessionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: No active session found')),
+      );
+      return;
+    }
+
+    final data = {
+      'id': const Uuid().v4(),
+      'session_id': sessionId,
+      'tractor_count': int.tryParse(vehicles['Tractor']?.text ?? '') ?? 0,
+      'car_jeep_count': int.tryParse(vehicles['Car/Jeep']?.text ?? '') ?? 0,
+      'motorcycle_scooter_count': int.tryParse(vehicles['Motorcycle/Scooter']?.text ?? '') ?? 0,
+      'cycle_count': int.tryParse(vehicles['Cycle']?.text ?? '') ?? 0,
+      'e_rickshaw_count': int.tryParse(vehicles['E-rickshaw']?.text ?? '') ?? 0,
+      'pickup_truck_count': int.tryParse(vehicles['Pick-up/Truck']?.text ?? '') ?? 0,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await DatabaseHelper().insert('village_transport_facilities', data);
+      await supabaseService.saveVillageData('village_transport_facilities', data);
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      print('Error saving data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving data: $e')),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {

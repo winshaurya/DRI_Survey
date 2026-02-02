@@ -38,8 +38,10 @@ class _HouseConditionsPageState extends State<HouseConditionsPage> {
 
   // Other
   String? _tulsiPlants;
-  String? _numberOfRooms;
-  String? _houseOwnership;
+
+  // Toilet secondary questions
+  String? _toiletInUse;
+  String? _toiletCondition;
 
   @override
   void initState() {
@@ -66,8 +68,10 @@ class _HouseConditionsPageState extends State<HouseConditionsPage> {
     _nutritionalGarden = widget.pageData['nutritional_garden'] ?? false;
 
     _tulsiPlants = widget.pageData['tulsi_plants'];
-    _numberOfRooms = widget.pageData['number_of_rooms'];
-    _houseOwnership = widget.pageData['house_ownership'];
+
+    // Initialize toilet secondary questions
+    _toiletInUse = widget.pageData['toilet_in_use'];
+    _toiletCondition = widget.pageData['toilet_condition'];
   }
 
   void _updateData() {
@@ -88,8 +92,8 @@ class _HouseConditionsPageState extends State<HouseConditionsPage> {
       'electric_connection': _electricConnection,
       'nutritional_garden': _nutritionalGarden,
       'tulsi_plants': _tulsiPlants,
-      'number_of_rooms': _numberOfRooms,
-      'house_ownership': _houseOwnership,
+      'toilet_in_use': _toiletInUse,
+      'toilet_condition': _toiletCondition,
     };
     widget.onDataChanged(data);
   }
@@ -141,7 +145,7 @@ class _HouseConditionsPageState extends State<HouseConditionsPage> {
           FadeInLeft(
             delay: const Duration(milliseconds: 200),
             child: Text(
-              'House Type:',
+              'Type:',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -160,7 +164,7 @@ class _HouseConditionsPageState extends State<HouseConditionsPage> {
           FadeInLeft(
             delay: const Duration(milliseconds: 500),
             child: Text(
-              l10n.houseFacilities,
+              'Facilities:',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -229,44 +233,127 @@ class _HouseConditionsPageState extends State<HouseConditionsPage> {
             ),
           ),
 
-          const SizedBox(height: 16),
-
-          FadeInUp(
-            delay: const Duration(milliseconds: 1200),
-            child: TextFormField(
-              initialValue: _numberOfRooms,
-              decoration: InputDecoration(
-                labelText: 'Number of rooms',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+          // Toilet secondary questions - only show if toilet is selected
+          if (_toilet) ...[
+            const SizedBox(height: 16),
+            FadeInUp(
+              delay: const Duration(milliseconds: 1200),
+              child: Text(
+                'Toilet Details:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[800],
                 ),
               ),
-              keyboardType: TextInputType.number,
-              onChanged: (value) {
-                _numberOfRooms = value;
-                _updateData();
-              },
             ),
-          ),
+            const SizedBox(height: 12),
 
-          const SizedBox(height: 16),
-
-          FadeInUp(
-            delay: const Duration(milliseconds: 1250),
-            child: TextFormField(
-              initialValue: _houseOwnership,
-              decoration: InputDecoration(
-                labelText: 'House ownership (Owned/Rented)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+            FadeInUp(
+              delay: const Duration(milliseconds: 1250),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'In Use:',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Radio<String>(
+                        value: 'yes',
+                        groupValue: _toiletInUse,
+                        onChanged: (value) {
+                          setState(() {
+                            _toiletInUse = value;
+                          });
+                          _updateData();
+                        },
+                        activeColor: Colors.green,
+                      ),
+                      const Text('Yes'),
+                      const SizedBox(width: 20),
+                      Radio<String>(
+                        value: 'no',
+                        groupValue: _toiletInUse,
+                        onChanged: (value) {
+                          setState(() {
+                            _toiletInUse = value;
+                          });
+                          _updateData();
+                        },
+                        activeColor: Colors.green,
+                      ),
+                      const Text('No'),
+                    ],
+                  ),
+                ],
               ),
-              onChanged: (value) {
-                _houseOwnership = value;
-                _updateData();
-              },
             ),
-          ),
+
+            const SizedBox(height: 12),
+
+            FadeInUp(
+              delay: const Duration(milliseconds: 1300),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Toilet Condition:',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Radio<String>(
+                        value: 'good',
+                        groupValue: _toiletCondition,
+                        onChanged: (value) {
+                          setState(() {
+                            _toiletCondition = value;
+                          });
+                          _updateData();
+                        },
+                        activeColor: Colors.green,
+                      ),
+                      const Text('Good'),
+                      const SizedBox(width: 16),
+                      Radio<String>(
+                        value: 'average',
+                        groupValue: _toiletCondition,
+                        onChanged: (value) {
+                          setState(() {
+                            _toiletCondition = value;
+                          });
+                          _updateData();
+                        },
+                        activeColor: Colors.green,
+                      ),
+                      const Text('Average'),
+                      const SizedBox(width: 16),
+                      Radio<String>(
+                        value: 'bad',
+                        groupValue: _toiletCondition,
+                        onChanged: (value) {
+                          setState(() {
+                            _toiletCondition = value;
+                          });
+                          _updateData();
+                        },
+                        activeColor: Colors.green,
+                      ),
+                      const Text('Bad'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

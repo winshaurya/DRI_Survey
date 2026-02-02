@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'cadastral_map_screen.dart'; // Import the previous screen
+import 'detailed_map_screen.dart';
 import 'biodiversity_register_screen.dart';
 
 class ForestMapScreen extends StatefulWidget {
@@ -30,7 +30,7 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
     // Navigate back to CadastralMapScreen
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => CadastralMapScreen()),
+      MaterialPageRoute(builder: (context) => DetailedMapScreen()),
     );
   }
 

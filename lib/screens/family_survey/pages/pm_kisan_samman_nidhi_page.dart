@@ -1,37 +1,92 @@
 // PM Kisan Samman Nidhi Beneficiary Page
 import 'package:flutter/material.dart';
 
-class PMKisanSammanNidhiPage extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../providers/survey_provider.dart';
+import '../widgets/family_scheme_data_widget.dart';
+import '../../../form_template.dart';
+
+class PMKisanSammanNidhiPage extends ConsumerStatefulWidget {
+  final Map<String, dynamic> pageData;
+  final Function(Map<String, dynamic>) onDataChanged;
+
+  const PMKisanSammanNidhiPage({
+    super.key,
+    required this.pageData,
+    required this.onDataChanged,
+  });
+
+  @override
+  ConsumerState<PMKisanSammanNidhiPage> createState() => _PMKisanSammanNidhiPageState();
+}
+
+class _PMKisanSammanNidhiPageState extends ConsumerState<PMKisanSammanNidhiPage> {
+  Map<String, dynamic> _schemeData = {};
+  List<String> _familyMemberNames = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _schemeData = Map<String, dynamic>.from(widget.pageData);
+     if (_schemeData.isEmpty) {
+        _schemeData = {'is_beneficiary': false, 'members': []};
+    }
+    _loadFamilyMembers();
+  }
+
+  @override
+  void didUpdateWidget(covariant PMKisanSammanNidhiPage oldWidget) {
+      super.didUpdateWidget(oldWidget);
+       if (widget.pageData != oldWidget.pageData) {
+         _schemeData = Map<String, dynamic>.from(widget.pageData);
+       }
+  }
+
+  void _loadFamilyMembers() {
+    final surveyState = ref.read(surveyProvider);
+    final familyMembers = surveyState.surveyData['family_members'] as List<dynamic>? ?? [];
+    setState(() {
+      _familyMemberNames = familyMembers
+          .map((member) => member['name'] as String? ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('PM Kisan Samman Nidhi Beneficiary'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return FormTemplateScreen(
+        title: 'PM Kisan Samman Nidhi Beneficiary',
+        stepNumber: '28',
+        nextScreenRoute: '/kisan-credit-card',
+        nextScreenName: 'Kisan Credit Card',
+        icon: Icons.monetization_on,
+        onReset: () {
+            setState(() {
+               _schemeData = {'is_beneficiary': false, 'members': []};
+               widget.onDataChanged(_schemeData);
+            });
+        },
+        contentWidget: Column(
           children: [
-            Container(
-              height: MediaQuery.of(context).size.height * 0.1, // 10% smaller
-              decoration: BoxDecoration(
-                color: Colors.tealAccent,
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-              child: Center(
-                child: Text(
-                  'PM Kisan Samman Nidhi Beneficiary Page Content Goes Here',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.black,
-                  ),
-                ),
-              ),
+            FamilySchemeDataWidget(
+              title: 'PM Kisan Samman Nidhi Beneficiary',
+              familyMemberNames: _familyMemberNames,
+              data: _schemeData,
+              showNameIncluded: false,
+              showDetailsCorrect: true,
+              showReceived: true,
+              showDays: false,
+              onDataChanged: (newData) {
+                setState(() {
+                  _schemeData = newData;
+                });
+                widget.onDataChanged(newData);
+              },
             ),
           ],
         ),
-      ),
     );
   }
 }

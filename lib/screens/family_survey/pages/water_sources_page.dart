@@ -54,6 +54,8 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
     _nalJaalQuality = widget.pageData['nal_jaal_quality'] ?? '';
     _otherSourcesQuality = widget.pageData['other_sources_quality'] ?? '';
 
+
+
     // Initialize distance controllers
     _handPumpsDistanceController = TextEditingController(text: widget.pageData['hand_pumps_distance']?.toString() ?? '');
     _wellDistanceController = TextEditingController(text: widget.pageData['well_distance']?.toString() ?? '');
@@ -226,7 +228,7 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Radio<String>(
-                                value: 'clean',
+                                value: 'good',
                                 groupValue: quality,
                                 onChanged: (value) {
                                   setState(() {
@@ -253,14 +255,14 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
                                 activeColor: Colors.green,
                                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              const Text('Clean', style: TextStyle(fontSize: 14)),
+                              const Text('Good', style: TextStyle(fontSize: 14)),
                             ],
                           ),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Radio<String>(
-                                value: 'dirty',
+                                value: 'average',
                                 groupValue: quality,
                                 onChanged: (value) {
                                   setState(() {
@@ -287,7 +289,41 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
                                 activeColor: Colors.green,
                                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              const Text('Dirty', style: TextStyle(fontSize: 14)),
+                              const Text('Average', style: TextStyle(fontSize: 14)),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Radio<String>(
+                                value: 'bad',
+                                groupValue: quality,
+                                onChanged: (value) {
+                                  setState(() {
+                                    switch (sourceKey) {
+                                      case 'hand_pumps':
+                                        _handPumpsQuality = value!;
+                                        break;
+                                      case 'well':
+                                        _wellQuality = value!;
+                                        break;
+                                      case 'tubewell':
+                                        _tubewellQuality = value!;
+                                        break;
+                                      case 'nal_jaal':
+                                        _nalJaalQuality = value!;
+                                        break;
+                                      case 'other_sources':
+                                        _otherSourcesQuality = value!;
+                                        break;
+                                    }
+                                  });
+                                  _updateData();
+                                },
+                                activeColor: Colors.green,
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              const Text('Bad', style: TextStyle(fontSize: 14)),
                             ],
                           ),
                         ],
@@ -324,14 +360,14 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
           FadeInDown(
             delay: const Duration(milliseconds: 100),
             child: Text(
-              'Select drinking water sources and rate water quality',
+              'Select drinking water sources available to your household and rate the quality of water from each source.',
               style: TextStyle(
                 color: Colors.grey[600],
                 fontSize: 16,
               ),
             ),
           ),
-          const SizedBox(height: 24),
+const SizedBox(height: 24),
 
           // Water source rows
           _buildWaterSourceRow('hand_pumps', l10n.handPumps ?? 'Hand Pumps', 'Manual water pumps', Icons.water, Colors.blue, 200),
@@ -341,65 +377,6 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
           _buildWaterSourceRow('other_sources', l10n.otherSources ?? 'Other Sources', 'River, pond, tanker, etc.', Icons.more_horiz, Colors.purple, 400),
 
           const SizedBox(height: 24),
-
-          // Information Text
-          FadeInUp(
-            delay: const Duration(milliseconds: 500),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.cyan[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.cyan[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.water_drop, color: Colors.cyan[700]),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Clean water is essential for good health. Please rate the quality of water from your selected sources.',
-                      style: TextStyle(
-                        color: Colors.cyan[700],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Validation Message
-          if (!_handPumps && !_well && !_tubewell && !_nalJaal && !_otherSources)
-            FadeInUp(
-              delay: const Duration(milliseconds: 600),
-              child: Container(
-                margin: const EdgeInsets.only(top: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.orange[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Please select at least one drinking water source',
-                        style: TextStyle(
-                          color: Colors.orange[700],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
     );

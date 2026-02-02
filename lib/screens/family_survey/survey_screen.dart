@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../components/logo_widget.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/survey_provider.dart';
- import 'widgets/progress_bar.dart';
 import 'widgets/side_navigation.dart';
 import 'widgets/survey_page.dart';
 
@@ -95,11 +94,6 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
 body: Column(
           children: [
             const AppHeader(),
-            // Progress Bar
-            SurveyProgressBar(
-              currentPage: surveyState.currentPage,
-              totalPages: surveyState.totalPages,
-            ),
 
             // Survey Pages
             Expanded(
@@ -359,6 +353,92 @@ body: Column(
       default:
         return true;
     }
+  }
+
+  String _getCurrentPageTitle(int pageIndex) {
+    final l10n = AppLocalizations.of(context)!;
+
+    switch (pageIndex) {
+      case 0:
+        return 'Location Information';
+      case 1:
+        return 'Family Details';
+      case 2:
+        return 'Social Consciousness (Part 1)';
+      case 3:
+        return 'Social Consciousness (Part 2)';
+      case 4:
+        return 'Social Consciousness (Part 3)';
+      case 5:
+        return 'Land Holding';
+      case 6:
+        return 'Irrigation Facilities';
+      case 7:
+        return 'Crop Productivity';
+      case 8:
+        return 'Fertilizer Usage';
+      case 9:
+        return 'Livestock & Animals';
+      case 10:
+        return 'Agricultural Equipment';
+      case 11:
+        return 'Entertainment Facilities';
+      case 12:
+        return 'Transport Facilities';
+      case 13:
+        return 'Drinking Water Sources';
+      case 14:
+        return 'Medical Treatment';
+      case 15:
+        return 'Disputes & Legal Issues';
+      case 16:
+        return 'House Conditions';
+      case 17:
+        return 'Health & Diseases';
+      case 18:
+        return 'Government Schemes';
+      case 19:
+        return 'Children & Education';
+      case 20:
+        return 'Migration';
+      case 21:
+        return 'Training & Skills';
+      case 22:
+        return 'Survey Summary';
+      default:
+        return 'Survey Page ${pageIndex + 1}';
+    }
+  }
+
+  Future<void> _navigateToPage(int pageIndex) async {
+    final surveyNotifier = ref.read(surveyProvider.notifier);
+    final currentPage = ref.read(surveyProvider).currentPage;
+
+    if (pageIndex == currentPage) return;
+
+    // Save current page data before navigating
+    await surveyNotifier.saveCurrentPageData();
+
+    // Navigate to the selected page
+    _pageController.animateToPage(
+      pageIndex,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+
+    // Update the survey state
+    if (pageIndex > currentPage) {
+      for (int i = currentPage; i < pageIndex; i++) {
+        surveyNotifier.nextPage();
+      }
+    } else {
+      for (int i = currentPage; i > pageIndex; i--) {
+        surveyNotifier.previousPage();
+      }
+    }
+
+    // Load data for the new page
+    await surveyNotifier.loadPageData(pageIndex);
   }
 
   void _showConstraintError(int pageIndex) {

@@ -97,7 +97,7 @@ class LandingScreen extends ConsumerWidget {
                       child: Column(
                         children: [
                           Text(
-                            'Conduct Family Surveys',
+                            'Conduct PRA Survey',
                             style: TextStyle(
                               fontSize: 18,
                               color: Colors.white.withOpacity(0.95),
@@ -108,7 +108,7 @@ class LandingScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Survey multiple families efficiently with our comprehensive questionnaire covering social, economic, and health aspects.',
+                            'The DRI PRA Survey captures all village and families data to give a total holistic picture of the state of the village, to enable the formulation of an action plan for sustainable development of the village.',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.white.withOpacity(0.85),
@@ -152,6 +152,7 @@ class LandingScreen extends ConsumerWidget {
                     ),
 
                     const SizedBox(height: 16),
+
 
                     // DRI Family Survey Button
                     SizedBox(

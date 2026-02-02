@@ -113,27 +113,45 @@ class Survey extends Equatable {
 
 // Family Member Model
 class FamilyMember extends Equatable {
-  final int? id;
-  final int surveyId;
-  final String? memberName;
+  final String? id;
+  final String phoneNumber;
+  final String? name;
+  final String? fathersName;
+  final String? mothersName;
+  final String? relationshipWithHead;
   final int? age;
   final String? sex;
-  final String? relation;
-  final String? education;
+  final String? physicallyFit;
+  final String? physicallyFitCause;
+  final String? educationalQualification;
+  final String? inclinationSelfEmployment;
   final String? occupation;
+  final int? daysEmployed;
+  final double? income;
+  final String? awarenessAboutVillage;
+  final String? participateGramSabha;
   final String? insured;
   final String? insuranceCompany;
   final String createdAt;
 
   const FamilyMember({
     this.id,
-    required this.surveyId,
-    this.memberName,
+    required this.phoneNumber,
+    this.name,
+    this.fathersName,
+    this.mothersName,
+    this.relationshipWithHead,
     this.age,
     this.sex,
-    this.relation,
-    this.education,
+    this.physicallyFit,
+    this.physicallyFitCause,
+    this.educationalQualification,
+    this.inclinationSelfEmployment,
     this.occupation,
+    this.daysEmployed,
+    this.income,
+    this.awarenessAboutVillage,
+    this.participateGramSabha,
     this.insured,
     this.insuranceCompany,
     required this.createdAt,
@@ -142,13 +160,22 @@ class FamilyMember extends Equatable {
   factory FamilyMember.fromMap(Map<String, dynamic> map) {
     return FamilyMember(
       id: map['id'],
-      surveyId: map['survey_id'],
-      memberName: map['member_name'],
+      phoneNumber: map['phone_number'],
+      name: map['name'],
+      fathersName: map['fathers_name'],
+      mothersName: map['mothers_name'],
+      relationshipWithHead: map['relationship_with_head'],
       age: map['age'],
       sex: map['sex'],
-      relation: map['relation'],
-      education: map['education'],
+      physicallyFit: map['physically_fit'],
+      physicallyFitCause: map['physically_fit_cause'],
+      educationalQualification: map['educational_qualification'],
+      inclinationSelfEmployment: map['inclination_self_employment'],
       occupation: map['occupation'],
+      daysEmployed: map['days_employed'],
+      income: map['income']?.toDouble(),
+      awarenessAboutVillage: map['awareness_about_village'],
+      participateGramSabha: map['participate_gram_sabha'],
       insured: map['insured'],
       insuranceCompany: map['insurance_company'],
       createdAt: map['created_at'],
@@ -158,13 +185,22 @@ class FamilyMember extends Equatable {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'survey_id': surveyId,
-      'member_name': memberName,
+      'phone_number': phoneNumber,
+      'name': name,
+      'fathers_name': fathersName,
+      'mothers_name': mothersName,
+      'relationship_with_head': relationshipWithHead,
       'age': age,
       'sex': sex,
-      'relation': relation,
-      'education': education,
+      'physically_fit': physicallyFit,
+      'physically_fit_cause': physicallyFitCause,
+      'educational_qualification': educationalQualification,
+      'inclination_self_employment': inclinationSelfEmployment,
       'occupation': occupation,
+      'days_employed': daysEmployed,
+      'income': income,
+      'awareness_about_village': awarenessAboutVillage,
+      'participate_gram_sabha': participateGramSabha,
       'insured': insured,
       'insurance_company': insuranceCompany,
       'created_at': createdAt,
@@ -174,13 +210,22 @@ class FamilyMember extends Equatable {
   @override
   List<Object?> get props => [
         id,
-        surveyId,
-        memberName,
+        phoneNumber,
+        name,
+        fathersName,
+        mothersName,
+        relationshipWithHead,
         age,
         sex,
-        relation,
-        education,
+        physicallyFit,
+        physicallyFitCause,
+        educationalQualification,
+        inclinationSelfEmployment,
         occupation,
+        daysEmployed,
+        income,
+        awarenessAboutVillage,
+        participateGramSabha,
         insured,
         insuranceCompany,
         createdAt,
@@ -1098,7 +1143,11 @@ class BankAccount extends Equatable {
   final String? memberName;
   final String? accountNumber;
   final String? bankName;
-  final String? detailsCorrect;
+  final String? ifscCode;
+  final String? branchName;
+  final String? accountType;
+  final bool? hasAccount;
+  final bool? detailsCorrect;
   final String? incorrectDetails;
   final String createdAt;
 
@@ -1109,6 +1158,10 @@ class BankAccount extends Equatable {
     this.memberName,
     this.accountNumber,
     this.bankName,
+    this.ifscCode,
+    this.branchName,
+    this.accountType,
+    this.hasAccount,
     this.detailsCorrect,
     this.incorrectDetails,
     required this.createdAt,
@@ -1122,7 +1175,11 @@ class BankAccount extends Equatable {
       memberName: map['member_name'],
       accountNumber: map['account_number'],
       bankName: map['bank_name'],
-      detailsCorrect: map['details_correct']?.toString(),
+      ifscCode: map['ifsc_code'],
+      branchName: map['branch_name'],
+      accountType: map['account_type'],
+      hasAccount: map['has_account'] == 1,
+      detailsCorrect: map['details_correct'] == 1,
       incorrectDetails: map['incorrect_details'],
       createdAt: map['created_at'],
     );
@@ -1136,7 +1193,11 @@ class BankAccount extends Equatable {
       'member_name': memberName,
       'account_number': accountNumber,
       'bank_name': bankName,
-      'details_correct': detailsCorrect,
+      'ifsc_code': ifscCode,
+      'branch_name': branchName,
+      'account_type': accountType,
+      'has_account': hasAccount == true ? 1 : 0,
+      'details_correct': detailsCorrect == true ? 1 : 0,
       'incorrect_details': incorrectDetails,
       'created_at': createdAt,
     };
@@ -1149,7 +1210,11 @@ class BankAccount extends Equatable {
     String? memberName,
     String? accountNumber,
     String? bankName,
-    String? detailsCorrect,
+    String? ifscCode,
+    String? branchName,
+    String? accountType,
+    bool? hasAccount,
+    bool? detailsCorrect,
     String? incorrectDetails,
     String? createdAt,
   }) {
@@ -1160,6 +1225,10 @@ class BankAccount extends Equatable {
       memberName: memberName ?? this.memberName,
       accountNumber: accountNumber ?? this.accountNumber,
       bankName: bankName ?? this.bankName,
+      ifscCode: ifscCode ?? this.ifscCode,
+      branchName: branchName ?? this.branchName,
+      accountType: accountType ?? this.accountType,
+      hasAccount: hasAccount ?? this.hasAccount,
       detailsCorrect: detailsCorrect ?? this.detailsCorrect,
       incorrectDetails: incorrectDetails ?? this.incorrectDetails,
       createdAt: createdAt ?? this.createdAt,

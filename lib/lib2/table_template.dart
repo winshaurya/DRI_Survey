@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../components/logo_widget.dart';
-import '../../screens/family_survey/widgets/side_navigation.dart';
 
 class TemplateScreen extends StatefulWidget {
   final String title;

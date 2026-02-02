@@ -294,65 +294,6 @@ class _TransportPageState extends State<TransportPage> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Information Text
-          FadeInUp(
-            delay: const Duration(milliseconds: 800),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.teal[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.teal[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.directions_bus, color: Colors.teal[700]),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Transport facilities indicate mobility and economic status. Select all vehicles owned by your family.',
-                      style: TextStyle(
-                        color: Colors.teal[700],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Validation Message
-          if (!_carJeep && !_motorcycleScooter && !_eRickshaw && !_cycle && !_pickupTruck && !_bullockCart)
-            FadeInUp(
-              delay: const Duration(milliseconds: 900),
-              child: Container(
-                margin: const EdgeInsets.only(top: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.orange[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Please select at least one transport facility to continue.',
-                        style: TextStyle(
-                          color: Colors.orange[700],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
     );

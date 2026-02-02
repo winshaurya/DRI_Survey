@@ -497,7 +497,7 @@ class _DropdownInputState extends State<DropdownInput> {
         ),
       ),
       child: DropdownButtonFormField<String>(
-        value: _selectedValue?.isEmpty ?? true ? null : _selectedValue,
+        initialValue: _selectedValue?.isEmpty ?? true ? null : _selectedValue,
         decoration: InputDecoration(
           labelText: widget.label,
           labelStyle: TextStyle(

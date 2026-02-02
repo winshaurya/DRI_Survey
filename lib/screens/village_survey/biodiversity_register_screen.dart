@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:uuid/uuid.dart';
+import 'package:provider/provider.dart';
 import 'forest_map_screen.dart'; // Import the previous screen
 import 'completion_screen.dart'; // Add this import
+import '../../services/file_upload_service.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 
 class BiodiversityRegisterScreen extends StatefulWidget {
   const BiodiversityRegisterScreen({super.key});
@@ -17,41 +23,203 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
   final TextEditingController detailsController = TextEditingController();
   final TextEditingController componentsController = TextEditingController();
   final TextEditingController knowledgeController = TextEditingController();
-  
+
+  final FileUploadService _fileUploadService = FileUploadService.instance;
+  final DatabaseService _databaseService = DatabaseService();
+
+  String? _currentSessionId;
+  String? _shineCode;
+  String _uploadStatus = 'none';
+
   // Image upload
-  File? _selectedImage;
+  XFile? _selectedImage;
   final ImagePicker _picker = ImagePicker();
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCurrentSession();
+    });
+  }
+
+  Future<void> _loadCurrentSession() async {
+    try {
+      final dbService = Provider.of<DatabaseService>(context, listen: false);
+      final sessionId = dbService.currentSessionId;
+      
+      if (sessionId != null) {
+        // Fetch session details to get village_code (shineCode)
+        final db = await DatabaseHelper().database;
+        final sessions = await db.query(
+          'village_survey_sessions',
+          where: 'session_id = ?',
+          whereArgs: [sessionId],
+        );
+
+        if (sessions.isNotEmpty) {
+          setState(() {
+            _currentSessionId = sessionId;
+            _shineCode = sessions.first['village_code'] as String?;
+          });
+          _loadExistingUploads();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading current session: $e');
+    }
+  }
+
+  Future<void> _loadExistingUploads() async {
+    if (_shineCode == null) return;
+
+    try {
+      final pendingUploads = await _fileUploadService.getPendingUploadsForSession(
+        _shineCode!,
+        'pbr',
+      );
+      final uploadedFiles = await _fileUploadService.getUploadedFilesForSession(
+        _shineCode!,
+        'pbr',
+      );
+
+      setState(() {
+        if (pendingUploads.isNotEmpty) {
+          _uploadStatus = pendingUploads.first['status'];
+        } else if (uploadedFiles.isNotEmpty) {
+          _uploadStatus = 'uploaded';
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading existing uploads: $e');
+    }
+  }
+
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (_shineCode == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No active village survey session found')),
+      );
+      return;
+    }
+
+    final XFile? image = await _fileUploadService.pickImage();
+
     if (image != null) {
       setState(() {
-        _selectedImage = File(image.path);
+        _selectedImage = image;
+        _uploadStatus = 'pending';
       });
+
+      try {
+        await _fileUploadService.queueFileForUpload(
+          image,
+          _shineCode!,
+          'pbr',
+          'biodiversity_register',
+          'image',
+        );
+
+        // Reload upload statuses
+        await _loadExistingUploads();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image queued for upload')),
+        );
+      } catch (e) {
+        setState(() => _uploadStatus = 'failed');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to queue image: $e')),
+        );
+      }
     }
   }
 
   Future<void> _takePhoto() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+    if (_shineCode == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No active village survey session found')),
+      );
+      return;
+    }
+
+    final XFile? image = await _fileUploadService.captureImage();
+
     if (image != null) {
       setState(() {
-        _selectedImage = File(image.path);
+        _selectedImage = image;
+        _uploadStatus = 'pending';
       });
+
+      try {
+        await _fileUploadService.queueFileForUpload(
+          image,
+          _shineCode!,
+          'pbr',
+          'biodiversity_register',
+          'image',
+        );
+
+        // Reload upload statuses
+        await _loadExistingUploads();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image queued for upload')),
+        );
+      } catch (e) {
+        setState(() => _uploadStatus = 'failed');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to queue image: $e')),
+        );
+      }
     }
   }
 
   void _removeImage() {
     setState(() {
       _selectedImage = null;
+      _uploadStatus = 'none';
     });
   }
 
-  void _submitForm() {
-    // Navigate to completion screen
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => CompletionScreen()),
-    );
+  Future<void> _submitForm() async {
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+
+    if (_currentSessionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No active village survey session found')),
+      );
+      return;
+    }
+
+    final data = {
+      'id': const Uuid().v4(),
+      'session_id': _currentSessionId,
+      'status': statusController.text,
+      'details': detailsController.text,
+      'components': componentsController.text,
+      'knowledge': knowledgeController.text,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await DatabaseHelper().insert('village_biodiversity_register', data);
+      await supabaseService.saveVillageData('village_biodiversity_register', data);
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => CompletionScreen()),
+        );
+      }
+    } catch (e) {
+      print('Error saving data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving data: $e')),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {
@@ -62,7 +230,7 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
     );
   }
 
-  Widget _buildInputField(String label, TextEditingController controller, {bool required = false, int lines = 1}) {
+  Widget _buildInputField(String label, TextEditingController controller, {int lines = 1}) {
     return Container(
       margin: EdgeInsets.only(bottom: 12), // Reduced from 15
       padding: EdgeInsets.all(10), // Reduced from 12
@@ -294,6 +462,7 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
                                   ),
                                 ),
                               ),
+                              _buildStatusIndicator(_uploadStatus),
                             ],
                           ),
                           SizedBox(height: 8), // Reduced from 10
@@ -321,7 +490,7 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(6), // Reduced from 8
                                     child: Image.file(
-                                      _selectedImage!,
+                                        File(_selectedImage!.path),
                                       fit: BoxFit.cover,
                                     ),
                                   ),
@@ -440,6 +609,28 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildStatusIndicator(String status) {
+    switch (status) {
+      case 'pending':
+        return Icon(Icons.schedule, color: Colors.orange, size: 16);
+      case 'uploading':
+        return SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+          ),
+        );
+      case 'uploaded':
+        return Icon(Icons.check_circle, color: Colors.green, size: 16);
+      case 'failed':
+        return Icon(Icons.error, color: Colors.red, size: 16);
+      default:
+        return SizedBox.shrink();
+    }
   }
 
   @override

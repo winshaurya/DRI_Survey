@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import 'educational_facilities_screen.dart';
-import 'infrastructure_screen.dart';
 
 class InfrastructureAvailabilityScreen extends StatefulWidget {
   const InfrastructureAvailabilityScreen({super.key});
@@ -47,18 +51,84 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
   bool _hasElectricalConnection = false;
   bool _hasDrinkingWaterSource = false;
 
-  void _submitForm() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => EducationalFacilitiesScreen()),
-    );
+  Future<void> _submitForm() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final sessionId = databaseService.currentSessionId;
+
+    if (sessionId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: No active session found')),
+        );
+      }
+      return;
+    }
+
+    final data = {
+      'id': const Uuid().v4(),
+      'session_id': sessionId,
+      'has_primary_school': _hasPrimarySchool ? 1 : 0,
+      'primary_school_distance': primarySchoolDistanceController.text,
+      'has_junior_school': _hasJuniorSchool ? 1 : 0,
+      'junior_school_distance': juniorSchoolDistanceController.text,
+      'has_high_school': _hasHighSchool ? 1 : 0,
+      'high_school_distance': highSchoolDistanceController.text,
+      'has_intermediate_school': _hasIntermediateSchool ? 1 : 0,
+      'intermediate_school_distance': intermediateSchoolDistanceController.text,
+      'other_education_facilities': otherEducationalFacilityController.text,
+      'boys_students_count': int.tryParse(boysStudentsController.text),
+      'girls_students_count': int.tryParse(girlsStudentsController.text),
+      'has_playground': _hasPlayground ? 1 : 0,
+      'playground_remarks': playgroundRemarksController.text,
+      'has_panchayat_bhavan': _hasPanchayatBhavan ? 1 : 0,
+      'panchayat_remarks': panchayatRemarksController.text,
+      'has_sharda_kendra': _hasShardaKendra ? 1 : 0,
+      'sharda_kendra_distance': shardaKendraDistanceController.text,
+      'has_post_office': _hasPostOffice ? 1 : 0,
+      'post_office_distance': postOfficeDistanceController.text,
+      'has_health_facility': _hasHealthFacility ? 1 : 0,
+      'health_facility_distance': healthFacilityDistanceController.text,
+      'has_bank': _hasBank ? 1 : 0,
+      'bank_distance': bankDistanceController.text,
+      'has_electrical_connection': _hasElectricalConnection ? 1 : 0,
+      'num_wells': int.tryParse(numWellsController.text),
+      'num_ponds': int.tryParse(numPondsController.text),
+      'num_hand_pumps': int.tryParse(numHandPumpsController.text),
+      'num_tube_wells': int.tryParse(numTubeWellsController.text),
+      'num_tap_water': int.tryParse(numTapWaterController.text),
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await DatabaseHelper().insert('village_infrastructure_details', data);
+      
+      try {
+        await supabaseService.saveVillageData('village_infrastructure_details', data);
+      } catch (e) {
+        print('Supabase sync warning: $e');
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => EducationalFacilitiesScreen()),
+        );
+      }
+    } catch (e) {
+      print('Error saving infrastructure details: $e');
+      if (mounted) {
+        // Proceed even if save fails, to avoid blocking
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => EducationalFacilitiesScreen()),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => InfrastructureScreen()),
-    );
+    Navigator.pop(context);
   }
 
   Widget _buildInfrastructureContent() {

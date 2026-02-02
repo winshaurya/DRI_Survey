@@ -31,7 +31,6 @@ class LocationService {
         'timestamp': DateTime.now().toIso8601String(),
       };
     } catch (e) {
-      print('Error getting current position: $e');
       return null;
     }
   }
@@ -66,7 +65,6 @@ class LocationService {
         'country': 'India', // Default for India
       };
     } catch (e) {
-      print('Error getting complete location data: $e');
       return null;
     }
   }

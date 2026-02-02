@@ -30,37 +30,30 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  google_fonts: ^7.0.2
-  flutter_riverpod: ^3.2.0
   supabase_flutter: ^2.5.1
+  connectivity_plus: ^2.3.0
   flutter_dotenv: ^6.0.0
-  flutter_launcher_icons: ^0.14.4
-  sqflite: ^2.3.0
-  path_provider: ^2.1.2
-  intl: ^0.20.2
-  animate_do: ^4.2.0
-  equatable: ^2.0.5
   flutter_localizations:
     sdk: flutter
-  csv: ^6.0.0
-  excel: ^4.0.3
-  open_file: ^3.2.1
-  universal_html: ^2.2.4
-  connectivity_plus: ^7.0.0
-  shared_preferences: ^2.2.3
-  google_sign_in: ^6.2.1
-  permission_handler: ^11.3.1
-  image_picker: ^1.0.4
-  flutter_map: ^6.1.0
+  flutter_riverpod: ^2.6.1
+  google_fonts: ^6.0.0
+  image_picker: ^0.8.5+3
+  flutter_map: ^6.0.0
   latlong2: ^0.9.0
-  location: ^6.0.0
+  location: ^8.0.1
+  sqflite: ^2.0.0+3
+  universal_html: ^2.0.0
+  csv: ^5.0.0
+  googleapis: ^13.1.0
+  googleapis_auth: ^1.6.0
+  animate_do: ^2.0.0
+  open_file: ^3.2.1
+  excel: ^4.0.6
+  uuid: ^4.2.1
+  provider: ^6.1.1
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
+  mockito: ^5.0.0
 
 flutter_launcher_icons:
   android: "dri_survey"

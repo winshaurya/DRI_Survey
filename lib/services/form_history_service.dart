@@ -52,7 +52,6 @@ class FormHistoryService {
       await _updateCurrentVersion(sessionId, formType, currentVersion);
 
     } catch (e) {
-      print('Error saving form version: $e');
       rethrow;
     }
   }
@@ -79,7 +78,6 @@ class FormHistoryService {
         return data;
       }
     } catch (e) {
-      print('Error getting form history: $e');
       return [];
     }
   }

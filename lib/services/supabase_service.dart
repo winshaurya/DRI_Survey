@@ -1,6 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -103,6 +102,10 @@ class SupabaseService {
       await _syncDiseases(phoneNumber, surveyData['diseases']);
       await _syncGovernmentSchemes(phoneNumber, surveyData);
       await _syncChildrenData(phoneNumber, surveyData['children_data']);
+      await _syncMalnourishedChildrenData(phoneNumber, surveyData['malnourished_children_data']);
+      await _syncChildDiseases(phoneNumber, surveyData['child_diseases']);
+      await _syncFolkloreMedicine(phoneNumber, surveyData['folklore_medicine']);
+      await _syncHealthProgrammes(phoneNumber, surveyData['health_programmes']);
       await _syncMalnutritionData(phoneNumber, surveyData['malnutrition_data']);
       await _syncMigration(phoneNumber, surveyData['migration']);
       await _syncTraining(phoneNumber, surveyData['training']);
@@ -121,68 +124,7 @@ class SupabaseService {
     }
   }
 
-  // Sync village survey data to Supabase
-  Future<void> syncVillageSurveyToSupabase(String sessionId, Map<String, dynamic> surveyData) async {
-    try {
-      // Get current user email for audit trail
-      final userEmail = currentUser?.email ?? surveyData['surveyor_email'];
-
-      // Insert main village survey session data
-      await client
-          .from('village_survey_sessions')
-          .upsert({
-            'session_id': sessionId,
-            'surveyor_email': userEmail, // For RLS and audit trails
-            'village_name': surveyData['village_name'],
-            'village_code': surveyData['village_code'],
-            'state': surveyData['state'],
-            'district': surveyData['district'],
-            'block': surveyData['block'],
-            'panchayat': surveyData['panchayat'],
-            'tehsil': surveyData['tehsil'],
-            'ldg_code': surveyData['ldg_code'],
-            'gps_link': surveyData['gps_link'],
-            'shine_code': surveyData['shine_code'],
-            'latitude': surveyData['latitude'],
-            'longitude': surveyData['longitude'],
-            'location_accuracy': surveyData['location_accuracy'],
-            'location_timestamp': surveyData['location_timestamp'],
-            'status': 'completed',
-            'created_by': userEmail,
-            'updated_by': userEmail,
-            'user_id': currentUser?.id,
-          });
-
-      // Sync village-specific data tables
-      await _syncVillagePopulation(sessionId, surveyData['village_population']);
-      await _syncVillageFarmFamilies(sessionId, surveyData['village_farm_families']);
-      await _syncVillageHousing(sessionId, surveyData['village_housing']);
-      await _syncVillageAgriculturalImplements(sessionId, surveyData['village_agricultural_implements']);
-      await _syncVillageCropProductivity(sessionId, surveyData['village_crop_productivity']);
-      await _syncVillageAnimals(sessionId, surveyData['village_animals']);
-      await _syncVillageIrrigationFacilities(sessionId, surveyData['village_irrigation_facilities']);
-      await _syncVillageDrinkingWater(sessionId, surveyData['village_drinking_water']);
-      await _syncVillageTransport(sessionId, surveyData['village_transport']);
-      await _syncVillageEntertainment(sessionId, surveyData['village_entertainment']);
-      await _syncVillageMedicalTreatment(sessionId, surveyData['village_medical_treatment']);
-      await _syncVillageDisputes(sessionId, surveyData['village_disputes']);
-      await _syncVillageEducationalFacilities(sessionId, surveyData['village_educational_facilities']);
-      await _syncVillageSocialConsciousness(sessionId, surveyData['village_social_consciousness']);
-      await _syncVillageChildrenData(sessionId, surveyData['village_children_data']);
-      await _syncVillageMalnutritionData(sessionId, surveyData['village_malnutrition_data']);
-      await _syncVillageBplFamilies(sessionId, surveyData['village_bpl_families']);
-      await _syncVillageKitchenGardens(sessionId, surveyData['village_kitchen_gardens']);
-      await _syncVillageSeedClubs(sessionId, surveyData['village_seed_clubs']);
-      await _syncVillageBiodiversityRegister(sessionId, surveyData['village_biodiversity_register']);
-      await _syncVillageTraditionalOccupations(sessionId, surveyData['village_traditional_occupations']);
-      await _syncVillageUnemployment(sessionId, surveyData['village_unemployment']);
-
-    } catch (e) {
-      throw Exception('Failed to sync village survey to Supabase: $e');
-    }
-  }
-
-  // Helper methods for syncing family survey tables
+// Helper methods for syncing family survey tables
   Future<void> _syncFamilyMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
     await client.from('family_members').upsert(
@@ -236,12 +178,28 @@ class SupabaseService {
 
   Future<void> _syncDrinkingWaterSources(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('drinking_water_sources').upsert({...data, 'phone_number': phoneNumber});
+await client.from('drinking_water_sources').upsert({
+  ...data,
+  'phone_number': phoneNumber,
+  'hand_pumps_quality': data['hand_pumps_quality'],
+  'well_quality': data['well_quality'],
+  'tubewell_quality': data['tubewell_quality'],
+  'nal_jaal_quality': data['nal_jaal_quality'],
+  'other_sources_quality': data['other_sources_quality'],
+});
   }
 
   Future<void> _syncMedicalTreatment(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('medical_treatment').upsert({...data, 'phone_number': phoneNumber});
+    await client.from('medical_treatment').upsert({
+      'allopathic': data['allopathic'] ?? '0',
+      'ayurvedic': data['ayurvedic'] ?? '0',
+      'homeopathy': data['homeopathy'] ?? '0',
+      'traditional': data['traditional'] ?? '0',
+      'other_treatment': data['other_treatment'] ?? '0',
+      'preferred_treatment': data['preferred_treatment'],
+      'phone_number': phoneNumber
+    });
   }
 
   Future<void> _syncDisputes(String phoneNumber, Map<String, dynamic>? data) async {
@@ -297,6 +255,20 @@ class SupabaseService {
   Future<void> _syncChildrenData(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
     await client.from('children_data').upsert({...data, 'phone_number': phoneNumber});
+  }
+
+  Future<void> _syncMalnourishedChildrenData(String phoneNumber, List<dynamic>? data) async {
+    if (data == null || data.isEmpty) return;
+    await client.from('malnourished_children_data').upsert(
+      data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
+    );
+  }
+
+  Future<void> _syncChildDiseases(String phoneNumber, List<dynamic>? data) async {
+    if (data == null || data.isEmpty) return;
+    await client.from('child_diseases').upsert(
+      data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
+    );
   }
 
   Future<void> _syncMalnutritionData(String phoneNumber, List<dynamic>? data) async {
@@ -359,6 +331,11 @@ class SupabaseService {
     await client.from('folklore_medicine').upsert(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+  }
+
+  Future<void> _syncHealthProgrammes(String phoneNumber, Map<String, dynamic>? data) async {
+    if (data == null || data.isEmpty) return;
+    await client.from('health_programmes').upsert({...data, 'phone_number': phoneNumber});
   }
 
   Future<void> _syncTulsiPlants(String phoneNumber, Map<String, dynamic>? data) async {
@@ -540,6 +517,11 @@ class SupabaseService {
     await client.from('village_farm_families').upsert({...data, 'session_id': sessionId});
   }
 
+  Future<void> _syncVillageDrainageWaste(String sessionId, Map<String, dynamic>? data) async {
+    if (data == null || data.isEmpty) return;
+    await client.from('village_drainage_waste').upsert({...data, 'session_id': sessionId});
+  }
+
   Future<void> _syncVillageHousing(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
     await client.from('village_housing').upsert({...data, 'session_id': sessionId});
@@ -651,9 +633,9 @@ class SupabaseService {
   // Get survey statistics for dashboard
   Future<Map<String, dynamic>> getSurveyStatistics() async {
     try {
-      final surveyCount = await client.from('surveys').select('id').then((data) => data.length);
+      final surveyCount = await client.from('family_survey_sessions').select('id').then((data) => data.length);
       final todaySurveys = await client
-          .from('surveys')
+          .from('family_survey_sessions')
           .select('id')
           .gte('created_at', DateTime.now().toIso8601String().split('T')[0])
           .then((data) => data.length);
@@ -679,6 +661,64 @@ class SupabaseService {
           .order('created_at', ascending: false);
     } catch (e) {
       return [];
+    }
+  }
+
+  // Save village data to Supabase (generic method used by screens)
+  Future<void> saveVillageData(String tableName, Map<String, dynamic> data) async {
+    try {
+      await client.from(tableName).upsert(data);
+    } catch (e) {
+      throw Exception('Failed to save village data to $tableName: $e');
+    }
+  }
+
+  Future<void> syncVillageSurveyToSupabase(String sessionId, Map<String, dynamic> data) async {
+    // Extract main session data
+    final mainTableData = Map<String, dynamic>.from(data);
+    
+    // List of child tables to separate from main data
+    final childTables = [
+      'village_population', 'village_farm_families', 'village_housing',
+      'village_agricultural_implements', 'village_crop_productivity', 'village_animals',
+      'vile fillelage_irrigation_facilities', 'village_drinking_water', 'village_transport',
+      'village_entertainment', 'village_medical_treatment', 'village_disputes',
+      'village_educational_facilities', 'village_social_consciousness',
+      'village_children_data', 'village_malnutrition_data', 'village_bpl_families',
+      'village_kitchen_gardens', 'village_seed_clubs', 'village_biodiversity_register',
+      'village_traditional_occupations', 'village_drainage_waste', 'village_signboards'
+    ];
+    
+    // Remove child data from main session payload
+    for (var table in childTables) {
+      mainTableData.remove(table);
+    }
+    
+    // Sync main session
+    await saveVillageData('village_survey_sessions', mainTableData);
+    
+    // Sync child tables
+    for (var table in childTables) {
+      if (data.containsKey(table)) {
+        final tableData = data[table];
+        
+        if (tableData is List) {
+           for (var item in tableData) {
+             // Ensure session_id is present (it should be from local DB)
+              final mapItem = Map<String, dynamic>.from(item);
+              if (!mapItem.containsKey('session_id')) {
+                mapItem['session_id'] = sessionId;
+              }
+              await saveVillageData(table, mapItem);
+           }
+        } else if (tableData is Map<String, dynamic>) {
+           final mapItem = Map<String, dynamic>.from(tableData);
+           if (!mapItem.containsKey('session_id')) {
+             mapItem['session_id'] = sessionId;
+           }
+           await saveVillageData(table, mapItem);
+        }
+      }
     }
   }
 }

@@ -1,5 +1,9 @@
 // completion_screen.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import 'village_form_screen.dart';
 
 class CompletionScreen extends StatelessWidget {
@@ -85,10 +89,42 @@ class CompletionScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 20),
                   ElevatedButton.icon(
-                    onPressed: () {
+                    onPressed: () async {
+                      try {
+                        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+                        final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+                        final sessionId = databaseService.currentSessionId;
+
+                        if (sessionId != null) {
+                          final updateData = {
+                            'status': 'completed',
+                            'updated_at': DateTime.now().toIso8601String()
+                          };
+
+                          await DatabaseHelper().update(
+                            'village_survey_sessions',
+                            updateData,
+                            where: 'session_id = ?',
+                            whereArgs: [sessionId],
+                          );
+
+                          // Sync to Supabase
+                          try {
+                            await supabaseService.saveVillageData('village_survey_sessions', {
+                              'session_id': sessionId,
+                              ...updateData,
+                            });
+                          } catch (e) {
+                            print('Error syncing completion status: $e');
+                          }
+                        }
+                      } catch (e) {
+                        print('Error completing session: $e');
+                      }
+
                       Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (context) => VillageFormScreen()),
-                        (route) => false,
+                        MaterialPageRoute(builder: (context) => const VillageFormScreen()),
+                        (route) => false, // Remove all previous routes
                       );
                     },
                     style: ElevatedButton.styleFrom(

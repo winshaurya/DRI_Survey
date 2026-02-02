@@ -63,7 +63,7 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
     );
   }
 
-  Widget _buildInputField(String label, TextEditingController controller, {bool required = false, int lines = 1}) {
+  Widget _buildInputField(String label, TextEditingController controller, {int lines = 1}) {
     return Container(
       margin: EdgeInsets.only(bottom: 12), // Reduced from 15
       padding: EdgeInsets.all(10), // Reduced from 12

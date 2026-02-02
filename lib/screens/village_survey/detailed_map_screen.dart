@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:uuid/uuid.dart';
+import 'package:provider/provider.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import 'survey_details_screen.dart';
-import 'cadastral_map_screen.dart';
+import 'forest_map_screen.dart';
 
 class DetailedMapScreen extends StatefulWidget {
   const DetailedMapScreen({super.key});
@@ -79,12 +84,50 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
     });
   }
 
-  void _saveAndContinue() {
-    // Navigate directly to next screen without showing dialog
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => CadastralMapScreen()),
-    );
+  Future<void> _saveAndContinue() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final sessionId = databaseService.currentSessionId;
+
+    if (sessionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: No active session found')),
+      );
+      return;
+    }
+
+    try {
+      // 1. Save all points
+      for (var point in _mapPoints) {
+        final data = {
+          'id': const Uuid().v4(),
+          'session_id': sessionId,
+          'latitude': point.position.latitude,
+          'longitude': point.position.longitude,
+          'category': point.category,
+          'remarks': point.remarks,
+          'point_id': point.id,
+          'created_at': DateTime.now().toIso8601String(),
+        };
+
+        await DatabaseHelper().insert('village_map_points', data);
+        await supabaseService.saveVillageData('village_map_points', data);
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ForestMapScreen()),
+        );
+      }
+    } catch (e) {
+      print('Error saving data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving data: $e')),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {

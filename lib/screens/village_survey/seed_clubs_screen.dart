@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import 'package:provider/provider.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import 'irrigation_facilities_screen.dart'; // Import the previous screen
 import 'signboards_screen.dart';
 
@@ -13,11 +18,46 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _seedClubsController = TextEditingController();
 
-  void _submitForm() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const SignboardsScreen()),
-    );
+  Future<void> _submitForm() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final sessionId = databaseService.currentSessionId;
+
+    if (sessionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: No active session found')),
+      );
+      return;
+    }
+
+    final int clubsCount = int.tryParse(_seedClubsController.text) ?? 0;
+
+    final data = {
+      'id': const Uuid().v4(),
+      'session_id': sessionId,
+      'clubs_available': clubsCount > 0 ? 1 : 0,
+      'total_clubs': clubsCount,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await DatabaseHelper().insert('village_seed_clubs', data);
+      await supabaseService.saveVillageData('village_seed_clubs', data);
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const SignboardsScreen()),
+        );
+      }
+    } catch (e) {
+      print('Error saving data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving data: $e')),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {

@@ -2,36 +2,47 @@
 import 'package:flutter/material.dart';
 
 class TrainingPage extends StatelessWidget {
+  final Map<String, dynamic> pageData;
+  final Function(Map<String, dynamic>) onDataChanged;
+
+  const TrainingPage({
+    super.key,
+    required this.pageData,
+    required this.onDataChanged,
+  });
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Training Taken'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              height: MediaQuery.of(context).size.height * 0.1, // 10% smaller
-              decoration: BoxDecoration(
-                color: Colors.blueAccent,
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-              child: Center(
-                child: Text(
-                  'Training Page Content Goes Here',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Training & Skills',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
         ),
-      ),
+        const SizedBox(height: 16),
+        Text(
+          'Please provide information about training and skills',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue[200]!),
+          ),
+          child: const Text(
+            'Training page content will be implemented here',
+            style: TextStyle(fontSize: 16),
+          ),
+        ),
+      ],
     );
   }
 }

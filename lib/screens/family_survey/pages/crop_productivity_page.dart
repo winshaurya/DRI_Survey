@@ -284,7 +284,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
             Container(
               width: double.infinity,
               child: DropdownButtonFormField<String>(
-                value: widget.pageData['crop_${cropNumber}_season'] ?? 'Kharif',
+                initialValue: widget.pageData['crop_${cropNumber}_season'] ?? 'Kharif',
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),

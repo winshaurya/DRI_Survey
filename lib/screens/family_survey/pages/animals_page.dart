@@ -1,10 +1,8 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../components/autocomplete_dropdown.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../providers/survey_provider.dart';
 
 class AnimalsPage extends StatefulWidget {
   final Map<String, dynamic> pageData;

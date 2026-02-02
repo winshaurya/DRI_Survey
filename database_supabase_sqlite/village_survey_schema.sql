@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS village_survey_sessions (
 
     -- Audit fields
     created_by TEXT,
-    updated_by TEXT,
+ co   updated_by TEXT,
 
     -- Sync fields
     is_deleted BOOLEAN DEFAULT FALSE,
@@ -541,6 +541,36 @@ CREATE TABLE IF NOT EXISTS village_traditional_occupations (
 );
 
 -- ===========================================
+-- VILLAGE DRAINAGE AND WASTE TABLE
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_drainage_waste (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    -- Drainage system types (multiple selection)
+    earthen_drain BOOLEAN DEFAULT FALSE,
+    masonry_drain BOOLEAN DEFAULT FALSE,
+    covered_drain BOOLEAN DEFAULT FALSE,
+    open_channel BOOLEAN DEFAULT FALSE,
+    no_drainage_system BOOLEAN DEFAULT FALSE,
+
+    -- Drainage destination
+    drainage_destination TEXT,
+
+    -- Drainage remarks
+    drainage_remarks TEXT,
+
+    -- Waste management
+    waste_collected_regularly BOOLEAN DEFAULT FALSE,
+    waste_segregated BOOLEAN DEFAULT FALSE,
+    waste_remarks TEXT,
+
+    UNIQUE(session_id)
+);
+
+-- ===========================================
 -- VILLAGE UNEMPLOYMENT TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS village_unemployment (
@@ -597,12 +627,15 @@ ALTER TABLE village_kitchen_gardens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_seed_clubs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_biodiversity_register ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_traditional_occupations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_drainage_waste ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_unemployment ENABLE ROW LEVEL SECURITY;
 
 -- SECURE RLS Policies: Users can only access their own village surveys based on surveyor_email
+DROP POLICY IF EXISTS "Users can access their own village surveys" ON village_survey_sessions;
 CREATE POLICY "Users can access their own village surveys" ON village_survey_sessions
     FOR ALL USING (auth.jwt() ->> 'email' = surveyor_email);
 
+DROP POLICY IF EXISTS "Users can access village form history from their surveys" ON village_form_history;
 CREATE POLICY "Users can access village form history from their surveys" ON village_form_history
     FOR ALL USING (
         EXISTS (
@@ -613,6 +646,7 @@ CREATE POLICY "Users can access village form history from their surveys" ON vill
     );
 
 -- Child tables inherit the same restriction through foreign key relationships
+DROP POLICY IF EXISTS "Users can access village population from their surveys" ON village_population;
 CREATE POLICY "Users can access village population from their surveys" ON village_population
     FOR ALL USING (
         EXISTS (
@@ -622,6 +656,7 @@ CREATE POLICY "Users can access village population from their surveys" ON villag
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village farm families from their surveys" ON village_farm_families;
 CREATE POLICY "Users can access village farm families from their surveys" ON village_farm_families
     FOR ALL USING (
         EXISTS (
@@ -631,6 +666,7 @@ CREATE POLICY "Users can access village farm families from their surveys" ON vil
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village housing from their surveys" ON village_housing;
 CREATE POLICY "Users can access village housing from their surveys" ON village_housing
     FOR ALL USING (
         EXISTS (
@@ -640,6 +676,7 @@ CREATE POLICY "Users can access village housing from their surveys" ON village_h
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village agricultural implements from their surveys" ON village_agricultural_implements;
 CREATE POLICY "Users can access village agricultural implements from their surveys" ON village_agricultural_implements
     FOR ALL USING (
         EXISTS (
@@ -649,6 +686,7 @@ CREATE POLICY "Users can access village agricultural implements from their surve
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village crop productivity from their surveys" ON village_crop_productivity;
 CREATE POLICY "Users can access village crop productivity from their surveys" ON village_crop_productivity
     FOR ALL USING (
         EXISTS (
@@ -658,6 +696,7 @@ CREATE POLICY "Users can access village crop productivity from their surveys" ON
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village animals from their surveys" ON village_animals;
 CREATE POLICY "Users can access village animals from their surveys" ON village_animals
     FOR ALL USING (
         EXISTS (
@@ -667,6 +706,7 @@ CREATE POLICY "Users can access village animals from their surveys" ON village_a
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village irrigation facilities from their surveys" ON village_irrigation_facilities;
 CREATE POLICY "Users can access village irrigation facilities from their surveys" ON village_irrigation_facilities
     FOR ALL USING (
         EXISTS (
@@ -676,6 +716,7 @@ CREATE POLICY "Users can access village irrigation facilities from their surveys
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village drinking water from their surveys" ON village_drinking_water;
 CREATE POLICY "Users can access village drinking water from their surveys" ON village_drinking_water
     FOR ALL USING (
         EXISTS (
@@ -685,6 +726,7 @@ CREATE POLICY "Users can access village drinking water from their surveys" ON vi
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village transport from their surveys" ON village_transport;
 CREATE POLICY "Users can access village transport from their surveys" ON village_transport
     FOR ALL USING (
         EXISTS (
@@ -694,6 +736,7 @@ CREATE POLICY "Users can access village transport from their surveys" ON village
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village entertainment from their surveys" ON village_entertainment;
 CREATE POLICY "Users can access village entertainment from their surveys" ON village_entertainment
     FOR ALL USING (
         EXISTS (
@@ -703,6 +746,7 @@ CREATE POLICY "Users can access village entertainment from their surveys" ON vil
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village medical treatment from their surveys" ON village_medical_treatment;
 CREATE POLICY "Users can access village medical treatment from their surveys" ON village_medical_treatment
     FOR ALL USING (
         EXISTS (
@@ -712,6 +756,7 @@ CREATE POLICY "Users can access village medical treatment from their surveys" ON
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village disputes from their surveys" ON village_disputes;
 CREATE POLICY "Users can access village disputes from their surveys" ON village_disputes
     FOR ALL USING (
         EXISTS (
@@ -721,6 +766,7 @@ CREATE POLICY "Users can access village disputes from their surveys" ON village_
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village educational facilities from their surveys" ON village_educational_facilities;
 CREATE POLICY "Users can access village educational facilities from their surveys" ON village_educational_facilities
     FOR ALL USING (
         EXISTS (
@@ -730,6 +776,7 @@ CREATE POLICY "Users can access village educational facilities from their survey
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village social consciousness from their surveys" ON village_social_consciousness;
 CREATE POLICY "Users can access village social consciousness from their surveys" ON village_social_consciousness
     FOR ALL USING (
         EXISTS (
@@ -739,6 +786,7 @@ CREATE POLICY "Users can access village social consciousness from their surveys"
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village children data from their surveys" ON village_children_data;
 CREATE POLICY "Users can access village children data from their surveys" ON village_children_data
     FOR ALL USING (
         EXISTS (
@@ -748,6 +796,7 @@ CREATE POLICY "Users can access village children data from their surveys" ON vil
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village malnutrition data from their surveys" ON village_malnutrition_data;
 CREATE POLICY "Users can access village malnutrition data from their surveys" ON village_malnutrition_data
     FOR ALL USING (
         EXISTS (
@@ -757,6 +806,7 @@ CREATE POLICY "Users can access village malnutrition data from their surveys" ON
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village bpl families from their surveys" ON village_bpl_families;
 CREATE POLICY "Users can access village bpl families from their surveys" ON village_bpl_families
     FOR ALL USING (
         EXISTS (
@@ -766,6 +816,7 @@ CREATE POLICY "Users can access village bpl families from their surveys" ON vill
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village kitchen gardens from their surveys" ON village_kitchen_gardens;
 CREATE POLICY "Users can access village kitchen gardens from their surveys" ON village_kitchen_gardens
     FOR ALL USING (
         EXISTS (
@@ -775,6 +826,7 @@ CREATE POLICY "Users can access village kitchen gardens from their surveys" ON v
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village seed clubs from their surveys" ON village_seed_clubs;
 CREATE POLICY "Users can access village seed clubs from their surveys" ON village_seed_clubs
     FOR ALL USING (
         EXISTS (
@@ -784,6 +836,7 @@ CREATE POLICY "Users can access village seed clubs from their surveys" ON villag
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village biodiversity register from their surveys" ON village_biodiversity_register;
 CREATE POLICY "Users can access village biodiversity register from their surveys" ON village_biodiversity_register
     FOR ALL USING (
         EXISTS (
@@ -793,6 +846,7 @@ CREATE POLICY "Users can access village biodiversity register from their surveys
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village traditional occupations from their surveys" ON village_traditional_occupations;
 CREATE POLICY "Users can access village traditional occupations from their surveys" ON village_traditional_occupations
     FOR ALL USING (
         EXISTS (
@@ -802,6 +856,17 @@ CREATE POLICY "Users can access village traditional occupations from their surve
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village drainage waste from their surveys" ON village_drainage_waste;
+CREATE POLICY "Users can access village drainage waste from their surveys" ON village_drainage_waste
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_drainage_waste.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can access village unemployment from their surveys" ON village_unemployment;
 CREATE POLICY "Users can access village unemployment from their surveys" ON village_unemployment
     FOR ALL USING (
         EXISTS (

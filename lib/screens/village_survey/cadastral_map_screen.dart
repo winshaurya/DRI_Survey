@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:uuid/uuid.dart';
+import 'package:provider/provider.dart';
+import '../../services/database_service.dart';
+import '../../database/database_helper.dart';
+import '../../services/supabase_service.dart';
 import 'detailed_map_screen.dart'; // Import the previous screen
 import 'forest_map_screen.dart';
 
@@ -47,12 +52,56 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
     });
   }
 
-  void _submitForm() {
-    // Navigate directly to next screen without showing dialog
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => ForestMapScreen()),
-    );
+  Future<void> _submitForm() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    
+    // Get session ID (ensure DatabaseService is updated to return String ID)
+    final sessionId = databaseService.currentSessionId;
+
+    if (sessionId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('Error: No active session found')),
+        );
+      }
+      return;
+    }
+
+    final data = {
+      'id': const Uuid().v4(),
+      'session_id': sessionId,
+      'has_cadastral_map': hasCadastralMap ? 1 : 0,
+      'map_details': mapDetailsController.text,
+      'availability_status': availabilityStatusController.text,
+      // 'image_path': _selectedImage?.path, // If we had a column for it
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      // NOTE: Ensure 'village_cadastral_maps' table exists in DatabaseHelper
+      // If not, we might need to add it or skip this.
+      // Assuming it doesn't exist yet based on previous file reads of DatabaseHelper.
+      // I will add the table creation to DatabaseHelper shortly.
+      await DatabaseHelper().insert('village_cadastral_maps', data);
+      await supabaseService.saveVillageData('village_cadastral_maps', data);
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ForestMapScreen()),
+        );
+      }
+    } catch (e) {
+      print('Error saving cadastral map data: $e');
+      if (mounted) {
+        // Navigate anyway to avoid blocking
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ForestMapScreen()),
+        );
+      }
+    }
   }
 
   void _goToPreviousScreen() {
