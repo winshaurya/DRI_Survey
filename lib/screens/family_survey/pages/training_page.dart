@@ -19,13 +19,29 @@ class TrainingPage extends ConsumerStatefulWidget {
 
 class _TrainingPageState extends ConsumerState<TrainingPage> {
   // Training
-  List<Map<String, dynamic>> _trainings = [];
+  List<Map<String, dynamic>> _trainingsTaken = [];
+  bool _needTraining = false;
+  List<Map<String, dynamic>> _trainingsNeeded = [];
+
   // SHG
   List<Map<String, dynamic>> _shgMembers = [];
   // FPO
   List<Map<String, dynamic>> _fpoMembers = [];
 
   List<String> _familyMemberNames = [];
+  
+  static const List<String> _farmSectors = [
+    'Mushroom Production', 'Pearl Culture', 'Goat Farming', 'Poultry Farming', 
+    'Fish Culture', 'Seed Production', 'Dairying', 'Vermi Compost Production', 
+    'Bio Formulations', 'Herbal Gulal', 'Ornamental and Vegetable Nursery', 
+    'Fruit Plant Nursery', 'Value Additon and Processing of Spices', 
+    'Value Additon and Processing of Forest Produce'
+  ];
+
+  static const List<String> _nonFarmSectors = [
+    'Cutting and Tailoring', 'Beauty and Wellness', 'Plumbing', 
+    'Computer application', 'Solar', 'Automobile', 'Electrician', 'Handy Crafts'
+  ];
 
   @override
   void initState() {
@@ -35,7 +51,14 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   }
 
   void _loadExistingData() {
-    _trainings = List<Map<String, dynamic>>.from(widget.pageData['trainings'] ?? []);
+    // Separate taken vs needed
+    final rawTrainings = List<Map<String, dynamic>>.from(widget.pageData['training_members'] ?? []);
+    
+    _trainingsTaken = rawTrainings.where((t) => t['status'] == 'taken' || t['status'] == null).toList();
+    _trainingsNeeded = rawTrainings.where((t) => t['status'] == 'needed').toList();
+    
+    _needTraining = widget.pageData['want_training'] == true || _trainingsNeeded.isNotEmpty;
+
     _shgMembers = List<Map<String, dynamic>>.from(widget.pageData['shg_members'] ?? []);
     _fpoMembers = List<Map<String, dynamic>>.from(widget.pageData['fpo_members'] ?? []);
   }
@@ -47,8 +70,10 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   }
 
   void _updateData() {
+    final allTrainings = [..._trainingsTaken, ..._trainingsNeeded];
     final data = {
-      'trainings': _trainings,
+      'training_members': allTrainings,
+      'want_training': _needTraining,
       'shg_members': _shgMembers,
       'fpo_members': _fpoMembers,
     };
@@ -56,13 +81,24 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   }
 
   // --- Add Methods ---
-  void _addTraining() {
+  void _addTrainingTaken() {
     setState(() {
-      _trainings.add({
+      _trainingsTaken.add({
         'member_name': '',
         'training_type': '',
-        'duration': '',
-        'institute': '',
+        'pass_out_year': '',
+        'status': 'taken',
+      });
+    });
+    _updateData();
+  }
+
+  void _addTrainingNeeded() {
+    setState(() {
+      _trainingsNeeded.add({
+        'member_name': '',
+        'training_type': '',
+        'status': 'needed',
       });
     });
     _updateData();
@@ -73,7 +109,8 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
       _shgMembers.add({
         'member_name': '',
         'shg_name': '',
-        'role': '',
+        'purpose': '',
+        'agency': '',
       });
     });
     _updateData();
@@ -84,16 +121,24 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
       _fpoMembers.add({
         'member_name': '',
         'fpo_name': '',
-        'share_amount': '',
+        'purpose': '',
+        'agency': '',
       });
     });
     _updateData();
   }
 
   // --- Remove Methods ---
-  void _removeTraining(int index) {
+  void _removeTrainingTaken(int index) {
     setState(() {
-      _trainings.removeAt(index);
+      _trainingsTaken.removeAt(index);
+    });
+    _updateData();
+  }
+
+  void _removeTrainingNeeded(int index) {
+    setState(() {
+      _trainingsNeeded.removeAt(index);
     });
     _updateData();
   }
@@ -141,56 +186,98 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
           ),
           const SizedBox(height: 24),
 
-          // --- Training Section ---
+          // --- Training Taken Section ---
           FadeInLeft(
             delay: const Duration(milliseconds: 200),
             child: _buildSectionHeader(
-              'Technical Training',
+              'Training Taken?',
+              'Family members that have already received training',
               Icons.school,
               Colors.orange,
-              _addTraining,
-              'Add Training Details',
+              _addTrainingTaken,
+              'Add Family Member',
             ),
           ),
           const SizedBox(height: 16),
-          ..._trainings.asMap().entries.map((entry) => _buildTrainingCard(entry.key, entry.value)),
-          const SizedBox(height: 24),
+          if (_trainingsTaken.isEmpty)
+             _buildEmptyState('No training records added.'),
+          ...List.generate(
+            _trainingsTaken.length,
+            (index) => _buildTrainingTakenCard(index, _trainingsTaken[index]),
+          ),
+
+          const SizedBox(height: 32),
+          const Divider(thickness: 1.5),
+          const SizedBox(height: 16),
+
+          // --- Training Needs Section ---
+           FadeInLeft(
+            delay: const Duration(milliseconds: 250),
+            child: _buildTrainingNeedsSection(),
+           ),
+
+          const SizedBox(height: 32),
+          const Divider(thickness: 1.5),
+          const SizedBox(height: 16),
 
           // --- SHG Section ---
           FadeInLeft(
             delay: const Duration(milliseconds: 300),
             child: _buildSectionHeader(
-              'Self Help Group (SHG) Membership',
-              Icons.diversity_3,
+              'Self Help Group (SHG) Members',
+              'Family members part of SHG',
+              Icons.groups,
               Colors.purple,
               _addShgMember,
-              'Add SHG Member',
+              'Add Another Family Member',
             ),
           ),
           const SizedBox(height: 16),
-          ..._shgMembers.asMap().entries.map((entry) => _buildShgCard(entry.key, entry.value)),
-          const SizedBox(height: 24),
+          if (_shgMembers.isEmpty)
+             _buildEmptyState('No SHG members added.'),
+          ...List.generate(
+            _shgMembers.length,
+            (index) => _buildShgCard(index, _shgMembers[index]),
+          ),
+
+          const SizedBox(height: 32),
+          const Divider(thickness: 1.5),
+          const SizedBox(height: 16),
 
           // --- FPO Section ---
           FadeInLeft(
             delay: const Duration(milliseconds: 400),
             child: _buildSectionHeader(
-              'FPO Membership',
-              Icons.agriculture,
+              'FPO Members',
+              'Family members part of FPO',
+              Icons.store,
               Colors.teal,
               _addFpoMember,
-              'Add FPO Member',
+              'Add Another Family Member',
             ),
           ),
           const SizedBox(height: 16),
           ..._fpoMembers.asMap().entries.map((entry) => _buildFpoCard(entry.key, entry.value)),
-          const SizedBox(height: 32),
+          
+          const SizedBox(height: 60), // Bottom padding
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon, Color color, VoidCallback onAdd, String addLabel) {
+  Widget _buildEmptyState(String message) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Center(
+        child: Text(
+          message,
+          style: TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, String subtitle, IconData icon, Color color, VoidCallback onAdd, String addLabel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -206,9 +293,18 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
               ),
             ),
           ],
@@ -228,59 +324,139 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
     );
   }
 
-  // --- Specific Card Builders ---
-
-  Widget _buildTrainingCard(int index, Map<String, dynamic> data) {
-    return _buildBaseCard(
-      index,
-      Colors.orange,
-      () => _removeTraining(index),
+  Widget _buildTrainingNeedsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildMemberDropdown(data, 'member_name'),
-        const SizedBox(height: 12),
-        TextFormField(
-          decoration: const InputDecoration(labelText: 'Training Type / Subject', border: OutlineInputBorder()),
-          initialValue: data['training_type'],
-          onChanged: (val) {
-             data['training_type'] = val;
-             _updateData();
-          },
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                decoration: const InputDecoration(labelText: 'Duration (days)', border: OutlineInputBorder()),
-                 initialValue: data['duration'],
-                 onChanged: (val) {
-                    data['duration'] = val;
-                    _updateData();
-                 },
-                 keyboardType: TextInputType.number,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: TextFormField(
-                decoration: const InputDecoration(labelText: 'Organizing Institute', border: OutlineInputBorder()),
-                initialValue: data['institute'],
+         const Text(
+            'Do you need Training?',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Radio<bool>(
+                value: true,
+                groupValue: _needTraining,
                 onChanged: (val) {
-                  data['institute'] = val;
+                  setState(() {
+                    _needTraining = val!;
+                    if (_trainingsNeeded.isEmpty) {
+                      _addTrainingNeeded();
+                    }
+                  });
                   _updateData();
                 },
               ),
+              const Text('Yes'),
+              const SizedBox(width: 24),
+              Radio<bool>(
+                value: false,
+                groupValue: _needTraining,
+                onChanged: (val) {
+                   setState(() {
+                    _needTraining = val!;
+                    _trainingsNeeded.clear();
+                  });
+                  _updateData();
+                },
+              ),
+              const Text('No'),
+            ],
+          ),
+          if (_needTraining) ...[
+            const SizedBox(height: 16),
+            ...List.generate(
+              _trainingsNeeded.length,
+              (index) => _buildTrainingNeededCard(index, _trainingsNeeded[index]),
             ),
-          ],
+            if (_trainingsNeeded.isNotEmpty)
+              Padding(
+                 padding: const EdgeInsets.only(top: 8),
+                 child: TextButton.icon(
+                    onPressed: _addTrainingNeeded,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Another Requirement'),
+                 ),
+              ),
+          ]
+      ],
+    );
+  }
+
+  // --- Specific Card Builders ---
+
+  Widget _buildTrainingTakenCard(int index, Map<String, dynamic> data) {
+    return _buildBaseCard(
+      index,
+      'training_taken',
+      Colors.orange,
+      () => _removeTrainingTaken(index),
+      children: [
+        _buildMemberDropdown(data, 'member_name'),
+        const SizedBox(height: 12),
+        _buildTrainingTypeDropdown(data, 'training_type', 'Field of Training'),
+        const SizedBox(height: 12),
+        TextFormField(
+          decoration: const InputDecoration(labelText: 'Passing Year', border: OutlineInputBorder()),
+           initialValue: data['pass_out_year']?.toString(),
+           keyboardType: TextInputType.number,
+           onChanged: (val) {
+             data['pass_out_year'] = val;
+             _updateData();
+           },
         ),
       ],
+    );
+  }
+
+  Widget _buildTrainingNeededCard(int index, Map<String, dynamic> data) {
+    return _buildBaseCard(
+      index,
+      'training_needed',
+      Colors.blue,
+      () => _removeTrainingNeeded(index),
+      children: [
+        // Optional: Member name if we want to track WHO needs it. 
+        // User prompt: "If Yes, 'What field', and space to add what wanted via same autofill dropdown".
+        // It implies we just want the field. But in family survey context, member is good practice.
+        _buildMemberDropdown(data, 'member_name'),
+         const SizedBox(height: 12),
+        _buildTrainingTypeDropdown(data, 'training_type', 'What field?'),
+      ],
+    );
+  }
+
+  Widget _buildTrainingTypeDropdown(Map<String, dynamic> data, String key, String label) {
+    return DropdownButtonFormField<String>(
+      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      value: (data[key] != null && (_farmSectors.contains(data[key]) || _nonFarmSectors.contains(data[key]))) ? data[key] : null,
+      isExpanded: true,
+      items: [
+        const DropdownMenuItem<String>(
+          enabled: false,
+          child: Text('--- Farm Sectors ---', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+        ),
+        ..._farmSectors.map((e) => DropdownMenuItem(value: e, child: Text(e))),
+        const DropdownMenuItem<String>(
+          enabled: false,
+          child: Text('--- Non Farm Sectors ---', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+        ),
+        ..._nonFarmSectors.map((e) => DropdownMenuItem(value: e, child: Text(e))),
+      ],
+      onChanged: (val) {
+        if (val != null) {
+          data[key] = val;
+          _updateData();
+        }
+      },
     );
   }
 
   Widget _buildShgCard(int index, Map<String, dynamic> data) {
     return _buildBaseCard(
       index,
+      'shg',
       Colors.purple,
       () => _removeShgMember(index),
       children: [
@@ -296,10 +472,19 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
         ),
         const SizedBox(height: 12),
         TextFormField(
-          decoration: const InputDecoration(labelText: 'Role / Designation', border: OutlineInputBorder()),
-          initialValue: data['role'],
+          decoration: const InputDecoration(labelText: 'Purpose of SHG', border: OutlineInputBorder()),
+          initialValue: data['purpose'],
            onChanged: (val) {
-             data['role'] = val;
+             data['purpose'] = val;
+             _updateData();
+           },
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          decoration: const InputDecoration(labelText: 'Under which Agency', border: OutlineInputBorder()),
+          initialValue: data['agency'],
+           onChanged: (val) {
+             data['agency'] = val;
              _updateData();
            },
         ),
@@ -310,6 +495,7 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   Widget _buildFpoCard(int index, Map<String, dynamic> data) {
     return _buildBaseCard(
       index,
+      'fpo',
       Colors.teal,
       () => _removeFpoMember(index),
       children: [
@@ -325,11 +511,19 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
         ),
         const SizedBox(height: 12),
         TextFormField(
-          decoration: const InputDecoration(labelText: 'Share Capital Amount (₹)', border: OutlineInputBorder()),
-          initialValue: data['share_amount'],
-          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Purpose of FPO', border: OutlineInputBorder()),
+          initialValue: data['purpose'],
           onChanged: (val) {
-            data['share_amount'] = val;
+            data['purpose'] = val;
+            _updateData();
+          },
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          decoration: const InputDecoration(labelText: 'Under which Agency', border: OutlineInputBorder()),
+          initialValue: data['agency'],
+          onChanged: (val) {
+            data['agency'] = val;
             _updateData();
           },
         ),
@@ -338,9 +532,9 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   }
 
   // --- Reusable Widgets ---
-  Widget _buildBaseCard(int index, Color color, VoidCallback onRemove, {required List<Widget> children}) {
+  Widget _buildBaseCard(int index, String keyPrefix, Color color, VoidCallback onRemove, {required List<Widget> children}) {
     return FadeInUp(
-      key: ValueKey('card_$index'),
+      key: ValueKey('${keyPrefix}_$index'),
       child: Card(
         elevation: 2,
         margin: const EdgeInsets.only(bottom: 12),

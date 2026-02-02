@@ -23,7 +23,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 22,
+      version: 24,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -48,6 +48,30 @@ class DatabaseHelper {
     }
     if (oldVersion < 22) {
       await db.execute('ALTER TABLE pending_uploads ADD COLUMN status TEXT DEFAULT "pending"');
+    }
+    if (oldVersion < 23) {
+      // Add missing columns to shg_members and fpo_members tables
+      // For SHG members
+      try {
+        await db.execute('ALTER TABLE shg_members ADD COLUMN purpose TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE shg_members ADD COLUMN agency TEXT');
+      } catch (_) {}
+      
+      // For FPO members
+      try {
+        await db.execute('ALTER TABLE fpo_members ADD COLUMN purpose TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE fpo_members ADD COLUMN agency TEXT');
+      } catch (_) {}
+    }
+    if (oldVersion < 24) {
+      // Add status column to training_data to distinguish between taken and needed
+      try {
+        await db.execute('ALTER TABLE training_data ADD COLUMN status TEXT DEFAULT "taken"');
+      } catch (_) {}
     }
   }
 
@@ -335,13 +359,13 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS social_consciousness (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, alcoholism TEXT, dowry TEXT, death_feast TEXT, child_marriage TEXT, untouchability TEXT, plantation TEXT, guests TEXT, education_boys TEXT, education_girls TEXT, created_at TEXT)');
 
     // Training Data
-    await db.execute('CREATE TABLE IF NOT EXISTS training_data (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, member_name TEXT, training_topic TEXT, training_duration TEXT, training_date TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS training_data (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, member_name TEXT, training_topic TEXT, training_duration TEXT, training_date TEXT, status TEXT DEFAULT "taken", created_at TEXT)');
 
     // SHG Members
-    await db.execute('CREATE TABLE IF NOT EXISTS shg_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, member_name TEXT, shg_name TEXT, position TEXT, monthly_saving REAL, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS shg_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, member_name TEXT, shg_name TEXT, purpose TEXT, agency TEXT, position TEXT, monthly_saving REAL, created_at TEXT)');
 
     // FPO Members
-    await db.execute('CREATE TABLE IF NOT EXISTS fpo_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, member_name TEXT, fpo_name TEXT, share_capital REAL, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS fpo_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, member_name TEXT, fpo_name TEXT, purpose TEXT, agency TEXT, share_capital REAL, created_at TEXT)');
 
     // Children Data
     await db.execute('CREATE TABLE IF NOT EXISTS children_data (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, births_last_3_years INTEGER, infant_deaths_last_3_years INTEGER, malnourished_children INTEGER, created_at TEXT)');

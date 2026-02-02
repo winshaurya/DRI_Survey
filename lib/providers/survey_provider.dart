@@ -54,7 +54,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   SurveyState build() {
     return const SurveyState(
       currentPage: 0,
-      totalPages: 23, // Based on survey_page.dart switch cases (0-22)
+      totalPages: 31, // Based on survey_page.dart switch cases (0-30)
       surveyData: {},
       isLoading: false,
     );

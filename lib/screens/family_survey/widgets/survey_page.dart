@@ -29,6 +29,12 @@ import '../pages/folklore_medicine_page.dart';
 import '../pages/health_programme_page.dart';
 import '../pages/migration_page.dart';
 import '../pages/training_page.dart';
+import '../pages/vb_g_ram_g_beneficiary_page.dart';
+import '../pages/pm_kisan_samman_nidhi_page.dart';
+import '../pages/kisan_credit_card_page.dart';
+import '../pages/swachh_bharat_mission_page.dart';
+import '../pages/fasal_bima_page.dart';
+import '../pages/bank_account_page.dart';
 import '../pages/final_page.dart';
 
 class SurveyPage extends ConsumerStatefulWidget {
@@ -129,7 +135,7 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
                           ),
                         ),
                         child: Text(
-                          widget.pageIndex == 24 ? l10n.submit : l10n.next,
+                          widget.pageIndex == 30 ? l10n.submit : l10n.next,
                           style: const TextStyle(fontSize: 16),
                         ),
                       ),
@@ -195,6 +201,18 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
       case 23:
         return TrainingPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
       case 24:
+        return VBGBeneficiaryPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+      case 25:
+        return PMKisanSammanNidhiPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+      case 26:
+        return KisanCreditCardPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+      case 27:
+        return SwachhBharatMissionPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+      case 28:
+        return FasalBimaPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+      case 29:
+        return BankAccountPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+      case 30:
         return FinalPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
       default:
         return const Center(child: Text('Page not found'));
