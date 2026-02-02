@@ -1,10 +1,8 @@
 // VB G RAM G Beneficiary Page
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/survey_provider.dart';
 import '../widgets/family_scheme_data_widget.dart';
-import '../../../form_template.dart';
 
 class VBGBeneficiaryPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> pageData;
@@ -55,37 +53,20 @@ class _VBGBeneficiaryPageState extends ConsumerState<VBGBeneficiaryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FormTemplateScreen(
+    return FamilySchemeDataWidget(
       title: 'VB G RAM G Beneficiary',
-      stepNumber: '26',
-      nextScreenRoute: '/pm-kisan-nidhi', 
-      nextScreenName: 'PM Kisan Nidhi',
-      icon: Icons.grass, 
-      onReset: () {
+      familyMemberNames: _familyMemberNames,
+      data: _schemeData,
+      showNameIncluded: true,
+      showDetailsCorrect: true,
+      showDays: true,
+      daysLabel: 'No. of days',
+      onDataChanged: (newData) {
         setState(() {
-          _schemeData = {'is_beneficiary': false, 'members': []};
-          widget.onDataChanged(_schemeData);
+          _schemeData = newData;
         });
+        widget.onDataChanged(newData);
       },
-      contentWidget: Column(
-        children: [
-          FamilySchemeDataWidget(
-            title: 'VB G RAM G Beneficiary',
-            familyMemberNames: _familyMemberNames,
-            data: _schemeData,
-            showNameIncluded: true,
-            showDetailsCorrect: true,
-            showDays: true,
-            daysLabel: 'No. of days',
-            onDataChanged: (newData) {
-              setState(() {
-                _schemeData = newData;
-              });
-              widget.onDataChanged(newData);
-            },
-          ),
-        ],
-      ),
     );
   }
 }

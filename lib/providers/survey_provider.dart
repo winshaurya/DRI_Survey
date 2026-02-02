@@ -821,6 +821,21 @@ class SurveyNotifier extends Notifier<SurveyState> {
     }
   }
 
+  Future<void> jumpToPage(int page) async {
+    if (page >= 0 && page < state.totalPages) {
+      // Save current page data before jumping
+      await saveCurrentPageData();
+      // Update the survey session timestamp
+      if (state.phoneNumber != null) {
+        await _databaseService.saveData('survey_sessions', {
+          'phone_number': state.phoneNumber,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      }
+      state = state.copyWith(currentPage: page);
+    }
+  }
+
   void goToPage(int page) {
     if (page >= 0 && page < state.totalPages) {
       state = state.copyWith(currentPage: page);

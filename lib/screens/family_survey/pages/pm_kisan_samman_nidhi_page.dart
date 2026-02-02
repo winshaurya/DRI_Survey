@@ -1,11 +1,8 @@
 // PM Kisan Samman Nidhi Beneficiary Page
 import 'package:flutter/material.dart';
-
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/survey_provider.dart';
 import '../widgets/family_scheme_data_widget.dart';
-import '../../../form_template.dart';
 
 class PMKisanSammanNidhiPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> pageData;
@@ -29,7 +26,7 @@ class _PMKisanSammanNidhiPageState extends ConsumerState<PMKisanSammanNidhiPage>
   void initState() {
     super.initState();
     _schemeData = Map<String, dynamic>.from(widget.pageData);
-     if (_schemeData.isEmpty) {
+    if (_schemeData.isEmpty) {
         _schemeData = {'is_beneficiary': false, 'members': []};
     }
     _loadFamilyMembers();
@@ -56,37 +53,20 @@ class _PMKisanSammanNidhiPageState extends ConsumerState<PMKisanSammanNidhiPage>
 
   @override
   Widget build(BuildContext context) {
-    return FormTemplateScreen(
-        title: 'PM Kisan Samman Nidhi Beneficiary',
-        stepNumber: '28',
-        nextScreenRoute: '/kisan-credit-card',
-        nextScreenName: 'Kisan Credit Card',
-        icon: Icons.monetization_on,
-        onReset: () {
-            setState(() {
-               _schemeData = {'is_beneficiary': false, 'members': []};
-               widget.onDataChanged(_schemeData);
-            });
-        },
-        contentWidget: Column(
-          children: [
-            FamilySchemeDataWidget(
-              title: 'PM Kisan Samman Nidhi Beneficiary',
-              familyMemberNames: _familyMemberNames,
-              data: _schemeData,
-              showNameIncluded: false,
-              showDetailsCorrect: true,
-              showReceived: true,
-              showDays: false,
-              onDataChanged: (newData) {
-                setState(() {
-                  _schemeData = newData;
-                });
-                widget.onDataChanged(newData);
-              },
-            ),
-          ],
-        ),
+    return FamilySchemeDataWidget(
+      title: 'PM Kisan Samman Nidhi Beneficiary',
+      familyMemberNames: _familyMemberNames,
+      data: _schemeData,
+      showNameIncluded: false,
+      showDetailsCorrect: true,
+      showReceived: true,
+      showDays: false,
+      onDataChanged: (newData) {
+        setState(() {
+          _schemeData = newData;
+        });
+        widget.onDataChanged(newData);
+      },
     );
   }
 }

@@ -1,10 +1,8 @@
 // Kisan Credit Card Beneficiary Page
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/survey_provider.dart';
 import '../widgets/family_scheme_data_widget.dart';
-import '../../../form_template.dart';
 
 class KisanCreditCardPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> pageData;
@@ -28,7 +26,7 @@ class _KisanCreditCardPageState extends ConsumerState<KisanCreditCardPage> {
   void initState() {
     super.initState();
     _schemeData = Map<String, dynamic>.from(widget.pageData);
-     if (_schemeData.isEmpty) {
+    if (_schemeData.isEmpty) {
         _schemeData = {'is_beneficiary': false, 'members': []};
     }
     _loadFamilyMembers();
@@ -55,37 +53,20 @@ class _KisanCreditCardPageState extends ConsumerState<KisanCreditCardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FormTemplateScreen(
-        title: 'Kisan Credit Card Beneficiary',
-        stepNumber: '29',
-        nextScreenRoute: '/swachh-bharat',
-        nextScreenName: 'Swachh Bharat Mission',
-        icon: Icons.credit_card,
-        onReset: () {
-            setState(() {
-               _schemeData = {'is_beneficiary': false, 'members': []};
-               widget.onDataChanged(_schemeData);
-            });
-        },
-        contentWidget: Column(
-          children: [
-            FamilySchemeDataWidget(
-              title: 'Kisan Credit Card Beneficiary',
-              familyMemberNames: _familyMemberNames,
-              data: _schemeData,
-              showNameIncluded: false,
-              showDetailsCorrect: true,
-              showReceived: true,
-              showDays: false,
-              onDataChanged: (newData) {
-                setState(() {
-                  _schemeData = newData;
-                });
-                widget.onDataChanged(newData);
-              },
-            ),
-          ],
-        ),
+    return FamilySchemeDataWidget(
+      title: 'Kisan Credit Card Beneficiary',
+      familyMemberNames: _familyMemberNames,
+      data: _schemeData,
+      showNameIncluded: false,
+      showDetailsCorrect: true,
+      showReceived: true,
+      showDays: false,
+      onDataChanged: (newData) {
+        setState(() {
+          _schemeData = newData;
+        });
+        widget.onDataChanged(newData);
+      },
     );
   }
 }

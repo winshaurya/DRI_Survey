@@ -36,6 +36,7 @@ import '../pages/swachh_bharat_mission_page.dart';
 import '../pages/fasal_bima_page.dart';
 import '../pages/bank_account_page.dart';
 import '../pages/final_page.dart';
+import '../pages/survey_preview_page.dart';
 
 class SurveyPage extends ConsumerStatefulWidget {
   final int pageIndex;
@@ -213,7 +214,7 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
       case 29:
         return BankAccountPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
       case 30:
-        return FinalPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return SurveyPreviewPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
       default:
         return const Center(child: Text('Page not found'));
     }

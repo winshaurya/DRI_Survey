@@ -6,6 +6,7 @@ import '../../l10n/app_localizations.dart';
 import '../../providers/survey_provider.dart';
 import 'widgets/side_navigation.dart';
 import 'widgets/survey_page.dart';
+import 'widgets/survey_progress_indicator.dart';
 
 class SurveyScreen extends ConsumerStatefulWidget {
   final String? previewSessionId;
@@ -87,64 +88,113 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     final surveyState = ref.watch(surveyProvider);
     final surveyNotifier = ref.read(surveyProvider.notifier);
 
+    // Page names for progress indicator
+    const List<String> pageNames = [
+      'Location',
+      'Family',
+      'Social 1',
+      'Social 2',
+      'Social 3',
+      'Land',
+      'Irrigation',
+      'Crops',
+      'Fertilizer',
+      'Animals',
+      'Equipment',
+      'Entertainment',
+      'Transport',
+      'Water',
+      'Medical',
+      'Disputes',
+      'House',
+      'Diseases',
+      'Schemes',
+      'Medicine',
+      'Health Prog',
+      'Children',
+      'Migration',
+      'Training',
+      'VB-G RAM-G',
+      'PM Kisan',
+      'Kisan CC',
+      'Swachh',
+      'Fasal Bima',
+      'Bank',
+      'Preview',
+    ];
+
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
         drawer: const SideNavigation(),
-body: Column(
+        body: Row(
           children: [
-            const AppHeader(),
-
-            // Survey Pages
+            // Progress indicator (sidebar on desktop, hidden on mobile)
+            if (MediaQuery.of(context).size.width >= 600)
+              SurveyProgressIndicator(
+                currentPage: surveyState.currentPage,
+                totalPages: surveyState.totalPages,
+                onPageSelected: _jumpToPage,
+                pageNames: pageNames,
+              ),
+            
+            // Main content
             Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: surveyState.totalPages,
-                itemBuilder: (context, index) {
-                  return SurveyPage(
-                    pageIndex: index,
-                    onNext: ([Map<String, dynamic>? pageData]) async {
-                      if (index < surveyState.totalPages - 1) {
-                        // Constraints disabled: always allow next page
-                        if (index == 0) {
-                          await surveyNotifier.initializeSurvey(
-                            villageName: surveyState.surveyData['village_name'] ?? '',
-                            villageNumber: surveyState.surveyData['village_number'],
-                            panchayat: surveyState.surveyData['panchayat'],
-                            block: surveyState.surveyData['block'],
-                            tehsil: surveyState.surveyData['tehsil'],
-                            district: surveyState.surveyData['district'],
-                            postalAddress: surveyState.surveyData['postal_address'],
-                            pinCode: surveyState.surveyData['pin_code'],
-                            surveyorName: surveyState.surveyData['surveyor_name'],
-                            phoneNumber: surveyState.surveyData['phone_number'],
-                          );
-                        }
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
+              child: Column(
+                children: [
+                  const AppHeader(),
+
+                  // Mobile progress indicator
+                  if (MediaQuery.of(context).size.width < 600)
+                    SurveyProgressIndicator(
+                      currentPage: surveyState.currentPage,
+                      totalPages: surveyState.totalPages,
+                      onPageSelected: _jumpToPage,
+                      pageNames: pageNames,
+                    ),
+
+                  // Survey Pages
+                  Expanded(
+                    child: PageView.builder(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: surveyState.totalPages,
+                      itemBuilder: (context, index) {
+                        return SurveyPage(
+                          pageIndex: index,
+                          onNext: ([Map<String, dynamic>? pageData]) async {
+                            if (index < surveyState.totalPages - 1) {
+                              // Constraints disabled: always allow next page
+                              if (index == 0) {
+                                await surveyNotifier.initializeSurvey(
+                                  villageName: surveyState.surveyData['village_name'] ?? '',
+                                  villageNumber: surveyState.surveyData['village_number'],
+                                  panchayat: surveyState.surveyData['panchayat'],
+                                  block: surveyState.surveyData['block'],
+                                  tehsil: surveyState.surveyData['tehsil'],
+                                  district: surveyState.surveyData['district'],
+                                  postalAddress: surveyState.surveyData['postal_address'],
+                                  pinCode: surveyState.surveyData['pin_code'],
+                                  surveyorName: surveyState.surveyData['surveyor_name'],
+                                  phoneNumber: surveyState.surveyData['phone_number'],
+                                );
+                              }
+                              _jumpToPage(index + 1);
+                            } else {
+                              // Complete survey
+                              _showCompletionDialog();
+                            }
+                          },
+                          onPrevious: index > 0
+                              ? () {
+                                  _jumpToPage(index - 1);
+                                }
+                              : null,
                         );
-                        surveyNotifier.nextPage();
-                      } else {
-        // Complete survey
-        _showCompletionDialog();
-                      }
-                    },
-                    onPrevious: index > 0
-                        ? () async {
-                            final newPage = index - 1;
-                            _pageController.previousPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                            surveyNotifier.previousPage();
-                            // Load data for the previous page
-                            await surveyNotifier.loadPageData(newPage);
-                          }
-                        : null,
-                  );
-                },
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -193,6 +243,15 @@ body: Column(
     );
 
     return result ?? false;
+  }
+
+  void _jumpToPage(int pageIndex) {
+    final surveyNotifier = ref.read(surveyProvider.notifier);
+    
+    if (pageIndex >= 0 && pageIndex < surveyNotifier.state.totalPages) {
+      _pageController.jumpToPage(pageIndex);
+      surveyNotifier.jumpToPage(pageIndex);
+    }
   }
 
   void _showCompletionDialog() async {
