@@ -56,20 +56,22 @@ class _HealthProgrammePageState extends State<HealthProgrammePage> {
   }
 
   void _loadFamilyMembers() {
-    final familyMembersData = widget.pageData['family_members'] as List<dynamic>?;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final familyMembersData = widget.pageData['family_members'] as List<dynamic>? ?? [];
 
-    if (familyMembersData != null) {
-      final members = familyMembersData
-          .map((member) => member['name'] as String)
-          .where((name) => name.isNotEmpty)
-          .toList();
+      if (familyMembersData.isNotEmpty && mounted) {
+        final members = familyMembersData
+            .map((member) => member['name'] as String)
+            .where((name) => name.isNotEmpty)
+            .toList();
 
-      if (_familyMembers != members) {
-        setState(() {
-          _familyMembers = members;
-        });
+        if (_familyMembers != members) {
+          setState(() {
+            _familyMembers = members;
+          });
+        }
       }
-    }
+    });
   }
 
   void _updateData() {

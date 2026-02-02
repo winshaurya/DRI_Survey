@@ -33,9 +33,15 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
   }
 
   void _loadFamilyMembers() {
-    final surveyState = ref.read(surveyProvider);
-    final familyMembers = surveyState.surveyData['family_members'] as List<dynamic>? ?? [];
-    _familyMemberNames = familyMembers.map((member) => member['name'] as String? ?? '').where((name) => name.isNotEmpty).toList();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final surveyState = ref.read(surveyProvider);
+      final familyMembers = surveyState.surveyData['family_members'] as List<dynamic>? ?? [];
+      if (mounted) {
+        setState(() {
+          _familyMemberNames = familyMembers.map((member) => member['name'] as String? ?? '').where((name) => name.isNotEmpty).toList();
+        });
+      }
+    });
   }
 
   void _initializeData() {
