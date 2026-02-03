@@ -776,6 +776,44 @@ CREATE TABLE IF NOT EXISTS training_data (
 );
 
 -- ===========================================
+-- CHILDREN DATA TABLE (added for policy references)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS children_data (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    sr_no INTEGER NOT NULL,
+    name TEXT,
+    age INTEGER,
+    sex TEXT,
+    school_name TEXT,
+    class TEXT,
+    health_notes TEXT,
+
+    UNIQUE(phone_number, sr_no)
+);
+
+-- ===========================================
+-- MALNUTRITION DATA TABLE (added for policy references)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS malnutrition_data (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    sr_no INTEGER NOT NULL,
+    name TEXT,
+    age INTEGER,
+    sex TEXT,
+    height_feet DECIMAL(3,1),
+    weight_kg DECIMAL(5,1),
+    disease_cause TEXT,
+
+    UNIQUE(phone_number, sr_no)
+);
+
+-- ===========================================
 -- SELF HELP GROUPS TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS self_help_groups (

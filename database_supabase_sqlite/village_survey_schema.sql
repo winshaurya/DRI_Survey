@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS village_survey_sessions (
 
     -- Audit fields
     created_by TEXT,
- co   updated_by TEXT,
+    updated_by TEXT,
 
     -- Sync fields
     is_deleted BOOLEAN DEFAULT FALSE,
@@ -775,10 +775,58 @@ CREATE TABLE IF NOT EXISTS village_transport_facilities (
 );
 
 -- ===========================================
+-- VILLAGE SIGNBOARDS TABLE (missing table added for policy references)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_signboards (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    signboard_type TEXT,
+    description TEXT,
+    location TEXT,
+    installed_by TEXT,
+    installed_at TIMESTAMPTZ,
+
+    UNIQUE(session_id, signboard_type, location)
+);
+
+-- ===========================================
+-- VILLAGE SOCIAL MAPS TABLE (missing table added for policy references)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_social_maps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    map_type TEXT,
+    description TEXT,
+    storage_link TEXT,
+    remarks TEXT,
+
+    UNIQUE(session_id, map_type)
+);
+
+-- ===========================================
+-- VILLAGE SURVIVAL DETAILS TABLE (missing table added for policy references)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_survival_details (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    survival_resources TEXT,
+    disaster_history TEXT,
+    emergency_contacts TEXT,
+    preparedness_level TEXT,
+
+    UNIQUE(session_id)
+);
+
+-- ===========================================
 -- INDEXES FOR PERFORMANCE
 -- ===========================================
 CREATE INDEX IF NOT EXISTS idx_village_sessions_status ON village_survey_sessions(status);
-CREATE INDEX IF NOT EXISTS idx_village_sessions_date ON village_survey_sessions(survey_date);
 CREATE INDEX IF NOT EXISTS idx_village_sessions_shine ON village_survey_sessions(shine_code);
 CREATE INDEX IF NOT EXISTS idx_village_form_history_session ON village_form_history(session_id);
 CREATE INDEX IF NOT EXISTS idx_village_form_history_version ON village_form_history(session_id, version);
