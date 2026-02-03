@@ -208,16 +208,73 @@ class ExcelService {
   void _createSocialSchemesSheet(Excel excel, Map<String, dynamic> data) {
      Sheet sheet = excel['Social & Schemes'];
      
-     // General Schemes Status (Booleans usually)
-     List<String> schemes = ['vb_g_ram_g', 'pm_kisan', 'kisan_credit_card', 'swachh_bharat', 'fasal_bima', 'ayushman_bharat'];
+     // 1. Beneficiary Programs (Key: program_type, value: list/map)
+     sheet.appendRow([TextCellValue('BENEFICIARY PROGRAMS')]);
+     _addHeader(sheet, ['Program', 'Beneficiary?', 'Member', 'Included?', 'Correct?', 'Received?', 'Days/Details']);
      
-     _addHeader(sheet, ['Scheme Name', 'Status/Beneficiary']);
-     for (var scheme in schemes) {
-       sheet.appendRow([
-         TextCellValue(scheme.replaceAll('_', ' ').toUpperCase()), 
-         TextCellValue(data[scheme]?.toString() ?? 'No')
-       ]);
+     // Handle flat beneficiary checks if present (vb_gram_g, etc.)
+     List<String> simpleSchemes = ['vb_g_ram_g', 'pm_kisan', 'kisan_credit_card', 'swachh_bharat', 'fasal_bima'];
+     for (var scheme in simpleSchemes) {
+        if (data.containsKey(scheme)) {
+           // This handles if the data is just a simple map or value
+           // For deeper structures, we rely on 'beneficiary_programs' list usually
+           var val = data[scheme];
+           var status = "No";
+           if (val is Map) {
+             status = val['is_beneficiary'] == true ? "Yes" : "No";
+           }
+           sheet.appendRow([TextCellValue(scheme.toUpperCase()), TextCellValue(status)]);
+        }
      }
+     
+     // Handle the main 'beneficiary_programs' list if populated
+     if (data['beneficiary_programs'] != null && data['beneficiary_programs'] is List) {
+       for (var prog in data['beneficiary_programs']) {
+         sheet.appendRow([
+           TextCellValue(prog['program_type']?.toString() ?? ''),
+           TextCellValue((prog['beneficiary'] == 1 || prog['beneficiary'] == true) ? 'Yes' : 'No'),
+           TextCellValue(prog['member_name']?.toString() ?? ''),
+           TextCellValue(prog['name_included']?.toString() ?? ''),
+           TextCellValue(prog['details_correct']?.toString() ?? ''),
+           TextCellValue(prog['received']?.toString() ?? ''),
+           TextCellValue('${prog['incorrect_details'] ?? ''} ${prog['days_worked'] ?? ''}'),
+         ]);
+       }
+     }
+
+     sheet.appendRow([]); // Spacer
+
+     // 2. Government Scheme Members (Aadhaar, Ration, etc.)
+     _addSchemeSection(sheet, 'AADHAAR SCHEME', data['aadhaar_scheme_members']);
+     _addSchemeSection(sheet, 'AYUSHMAN BHARAT', data['ayushman_scheme_members']);
+     _addSchemeSection(sheet, 'RATION CARD', data['ration_scheme_members']);
+     _addSchemeSection(sheet, 'FAMILY ID', data['family_id_scheme_members']);
+     _addSchemeSection(sheet, 'SAMAGRA ID', data['samagra_scheme_members']);
+     _addSchemeSection(sheet, 'HANDICAPPED ALLOWANCE', data['handicapped_scheme_members']);
+     _addSchemeSection(sheet, 'TRIBAL SCHEME', data['tribal_scheme_members']);
+     _addSchemeSection(sheet, 'PENSION SCHEME', data['pension_scheme_members']);
+     _addSchemeSection(sheet, 'WIDOW ALLOWANCE', data['widow_scheme_members']);
+  }
+
+  void _addSchemeSection(Sheet sheet, String title, dynamic membersList) {
+    if (membersList == null || (membersList is List && membersList.isEmpty)) return;
+    
+    sheet.appendRow([TextCellValue(title)]);
+    _addHeader(sheet, ['Member Name', 'Has Card?', 'Card Number', 'Details Correct?', 'Incorrect Field', 'Benefits Received?']);
+    
+    if (membersList is List) {
+      for (var member in membersList) {
+        sheet.appendRow([
+          TextCellValue(member['family_member_name']?.toString() ?? ''),
+          TextCellValue(member['have_card']?.toString() ?? ''),
+          TextCellValue(member['card_number']?.toString() ?? ''),
+          TextCellValue(member['details_correct']?.toString() ?? ''),
+          TextCellValue(member['what_incorrect']?.toString() ?? ''),
+          TextCellValue(member['benefits_received']?.toString() ?? ''),
+        ]);
+      }
+    }
+    sheet.appendRow([]); // Spacer
   }
 
   void _createOtherSheet(Excel excel, Map<String, dynamic> data) {
