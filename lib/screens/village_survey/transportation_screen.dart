@@ -50,7 +50,12 @@ class _TransportationScreenState extends State<TransportationScreen> {
 
     try {
       await DatabaseHelper().insert('village_transport_facilities', data);
-      await supabaseService.saveVillageData('village_transport_facilities', data);
+      
+      try {
+        await supabaseService.saveVillageData('village_transport_facilities', data);
+      } catch (e) {
+        print('Supabase sync failed (non-fatal): $e');
+      }
 
       if (mounted) {
         Navigator.pop(context);

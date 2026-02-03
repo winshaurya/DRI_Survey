@@ -344,6 +344,31 @@ class SurveyNotifier extends Notifier<SurveyState> {
             data['aadhaar_scheme_members'] = aadhaarMembers;
           }
 
+          final ayushmanMembers = await _databaseService.getData('ayushman_scheme_members', state.phoneNumber!);
+          if (ayushmanMembers.isNotEmpty) {
+            data['ayushman_scheme_members'] = ayushmanMembers;
+          }
+
+          final rationMembers = await _databaseService.getData('ration_scheme_members', state.phoneNumber!);
+          if (rationMembers.isNotEmpty) {
+            data['ration_scheme_members'] = rationMembers;
+          }
+
+          final familyIdMembers = await _databaseService.getData('family_id_scheme_members', state.phoneNumber!);
+          if (familyIdMembers.isNotEmpty) {
+            data['family_id_scheme_members'] = familyIdMembers;
+          }
+
+          final samagraMembers = await _databaseService.getData('samagra_scheme_members', state.phoneNumber!);
+          if (samagraMembers.isNotEmpty) {
+            data['samagra_scheme_members'] = samagraMembers;
+          }
+
+          final handicappedMembers = await _databaseService.getData('handicapped_scheme_members', state.phoneNumber!);
+          if (handicappedMembers.isNotEmpty) {
+            data['handicapped_scheme_members'] = handicappedMembers;
+          }
+
           final tribalMembers = await _databaseService.getData('tribal_scheme_members', state.phoneNumber!);
           if (tribalMembers.isNotEmpty) {
             data['tribal_scheme_members'] = tribalMembers;
@@ -619,6 +644,51 @@ class SurveyNotifier extends Notifier<SurveyState> {
         if (data['aadhaar_scheme_members'] != null) {
           for (final member in data['aadhaar_scheme_members']) {
             await _databaseService.saveData('aadhaar_scheme_members', {
+              'phone_number': state.phoneNumber,
+              ...member,
+            });
+          }
+        }
+
+        if (data['ayushman_scheme_members'] != null) {
+          for (final member in data['ayushman_scheme_members']) {
+            await _databaseService.saveData('ayushman_scheme_members', {
+              'phone_number': state.phoneNumber,
+              ...member,
+            });
+          }
+        }
+
+        if (data['ration_scheme_members'] != null) {
+          for (final member in data['ration_scheme_members']) {
+            await _databaseService.saveData('ration_scheme_members', {
+              'phone_number': state.phoneNumber,
+              ...member,
+            });
+          }
+        }
+
+        if (data['family_id_scheme_members'] != null) {
+          for (final member in data['family_id_scheme_members']) {
+            await _databaseService.saveData('family_id_scheme_members', {
+              'phone_number': state.phoneNumber,
+              ...member,
+            });
+          }
+        }
+
+        if (data['samagra_scheme_members'] != null) {
+          for (final member in data['samagra_scheme_members']) {
+            await _databaseService.saveData('samagra_scheme_members', {
+              'phone_number': state.phoneNumber,
+              ...member,
+            });
+          }
+        }
+
+        if (data['handicapped_scheme_members'] != null) {
+          for (final member in data['handicapped_scheme_members']) {
+            await _databaseService.saveData('handicapped_scheme_members', {
               'phone_number': state.phoneNumber,
               ...member,
             });

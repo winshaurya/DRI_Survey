@@ -23,7 +23,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 27,
+      version: 31,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -140,6 +140,274 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 28) {
+      // Recreate all village survey tables to ensure schema consistency
+      // 1. Village Irrigation
+      await db.execute('DROP TABLE IF EXISTS village_irrigation_facilities');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_irrigation_facilities (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          has_canal INTEGER DEFAULT 0,
+          has_tube_well INTEGER DEFAULT 0,
+          has_ponds INTEGER DEFAULT 0,
+          has_river INTEGER DEFAULT 0,
+          has_well INTEGER DEFAULT 0
+        )
+      ''');
+
+      // 2. Village Survey Details (Landscape & Biodiversity)
+      await db.execute('DROP TABLE IF EXISTS village_survey_details');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_survey_details (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          forest_details TEXT,
+          wasteland_details TEXT,
+          garden_details TEXT,
+          burial_ground_details TEXT,
+          crop_plants_details TEXT,
+          vegetables_details TEXT,
+          fruit_trees_details TEXT,
+          animals_details TEXT,
+          birds_details TEXT,
+          local_biodiversity_details TEXT,
+          traditional_knowledge_details TEXT,
+          special_features_details TEXT
+        )
+      ''');
+
+      // 3. Cadastral Maps
+      await db.execute('DROP TABLE IF EXISTS village_cadastral_maps');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_cadastral_maps (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          has_cadastral_map INTEGER DEFAULT 0,
+          map_details TEXT,
+          availability_status TEXT
+        )
+      ''');
+
+      // 4. Map Points
+      await db.execute('DROP TABLE IF EXISTS village_map_points');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_map_points (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          latitude REAL,
+          longitude REAL,
+          category TEXT,
+          remarks TEXT,
+          point_id INTEGER
+        )
+      ''');
+
+      // 5. Forest Maps
+      await db.execute('DROP TABLE IF EXISTS village_forest_maps');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_forest_maps (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          forest_area TEXT,
+          forest_types TEXT,
+          forest_resources TEXT,
+          conservation_status TEXT,
+          remarks TEXT
+        )
+      ''');
+
+      // 6. Infrastructure Details
+      await db.execute('DROP TABLE IF EXISTS village_infrastructure_details');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_infrastructure_details (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          has_primary_school INTEGER DEFAULT 0,
+          primary_school_distance TEXT,
+          has_junior_school INTEGER DEFAULT 0,
+          junior_school_distance TEXT,
+          has_high_school INTEGER DEFAULT 0,
+          high_school_distance TEXT,
+          has_intermediate_school INTEGER DEFAULT 0,
+          intermediate_school_distance TEXT,
+          other_education_facilities TEXT,
+          boys_students_count INTEGER,
+          girls_students_count INTEGER,
+          has_playground INTEGER DEFAULT 0,
+          playground_remarks TEXT,
+          has_panchayat_bhavan INTEGER DEFAULT 0,
+          panchayat_remarks TEXT,
+          has_sharda_kendra INTEGER DEFAULT 0,
+          sharda_kendra_distance TEXT,
+          has_post_office INTEGER DEFAULT 0,
+          post_office_distance TEXT,
+          has_health_facility INTEGER DEFAULT 0,
+          health_facility_distance TEXT,
+          has_bank INTEGER DEFAULT 0,
+          bank_distance TEXT,
+          has_electrical_connection INTEGER DEFAULT 0,
+          num_wells INTEGER,
+          num_ponds INTEGER,
+          num_hand_pumps INTEGER,
+          num_tube_wells INTEGER,
+          num_tap_water INTEGER
+        )
+      ''');
+
+      // 7. Infrastructure (Roads)
+      await db.execute('DROP TABLE IF EXISTS village_infrastructure');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_infrastructure (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          approach_roads_available INTEGER DEFAULT 0,
+          num_approach_roads INTEGER,
+          approach_condition TEXT,
+          approach_remarks TEXT,
+          internal_lanes_available INTEGER DEFAULT 0,
+          num_internal_lanes INTEGER,
+          internal_condition TEXT,
+          internal_remarks TEXT
+        )
+      ''');
+
+      // 8. Educational Facilities (Update)
+      await db.execute('DROP TABLE IF EXISTS village_educational_facilities');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_educational_facilities (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          primary_schools INTEGER DEFAULT 0,
+          middle_schools INTEGER DEFAULT 0,
+          secondary_schools INTEGER DEFAULT 0,
+          higher_secondary_schools INTEGER DEFAULT 0,
+          anganwadi_centers INTEGER DEFAULT 0,
+          skill_development_centers INTEGER DEFAULT 0,
+          shiksha_guarantee_centers INTEGER DEFAULT 0,
+          other_facility_name TEXT,
+          other_facility_count INTEGER DEFAULT 0
+        )
+      ''');
+
+      // 9. Seed Clubs
+      await db.execute('DROP TABLE IF EXISTS village_seed_clubs');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_seed_clubs (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          clubs_available INTEGER DEFAULT 0,
+          total_clubs INTEGER DEFAULT 0
+        )
+      ''');
+
+      // 10. Signboards
+      await db.execute('DROP TABLE IF EXISTS village_signboards');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_signboards (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          signboards TEXT,
+          info_boards TEXT,
+          wall_writing TEXT
+        )
+      ''');
+
+      // 11. Social Maps
+      await db.execute('DROP TABLE IF EXISTS village_social_maps');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_social_maps (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          remarks TEXT
+        )
+      ''');
+
+      // 12. Transport Facilities (Count)
+      await db.execute('DROP TABLE IF EXISTS village_transport_facilities');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_transport_facilities (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          tractor_count INTEGER DEFAULT 0,
+          car_jeep_count INTEGER DEFAULT 0,
+          motorcycle_scooter_count INTEGER DEFAULT 0,
+          cycle_count INTEGER DEFAULT 0,
+          e_rickshaw_count INTEGER DEFAULT 0,
+          pickup_truck_count INTEGER DEFAULT 0
+        )
+      ''');
+      
+      // 13. Drainage (Ensure up to date)
+      await db.execute('DROP TABLE IF EXISTS village_drainage_waste');
+       await db.execute('''
+        CREATE TABLE IF NOT EXISTS village_drainage_waste (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          earthen_drain INTEGER DEFAULT 0,
+          masonry_drain INTEGER DEFAULT 0,
+          covered_drain INTEGER DEFAULT 0,
+          open_channel INTEGER DEFAULT 0,
+          no_drainage_system INTEGER DEFAULT 0,
+          drainage_destination TEXT,
+          drainage_remarks TEXT,
+          waste_collected_regularly INTEGER DEFAULT 0,
+          waste_segregated INTEGER DEFAULT 0,
+          waste_remarks TEXT
+        )
+      ''');
+    }
+    if (oldVersion < 29) {
+      // Recreate pending_uploads with correct schema for file uploads
+      await db.execute('DROP TABLE IF EXISTS pending_uploads');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS pending_uploads (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          local_file_path TEXT,
+          file_name TEXT,
+          file_type TEXT,
+          village_smile_code TEXT,
+          page_type TEXT,
+          component TEXT,
+          status TEXT DEFAULT 'pending',
+          upload_attempts INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      ''');
+    }
+    if (oldVersion < 30) {
+      // Add missing columns to pending_uploads for error tracking
+      try {
+        await db.execute('ALTER TABLE pending_uploads ADD COLUMN last_attempt_at TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE pending_uploads ADD COLUMN error_message TEXT');
+      } catch (_) {}
+    }
+    if (oldVersion < 31) {
+      // Add missing government scheme tables
+      await db.execute('CREATE TABLE IF NOT EXISTS ayushman_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+      await db.execute('CREATE TABLE IF NOT EXISTS ration_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+      await db.execute('CREATE TABLE IF NOT EXISTS family_id_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+      await db.execute('CREATE TABLE IF NOT EXISTS samagra_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+      await db.execute('CREATE TABLE IF NOT EXISTS handicapped_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -154,10 +422,18 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS pending_uploads (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        table_name TEXT NOT NULL,
-        data TEXT NOT NULL,
+        local_file_path TEXT,
+        file_name TEXT,
+        file_type TEXT,
+        village_smile_code TEXT,
+        page_type TEXT,
+        component TEXT,
         status TEXT DEFAULT 'pending',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        upload_attempts INTEGER DEFAULT 0,
+        last_attempt_at TEXT,
+        error_message TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       )
     ''');
 
@@ -433,6 +709,11 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS tribal_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
     await db.execute('CREATE TABLE IF NOT EXISTS pension_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
     await db.execute('CREATE TABLE IF NOT EXISTS widow_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS ayushman_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS ration_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS family_id_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS samagra_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS handicapped_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
 
     // Social Consciousness
     await db.execute('''
@@ -751,6 +1032,56 @@ class DatabaseHelper {
             if (entry.value is List) {
               for (var member in entry.value) {
                 await txn.insert('widow_scheme_members', {
+                  ...member,
+                  'survey_id': surveyId,
+                });
+              }
+            }
+            break;
+          case 'ayushman_scheme_members':
+            if (entry.value is List) {
+              for (var member in entry.value) {
+                await txn.insert('ayushman_scheme_members', {
+                  ...member,
+                  'survey_id': surveyId,
+                });
+              }
+            }
+            break;
+          case 'ration_scheme_members':
+            if (entry.value is List) {
+              for (var member in entry.value) {
+                await txn.insert('ration_scheme_members', {
+                  ...member,
+                  'survey_id': surveyId,
+                });
+              }
+            }
+            break;
+          case 'family_id_scheme_members':
+            if (entry.value is List) {
+              for (var member in entry.value) {
+                await txn.insert('family_id_scheme_members', {
+                  ...member,
+                  'survey_id': surveyId,
+                });
+              }
+            }
+            break;
+          case 'samagra_scheme_members':
+            if (entry.value is List) {
+              for (var member in entry.value) {
+                await txn.insert('samagra_scheme_members', {
+                  ...member,
+                  'survey_id': surveyId,
+                });
+              }
+            }
+            break;
+          case 'handicapped_scheme_members':
+            if (entry.value is List) {
+              for (var member in entry.value) {
+                await txn.insert('handicapped_scheme_members', {
                   ...member,
                   'survey_id': surveyId,
                 });

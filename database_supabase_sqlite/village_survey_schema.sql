@@ -1195,3 +1195,36 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_village_sessions_updated_at
     BEFORE UPDATE ON village_survey_sessions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===========================================
+-- UPLOADED FILES TABLE (Google Drive / Storage Metadata)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS uploaded_files (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    village_smile_code TEXT,
+    page_type TEXT,
+    component TEXT,
+    file_name TEXT,
+    file_type TEXT,
+    drive_file_id TEXT,
+    drive_share_link TEXT,
+    phone_number TEXT,
+    uploaded_by TEXT,
+    
+    -- Sync fields
+    is_deleted BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for lookup
+CREATE INDEX IF NOT EXISTS idx_uploaded_files_village ON uploaded_files(village_smile_code);
+CREATE INDEX IF NOT EXISTS idx_uploaded_files_phone ON uploaded_files(phone_number);
+
+-- RLS
+ALTER TABLE uploaded_files ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own uploads" ON uploaded_files;
+CREATE POLICY "Users can view their own uploads" ON uploaded_files
+    FOR ALL USING (uploaded_by = auth.jwt() ->> 'email');

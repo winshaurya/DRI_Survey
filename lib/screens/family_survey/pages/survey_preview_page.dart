@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:dri_survey/services/excel_service.dart';
 
 class SurveyPreviewPage extends StatelessWidget {
   final Map<String, dynamic> pageData;
@@ -10,6 +11,28 @@ class SurveyPreviewPage extends StatelessWidget {
     required this.pageData,
     required this.onDataChanged,
   });
+
+  Future<void> _handleExport(BuildContext context) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Generating Excel file...')),
+      );
+      
+      await ExcelService().exportSurveyToExcel(pageData);
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Excel export completed successfully')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +50,33 @@ class SurveyPreviewPage extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
+          FadeInDown(
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _handleExport(context),
+                icon: const Icon(Icons.table_view, color: Colors.white),
+                label: const Text('Export to Excel', style: TextStyle(color: Colors.white, fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green[700],
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FadeInDown(
+            delay: const Duration(milliseconds: 100),
+            child: Text(
+              'Review all your survey responses before submitting',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 16,
+              ),
+            ),
+          ),
           FadeInDown(
             delay: const Duration(milliseconds: 100),
             child: Text(
@@ -98,8 +147,10 @@ class SurveyPreviewPage extends StatelessWidget {
               children: [
                 _buildPreviewField('Land Holding (acres)', pageData['land_holding']),
                 _buildPreviewField('Irrigation Type', pageData['irrigation']),
-                _buildPreviewField('Crop Productivity', pageData['crop_productivity']),
                 _buildPreviewField('Fertilizer Use', pageData['fertilizer_use']),
+                const Divider(),
+                const Text('Crop Details', style: TextStyle(fontWeight: FontWeight.bold)),
+                ..._buildCropsList(pageData['crops'] as List? ?? []),
               ],
             ),
           ),
@@ -112,8 +163,11 @@ class SurveyPreviewPage extends StatelessWidget {
               icon: Icons.pets,
               color: Colors.orange,
               children: [
-                _buildBoolField('Has Livestock', pageData['animals']),
+                ..._buildAnimalsList(pageData['animals'] as List? ?? []),
+                const SizedBox(height: 12),
                 _buildBoolField('Has Equipment', pageData['equipment']),
+                // Add equipment details if available in flat map
+                if (pageData['tractor'] != null) _buildPreviewField('Tractor', pageData['tractor']),
               ],
             ),
           ),
@@ -129,6 +183,8 @@ class SurveyPreviewPage extends StatelessWidget {
                 _buildBoolField('Entertainment Access', pageData['entertainment']),
                 _buildBoolField('Transportation Available', pageData['transport']),
                 _buildBoolField('Water Sources', pageData['water_sources']),
+                if (pageData['drinking_water_source'] != null) 
+                   _buildPreviewField('Drinking Water Source', pageData['drinking_water_source']),
               ],
             ),
           ),
@@ -142,7 +198,11 @@ class SurveyPreviewPage extends StatelessWidget {
               color: Colors.red,
               children: [
                 _buildBoolField('Medical Facilities', pageData['medical']),
-                _buildBoolField('Diseases Present', pageData['diseases']),
+                if (pageData['medical_treatment'] != null) _buildPreviewField('Treatment Type', pageData['medical_treatment']),
+                const SizedBox(height: 8),
+                const Text('Family Diseases', style: TextStyle(fontWeight: FontWeight.bold)),
+                ..._buildDiseasesList(pageData['diseases'] as List? ?? []),
+                const SizedBox(height: 8),
                 _buildBoolField('Health Programmes', pageData['health_programme']),
                 _buildPreviewField('Folklore Medicine Use', pageData['folklore_medicine']),
               ],
@@ -525,5 +585,53 @@ class SurveyPreviewPage extends StatelessWidget {
         }),
       ],
     );
+  }
+
+  List<Widget> _buildCropsList(List crops) {
+    if (crops.isEmpty) {
+      return [const Text('No crops recorded', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey))];
+    }
+    return List.generate(crops.length, (index) {
+      final crop = crops[index] as Map<String, dynamic>?;
+      if (crop == null) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text('• ${crop['crop_name']}: ${crop['area'] ?? 0} acres, ${crop['production'] ?? 0} quintals', 
+          style: const TextStyle(fontSize: 13)),
+      );
+    });
+  }
+
+  List<Widget> _buildAnimalsList(List animals) {
+    if (animals.isEmpty) {
+      return [const Text('No animals recorded', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey))];
+    }
+    return [
+      const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: Text('Livestock Details:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+      ),
+      ...List.generate(animals.length, (index) {
+        final animal = animals[index] as Map<String, dynamic>?;
+        if (animal == null) return const SizedBox.shrink();
+        return Text('• ${animal['animal_type']}: ${animal['count'] ?? 0} (Breed: ${animal['breed'] ?? 'N/A'})', 
+          style: const TextStyle(fontSize: 13));
+      })
+    ];
+  }
+
+  List<Widget> _buildDiseasesList(List diseases) {
+    if (diseases.isEmpty) {
+      return [const Text('No diseases recorded', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey, fontSize: 12))];
+    }
+    return List.generate(diseases.length, (index) {
+      final disease = diseases[index] as Map<String, dynamic>?;
+      if (disease == null) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text('• ${disease['member_name']}: ${disease['disease_name']} (${disease['treatment_type']})', 
+          style: const TextStyle(fontSize: 12)),
+      );
+    });
   }
 }

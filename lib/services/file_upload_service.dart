@@ -5,8 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -78,13 +80,27 @@ class FileUploadService {
   }
 
   Future<void> _loadCredentials() async {
-    // Load credentials from Android environment variables
-    _serviceAccountEmail = const String.fromEnvironment('GOOGLE_SERVICE_ACCOUNT_EMAIL');
-    _privateKey = const String.fromEnvironment('GOOGLE_PRIVATE_KEY').replaceAll(r'\n', '\n');
+    // Load credentials from Android environment variables or dotenv
+    String? email = const String.fromEnvironment('GOOGLE_SERVICE_ACCOUNT_EMAIL');
+    String? key = const String.fromEnvironment('GOOGLE_PRIVATE_KEY');
+    
+    if (email.isEmpty) {
+      email = dotenv.env['GOOGLE_SERVICE_ACCOUNT_EMAIL'];
+    }
+    
+    if (key.isEmpty) {
+      key = dotenv.env['GOOGLE_PRIVATE_KEY'];
+    }
+
+    _serviceAccountEmail = email;
+    _privateKey = key?.replaceAll(r'\n', '\n');
     _driveFolderId = ROOT_FOLDER_ID;
 
     // Also load GOOGLE_FORM if available (for alternative upload method)
-    final googleFormUrl = const String.fromEnvironment('GOOGLE_FORM');
+    String googleFormUrl = const String.fromEnvironment('GOOGLE_FORM');
+    if (googleFormUrl.isEmpty) {
+      googleFormUrl = dotenv.env['GOOGLE_FORM'] ?? '';
+    }
 
     if (_serviceAccountEmail == null || _privateKey == null) {
       if (googleFormUrl.isNotEmpty) {
@@ -222,9 +238,21 @@ class FileUploadService {
   }
 
   Future<void> processPendingUploads() async {
+    debugPrint('Processing pending uploads... Online: $_isOnline');
     if (!_isOnline) return;
 
+    // Check credentials existence to fail fast
+    if (_serviceAccountEmail == null && _privateKey == null) {
+        // Try loading again just in case
+        await _loadCredentials();
+        if (_serviceAccountEmail == null) {
+           debugPrint('Cannot process uploads: Credentials missing');
+           return;
+        }
+    }
+
     final pendingUploads = await _getPendingUploads();
+    debugPrint('Found ${pendingUploads.length} pending uploads');
     for (final upload in pendingUploads) {
       await _processSingleUpload(upload);
     }
@@ -285,13 +313,21 @@ class FileUploadService {
 
       // Update status to uploaded
       await _updateUploadStatus(uploadId, 'uploaded');
+      debugPrint('File upload successful: $fileName');
 
       // Optionally delete local file after successful upload
       // File(localPath).deleteSync();
 
     } catch (e) {
+      debugPrint('File upload failed: $e');
       final attempts = upload['upload_attempts'] + 1;
       final errorMessage = e.toString();
+
+      // If credentials error, fail immediately (don't retry endlessly)
+      if (errorMessage.contains('credentials not configured')) {
+         await _updateUploadStatus(uploadId, 'failed', errorMessage: errorMessage);
+         return;
+      }
 
       if (attempts >= 3) {
         await _updateUploadStatus(uploadId, 'failed', errorMessage: errorMessage);
@@ -388,6 +424,26 @@ class FileUploadService {
 
   Future<XFile?> pickImage() async {
     try {
+      // Check for permissions
+      if (Platform.isAndroid) {
+        // Android 13+ use photos/media permission, older use storage
+        // However, image_picker mostly handles this. 
+        // We will try to request to be safe if user's device is tricky.
+        var status = await Permission.photos.status;
+        if (status.isDenied) {
+           // On old Android, photos permission might map to storage or be permanently denied if assumed
+           // Actually, let's check storage too for older devices
+           var storageStatus = await Permission.storage.status;
+           if (storageStatus.isDenied) {
+              // Try requesting storage first as a catch-all for older devices including 12 and below
+              // On 13, this might not do anything useful but harmless
+              await Permission.storage.request();
+           }
+           // Try requesting photos for newer devices
+           await Permission.photos.request();
+        }
+      }
+
       final pickedFile = await _imagePicker.pickImage(source: ImageSource.gallery);
       return pickedFile;
     } catch (e) {
@@ -398,6 +454,11 @@ class FileUploadService {
 
   Future<XFile?> captureImage() async {
     try {
+      var status = await Permission.camera.status;
+      if (!status.isGranted) {
+        await Permission.camera.request();
+      }
+      
       final pickedFile = await _imagePicker.pickImage(source: ImageSource.camera);
       return pickedFile;
     } catch (e) {
@@ -407,9 +468,28 @@ class FileUploadService {
   }
 
   Future<XFile?> pickFile(List<String> allowedExtensions) async {
-    // File picker not implemented for now
-    debugPrint('File picker not implemented');
-    return null;
+    try {
+      // Storage permission check for older Androids
+      if (Platform.isAndroid) {
+          var status = await Permission.storage.status;
+          if (!status.isGranted) {
+             await Permission.storage.request();
+          }
+      }
+      
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: allowedExtensions,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        return XFile(result.files.single.path!);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error picking file: $e');
+      return null;
+    }
   }
 
   Future<XFile?> pickDocument() async {

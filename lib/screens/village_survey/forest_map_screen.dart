@@ -48,7 +48,12 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
 
     try {
       await DatabaseHelper().insert('village_forest_maps', data);
-      await supabaseService.saveVillageData('village_forest_maps', data);
+      
+      try {
+        await supabaseService.saveVillageData('village_forest_maps', data);
+      } catch (e) {
+         print('Supabase sync warning: $e');
+      }
 
       if (mounted) {
         Navigator.push(

@@ -41,8 +41,15 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
     };
 
     try {
+      // 1. Save to SQLite
       await DatabaseHelper().insert('village_seed_clubs', data);
-      await supabaseService.saveVillageData('village_seed_clubs', data);
+      
+      // 2. Save to Supabase (Non-blocking)
+      try {
+        await supabaseService.saveVillageData('village_seed_clubs', data);
+      } catch (e) {
+        print('Supabase sync warning: $e');
+      }
 
       if (mounted) {
         Navigator.push(

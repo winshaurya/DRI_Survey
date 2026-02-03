@@ -20,6 +20,16 @@ class GovernmentSchemesPage extends ConsumerStatefulWidget {
 class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
   // Aadhaar Scheme Members
   List<Map<String, dynamic>> _aadhaarMembers = [];
+  // Ayushman Scheme Members
+  List<Map<String, dynamic>> _ayushmanMembers = [];
+  // Ration Scheme Members
+  List<Map<String, dynamic>> _rationMembers = [];
+  // Family ID Scheme Members
+  List<Map<String, dynamic>> _familyIdMembers = [];
+  // Samagra Scheme Members
+  List<Map<String, dynamic>> _samagraMembers = [];
+  // Handicapped Scheme Members
+  List<Map<String, dynamic>> _handicappedMembers = [];
   // Tribal Scheme Members
   List<Map<String, dynamic>> _tribalMembers = [];
   // Pension Scheme Members
@@ -47,6 +57,11 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
 
   void _loadExistingData() {
     _aadhaarMembers = List<Map<String, dynamic>>.from(widget.pageData['aadhaar_scheme_members'] ?? []);
+    _ayushmanMembers = List<Map<String, dynamic>>.from(widget.pageData['ayushman_scheme_members'] ?? []);
+    _rationMembers = List<Map<String, dynamic>>.from(widget.pageData['ration_scheme_members'] ?? []);
+    _familyIdMembers = List<Map<String, dynamic>>.from(widget.pageData['family_id_scheme_members'] ?? []);
+    _samagraMembers = List<Map<String, dynamic>>.from(widget.pageData['samagra_scheme_members'] ?? []);
+    _handicappedMembers = List<Map<String, dynamic>>.from(widget.pageData['handicapped_scheme_members'] ?? []);
     _tribalMembers = List<Map<String, dynamic>>.from(widget.pageData['tribal_scheme_members'] ?? []);
     _pensionMembers = List<Map<String, dynamic>>.from(widget.pageData['pension_scheme_members'] ?? []);
     _widowMembers = List<Map<String, dynamic>>.from(widget.pageData['widow_scheme_members'] ?? []);
@@ -75,6 +90,11 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
   void _updateData() {
     final data = {
       'aadhaar_scheme_members': _aadhaarMembers,
+      'ayushman_scheme_members': _ayushmanMembers,
+      'ration_scheme_members': _rationMembers,
+      'family_id_scheme_members': _familyIdMembers,
+      'samagra_scheme_members': _samagraMembers,
+      'handicapped_scheme_members': _handicappedMembers,
       'tribal_scheme_members': _tribalMembers,
       'pension_scheme_members': _pensionMembers,
       'widow_scheme_members': _widowMembers,
@@ -86,6 +106,81 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
     setState(() {
       _aadhaarMembers.add({
         'sr_no': _aadhaarMembers.length + 1,
+        'family_member_name': '',
+        'have_card': null,
+        'card_number': '',
+        'details_correct': null,
+        'what_incorrect': '',
+        'benefits_received': null,
+      });
+    });
+    _updateData();
+  }
+
+  void _addAyushmanMember() {
+    setState(() {
+      _ayushmanMembers.add({
+        'sr_no': _ayushmanMembers.length + 1,
+        'family_member_name': '',
+        'have_card': null,
+        'card_number': '',
+        'details_correct': null,
+        'what_incorrect': '',
+        'benefits_received': null,
+      });
+    });
+    _updateData();
+  }
+
+  void _addRationMember() {
+    setState(() {
+      _rationMembers.add({
+        'sr_no': _rationMembers.length + 1,
+        'family_member_name': '',
+        'have_card': null,
+        'card_number': '',
+        'details_correct': null,
+        'what_incorrect': '',
+        'benefits_received': null,
+      });
+    });
+    _updateData();
+  }
+
+  void _addFamilyIdMember() {
+    setState(() {
+      _familyIdMembers.add({
+        'sr_no': _familyIdMembers.length + 1,
+        'family_member_name': '',
+        'have_card': null,
+        'card_number': '',
+        'details_correct': null,
+        'what_incorrect': '',
+        'benefits_received': null,
+      });
+    });
+    _updateData();
+  }
+
+  void _addSamagraMember() {
+    setState(() {
+      _samagraMembers.add({
+        'sr_no': _samagraMembers.length + 1,
+        'family_member_name': '',
+        'have_card': null,
+        'card_number': '',
+        'details_correct': null,
+        'what_incorrect': '',
+        'benefits_received': null,
+      });
+    });
+    _updateData();
+  }
+
+  void _addHandicappedMember() {
+    setState(() {
+      _handicappedMembers.add({
+        'sr_no': _handicappedMembers.length + 1,
         'family_member_name': '',
         'have_card': null,
         'card_number': '',
@@ -430,8 +525,8 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
               'Ayushman Card',
               Icons.health_and_safety,
               Colors.teal,
-              _aadhaarMembers, 
-              _addAadhaarMember,
+              _ayushmanMembers, 
+              _addAyushmanMember,
             ),
           ),
 
@@ -442,8 +537,8 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
               'Family ID',
               Icons.family_restroom,
               Colors.brown,
-              _aadhaarMembers, 
-              _addAadhaarMember, 
+              _familyIdMembers, 
+              _addFamilyIdMember, 
             ),
           ),
 
@@ -454,8 +549,8 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
               'Ration Card',
               Icons.shopping_basket,
               Colors.red,
-              _aadhaarMembers, 
-              _addAadhaarMember, 
+              _rationMembers, 
+              _addRationMember, 
             ),
           ),
 
@@ -466,8 +561,8 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
               'Samagra ID',
               Icons.featured_play_list,
               Colors.purple,
-              _aadhaarMembers, 
-              _addAadhaarMember, 
+              _samagraMembers, 
+              _addSamagraMember, 
             ),
           ),
 
@@ -478,8 +573,8 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
               'Handicapped Allowance',
               Icons.accessible,
               Colors.orange,
-              _aadhaarMembers, 
-              _addAadhaarMember, 
+              _handicappedMembers, 
+              _addHandicappedMember, 
             ),
           ),
 

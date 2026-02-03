@@ -121,7 +121,8 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
                 title: const Text('Gallery (Image)'),
                 onTap: () async {
                   Navigator.of(context).pop();
-                  final file = await _fileUploadService.pickFile(['jpg', 'jpeg', 'png']);
+                  // Use pickImage() which is implemented, instead of pickFile()
+                  final file = await _fileUploadService.pickImage();
                   if (file != null) _handleFileSelection(file, component, 'image');
                 },
               ),
@@ -210,7 +211,12 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
 
     try {
       await DatabaseHelper().insert('village_social_maps', data);
-      await supabaseService.saveVillageData('village_social_maps', data);
+      
+      try {
+        await supabaseService.saveVillageData('village_social_maps', data);
+      } catch (e) {
+        print('Supabase sync failed (non-fatal): $e');
+      }
 
       if (mounted) {
         Navigator.push(

@@ -204,7 +204,12 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
 
     try {
       await DatabaseHelper().insert('village_biodiversity_register', data);
-      await supabaseService.saveVillageData('village_biodiversity_register', data);
+      
+      try {
+        await supabaseService.saveVillageData('village_biodiversity_register', data);
+      } catch (e) {
+        print('Supabase sync warning: $e');
+      }
 
       if (mounted) {
         Navigator.push(

@@ -43,7 +43,12 @@ class _SignboardsScreenState extends State<SignboardsScreen> {
 
     try {
       await DatabaseHelper().insert('village_signboards', data);
-      await supabaseService.saveVillageData('village_signboards', data);
+      
+      try {
+        await supabaseService.saveVillageData('village_signboards', data);
+      } catch (e) {
+        print('Supabase sync failed (non-fatal): $e');
+      }
 
       if (mounted) {
         Navigator.push(

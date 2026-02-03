@@ -98,6 +98,7 @@ static Database? _database; // Added for database access
   String? _currentSessionId;
 
   String? get currentSessionId => _currentSessionId;
+  set currentSessionId(String? id) => _currentSessionId = id;
 
   Future<void> createNewVillageSurveySession(Map<String, dynamic> sessionData) async {
     final db = await database;

@@ -59,7 +59,56 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
     super.initState();
     _loadStateDistrictData();
 
+    // Check for existing session first
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForExistingSession();
+    });
+
     _initializeLocation();
+  }
+
+  Future<void> _checkForExistingSession() async {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final sessionId = databaseService.currentSessionId;
+    
+    if (sessionId != null) {
+      try {
+        final db = await databaseService.database;
+        final List<Map<String, dynamic>> sessions = await db.query(
+          'village_survey_sessions',
+          where: 'session_id = ?',
+          whereArgs: [sessionId],
+        );
+        
+        if (sessions.isNotEmpty) {
+          final session = sessions.first;
+          setState(() {
+            villageNameController.text = session['village_name'] ?? '';
+            villageCodeController.text = session['village_code'] ?? '';
+            blockController.text = session['block'] ?? '';
+            panchayatController.text = session['panchayat'] ?? '';
+            tehsilController.text = session['tehsil'] ?? '';
+            ldgCodeController.text = session['ldg_code'] ?? '';
+            shineCodeController.text = session['shine_code'] ?? '';
+            
+            selectedState = session['state'] ?? '';
+            if (selectedState.isNotEmpty) {
+              availableDistricts = Set<String>.from(stateDistrictData[selectedState] ?? []).toList()..sort();
+              selectedDistrict = session['district'] ?? '';
+            }
+
+            _latitude = session['latitude'];
+            _longitude = session['longitude'];
+            if (_latitude != null && _longitude != null) {
+              _locationFetched = true;
+              _currentLocation = LatLng(_latitude!, _longitude!);
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading existing session: $e');
+      }
+    }
   }
 
   Future<void> _getCurrentLocation() async {

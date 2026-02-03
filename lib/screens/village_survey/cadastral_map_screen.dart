@@ -84,7 +84,12 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
       // Assuming it doesn't exist yet based on previous file reads of DatabaseHelper.
       // I will add the table creation to DatabaseHelper shortly.
       await DatabaseHelper().insert('village_cadastral_maps', data);
-      await supabaseService.saveVillageData('village_cadastral_maps', data);
+      
+      try {
+        await supabaseService.saveVillageData('village_cadastral_maps', data);
+      } catch (e) {
+        print('Supabase sync warning: $e');
+      }
 
       if (mounted) {
         Navigator.push(

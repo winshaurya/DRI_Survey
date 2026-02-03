@@ -71,7 +71,12 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
 
     try {
       await DatabaseHelper().insert('village_survey_details', data);
-      await supabaseService.saveVillageData('village_survey_details', data);
+      
+      try {
+        await supabaseService.saveVillageData('village_survey_details', data);
+      } catch (e) {
+        print('Supabase sync warning: $e');
+      }
 
       if (mounted) {
         Navigator.push(

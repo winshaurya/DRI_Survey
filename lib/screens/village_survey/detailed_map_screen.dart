@@ -21,6 +21,7 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
   final List<MapPoint> _mapPoints = [];
   MapPoint? _selectedPoint;
   int _pointCounter = 1;
+  final TextEditingController _remarksController = TextEditingController();
 
   MapController _mapController = MapController();
   LatLng _currentLocation = LatLng(28.6139, 77.2090); // Default to Delhi
@@ -41,6 +42,56 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
   void initState() {
     super.initState();
     _getCurrentLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadExistingPoints();
+    });
+  }
+
+  @override
+  void dispose() {
+    _remarksController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadExistingPoints() async {
+    try {
+      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final sessionId = databaseService.currentSessionId;
+      if (sessionId == null) return;
+
+      final db = await DatabaseHelper().database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'village_map_points',
+        where: 'session_id = ?',
+        whereArgs: [sessionId],
+        orderBy: 'point_id ASC',
+      );
+
+      if (maps.isNotEmpty) {
+        setState(() {
+          _mapPoints.clear();
+          for (var map in maps) {
+            _mapPoints.add(MapPoint(
+              id: map['point_id'] as int,
+              position: LatLng(map['latitude'] as double, map['longitude'] as double),
+              category: map['category'] as String,
+              remarks: map['remarks'] as String? ?? '',
+            ));
+          }
+          if (_mapPoints.isNotEmpty) {
+            int maxId = _mapPoints.map((p) => p.id).reduce((curr, next) => curr > next ? curr : next);
+            _pointCounter = maxId + 1;
+            
+            // Set map center to the first point if available
+            if (_locationLoaded && _mapPoints.isNotEmpty) {
+               // Optional: center map
+            }
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading points: $e');
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -74,13 +125,24 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
         remarks: '',
       );
       _mapPoints.add(_selectedPoint!);
+      _remarksController.text = _selectedPoint!.remarks;
+    });
+  }
+
+  void _selectPoint(MapPoint point) {
+    setState(() {
+      _selectedPoint = point;
+      _remarksController.text = point.remarks;
     });
   }
 
   void _deletePoint(MapPoint point) {
     setState(() {
       _mapPoints.remove(point);
-      if (_selectedPoint?.id == point.id) _selectedPoint = null;
+      if (_selectedPoint?.id == point.id) {
+        _selectedPoint = null;
+        _remarksController.clear();
+      }
     });
   }
 
@@ -97,6 +159,10 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
     }
 
     try {
+      // Clear existing points for this session to avoid duplicates
+      final db = await DatabaseHelper().database;
+      await db.delete('village_map_points', where: 'session_id = ?', whereArgs: [sessionId]);
+
       // 1. Save all points
       for (var point in _mapPoints) {
         final data = {
@@ -111,7 +177,12 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
         };
 
         await DatabaseHelper().insert('village_map_points', data);
-        await supabaseService.saveVillageData('village_map_points', data);
+        
+        try {
+            await supabaseService.saveVillageData('village_map_points', data);
+        } catch (e) {
+             print('Supabase sync warning: $e');
+        }
       }
 
       if (mounted) {
@@ -204,7 +275,7 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
                         ..._mapPoints.map((point) => Marker(
                           point: point.position,
                           child: GestureDetector(
-                            onTap: () => setState(() => _selectedPoint = point),
+                            onTap: () => _selectPoint(point),
                             child: Container(
                               width: 30,
                               height: 30,
@@ -270,8 +341,17 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
                     Text('Remarks', style: TextStyle(fontWeight: FontWeight.w500)),
                     SizedBox(height: 4),
                     TextField(
-                      onChanged: (value) => setState(() => _selectedPoint!.remarks = value),
-                      decoration: InputDecoration(hintText: 'Enter remarks...', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                      controller: _remarksController,
+                      onChanged: (value) {
+                         if (_selectedPoint != null) {
+                           _selectedPoint!.remarks = value;
+                         }
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Enter remarks...', 
+                        border: OutlineInputBorder(), 
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)
+                      ),
                       maxLines: 2,
                     ),
                   ],

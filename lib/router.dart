@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/landing/landing_screen.dart';
 import 'screens/family_survey/survey_screen.dart';
+import 'screens/history/history_screen.dart';
 import 'screens/village_survey_screen.dart';
 import 'screens/village_survey/village_form_screen.dart';
 import 'screens/village_survey/infrastructure_screen.dart';
@@ -22,6 +23,7 @@ class AppRouter {
   static const String landing = '/';
   static const String auth = '/auth';
   static const String survey = '/survey';
+  static const String history = '/history';
   static const String villageSurvey = '/village-survey';
   static const String villageForm = '/village-form';
   static const String infrastructure = '/infrastructure';
@@ -42,6 +44,7 @@ class AppRouter {
     landing: (context) => const LandingScreen(),
     auth: (context) => const AuthScreen(),
     survey: (context) => const SurveyScreen(),
+    history: (context) => const HistoryScreen(),
     villageSurvey: (context) => const VillageSurveyScreen(),
     villageForm: (context) => const VillageFormScreen(),
     infrastructure: (context) => InfrastructureScreen(),

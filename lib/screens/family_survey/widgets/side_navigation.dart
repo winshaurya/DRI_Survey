@@ -117,7 +117,7 @@ class SideNavigation extends ConsumerWidget {
                         context,
                         icon: Icons.history,
                         title: 'History',
-                        onTap: () => _showHistoryDialog(context, l10n),
+                        onTap: () => Navigator.pushNamed(context, '/history'),
                       ),
 
                       _buildLanguageDropdown(context, l10n, ref),
