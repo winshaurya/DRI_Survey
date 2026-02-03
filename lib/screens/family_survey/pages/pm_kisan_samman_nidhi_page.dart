@@ -21,24 +21,29 @@ class PMKisanSammanNidhiPage extends ConsumerStatefulWidget {
 class _PMKisanSammanNidhiPageState extends ConsumerState<PMKisanSammanNidhiPage> {
   Map<String, dynamic> _schemeData = {};
   List<String> _familyMemberNames = [];
+  final String _schemeKey = 'pm_kisan_samman_nidhi';
 
   @override
   void initState() {
     super.initState();
-    _schemeData = Map<String, dynamic>.from(widget.pageData);
-    if (_schemeData.isEmpty) {
-        _schemeData = {'is_beneficiary': false, 'members': []};
-    }
+    _initData();
     _loadFamilyMembers();
   }
 
   @override
   void didUpdateWidget(covariant PMKisanSammanNidhiPage oldWidget) {
       super.didUpdateWidget(oldWidget);
-       if (widget.pageData != oldWidget.pageData) {
-         _schemeData = Map<String, dynamic>.from(widget.pageData);
-         _loadFamilyMembers();
-       }
+      _initData();
+      _loadFamilyMembers();
+  }
+
+  void _initData() {
+    var existing = widget.pageData[_schemeKey];
+    if (existing != null && existing is Map) {
+       _schemeData = Map<String, dynamic>.from(existing);
+    } else {
+       _schemeData = {'is_beneficiary': false, 'members': []};
+    }
   }
 
   void _loadFamilyMembers() {
@@ -78,7 +83,7 @@ class _PMKisanSammanNidhiPageState extends ConsumerState<PMKisanSammanNidhiPage>
         setState(() {
           _schemeData = newData;
         });
-        widget.onDataChanged(newData);
+        widget.onDataChanged({_schemeKey: newData});
       },
     );
   }

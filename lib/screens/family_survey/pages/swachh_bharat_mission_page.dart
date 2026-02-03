@@ -21,24 +21,29 @@ class SwachhBharatMissionPage extends ConsumerStatefulWidget {
 class _SwachhBharatMissionPageState extends ConsumerState<SwachhBharatMissionPage> {
   Map<String, dynamic> _schemeData = {};
   List<String> _familyMemberNames = [];
+  final String _schemeKey = 'swachh_bharat_mission';
 
   @override
   void initState() {
     super.initState();
-    _schemeData = Map<String, dynamic>.from(widget.pageData);
-    if (_schemeData.isEmpty) {
-        _schemeData = {'is_beneficiary': false, 'members': []};
-    }
+    _initData();
     _loadFamilyMembers();
   }
 
   @override
   void didUpdateWidget(covariant SwachhBharatMissionPage oldWidget) {
       super.didUpdateWidget(oldWidget);
-       if (widget.pageData != oldWidget.pageData) {
-         _schemeData = Map<String, dynamic>.from(widget.pageData);
-         _loadFamilyMembers();
-       }
+      _initData();
+      _loadFamilyMembers();
+  }
+
+  void _initData() {
+    var existing = widget.pageData[_schemeKey];
+    if (existing != null && existing is Map) {
+       _schemeData = Map<String, dynamic>.from(existing);
+    } else {
+       _schemeData = {'is_beneficiary': false, 'members': []};
+    }
   }
 
   void _loadFamilyMembers() {
@@ -78,7 +83,7 @@ class _SwachhBharatMissionPageState extends ConsumerState<SwachhBharatMissionPag
         setState(() {
           _schemeData = newData;
         });
-        widget.onDataChanged(newData);
+        widget.onDataChanged({_schemeKey: newData});
       },
     );
   }

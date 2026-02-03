@@ -21,26 +21,29 @@ class VBGBeneficiaryPage extends ConsumerStatefulWidget {
 class _VBGBeneficiaryPageState extends ConsumerState<VBGBeneficiaryPage> {
   Map<String, dynamic> _schemeData = {};
   List<String> _familyMemberNames = [];
+  final String _schemeKey = 'vb_gram_g';
 
   @override
   void initState() {
     super.initState();
-    _schemeData = Map<String, dynamic>.from(widget.pageData);
-    if (_schemeData.isEmpty) {
-        _schemeData = {'is_beneficiary': false, 'members': []};
-    }
+    _initData();
     _loadFamilyMembers();
   }
 
   @override
   void didUpdateWidget(covariant VBGBeneficiaryPage oldWidget) {
       super.didUpdateWidget(oldWidget);
-      // Always reload data as pageData is mutated in place by parent
-      _schemeData = Map<String, dynamic>.from(widget.pageData);
-      if (_schemeData.isEmpty) {
-          _schemeData = {'is_beneficiary': false, 'members': []};
-      }
+      _initData();
       _loadFamilyMembers();
+  }
+
+  void _initData() {
+    var existing = widget.pageData[_schemeKey];
+    if (existing != null && existing is Map) {
+       _schemeData = Map<String, dynamic>.from(existing);
+    } else {
+       _schemeData = {'is_beneficiary': false, 'members': []};
+    }
   }
 
   void _loadFamilyMembers() {
@@ -80,7 +83,7 @@ class _VBGBeneficiaryPageState extends ConsumerState<VBGBeneficiaryPage> {
         setState(() {
           _schemeData = newData;
         });
-        widget.onDataChanged(newData);
+        widget.onDataChanged({_schemeKey: newData});
       },
     );
   }
