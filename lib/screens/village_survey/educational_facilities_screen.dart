@@ -39,8 +39,8 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
     final data = {
       'id': const Uuid().v4(),
       'session_id': sessionId,
-      'num_anganwadi': int.tryParse(numAnganwadiController.text),
-      'num_shiksha_guarantee': int.tryParse(numShikshaGuaranteeController.text),
+      'anganwadi_centers': int.tryParse(numAnganwadiController.text),
+      'shiksha_guarantee_centers': int.tryParse(numShikshaGuaranteeController.text),
       'other_facility_name': otherFacilityNameController.text,
       'other_facility_count': int.tryParse(otherFacilityCountController.text),
       'created_at': DateTime.now().toIso8601String(),

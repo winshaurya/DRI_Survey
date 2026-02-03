@@ -38,6 +38,20 @@ class _IrrigationPageState extends ConsumerState<IrrigationPage> {
     _otherIrrigationSpecify = widget.pageData['other_irrigation_specify'];
   }
 
+  @override
+  void didUpdateWidget(covariant IrrigationPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      setState(() {
+        _canal = _parseBool(widget.pageData['canal']);
+        _tubeWell = _parseBool(widget.pageData['tube_well']);
+        _ponds = _parseBool(widget.pageData['ponds']);
+        _otherFacilities = _parseBool(widget.pageData['other_facilities']);
+        _otherIrrigationSpecify = widget.pageData['other_irrigation_specify'];
+      });
+    }
+  }
+
   bool _parseBool(dynamic value) {
     if (value is bool) return value;
     if (value is String) return value.toLowerCase() == 'yes' || value.toLowerCase() == 'true';

@@ -45,6 +45,25 @@ class _AnimalsPageState extends State<AnimalsPage> {
   }
 
   @override
+  void didUpdateWidget(covariant AnimalsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      if (widget.pageData['animals'] is List) {
+        setState(() {
+          _animals = List<Map<String, dynamic>>.from(
+            (widget.pageData['animals'] as List).map((e) => Map<String, dynamic>.from(e))
+          );
+          // Dispose and clear old controllers as data source changed
+          for (final controller in _breedControllers.values) {
+            controller.dispose();
+          }
+          _breedControllers.clear();
+        });
+      }
+    }
+  }
+
+  @override
   void dispose() {
     // Dispose all breed controllers
     for (final controller in _breedControllers.values) {
@@ -204,6 +223,7 @@ class _AnimalsPageState extends State<AnimalsPage> {
     final animalNumber = index + 1;
 
     return Card(
+      key: ObjectKey(animal), // Force rebuild when animal object instance changes
       elevation: 4,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(

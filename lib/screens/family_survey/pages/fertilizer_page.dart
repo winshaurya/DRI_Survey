@@ -32,6 +32,18 @@ class _FertilizerPageState extends ConsumerState<FertilizerPage> {
     _fertilizerTypesController = TextEditingController(text: widget.pageData['fertilizer_types']);
   }
 
+  @override
+  void didUpdateWidget(covariant FertilizerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      _fertilizerTypesController.text = widget.pageData['fertilizer_types']?.toString() ?? '';
+      setState(() {
+        _ureaFertilizer = _parseBool(widget.pageData['urea_fertilizer']);
+        _organicFertilizer = _parseBool(widget.pageData['organic_fertilizer']);
+      });
+    }
+  }
+
   bool _parseBool(dynamic value) {
     if (value is bool) return value;
     if (value is String) return value.toLowerCase() == 'yes' || value.toLowerCase() == 'true';

@@ -71,6 +71,31 @@ class _DisputesPageState extends State<DisputesPage> {
     _otherPeriod = widget.pageData['other_period'] ?? '';
   }
 
+  @override
+  void didUpdateWidget(DisputesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      setState(() {
+        _familyDisputes = widget.pageData['family_disputes'] ?? '';
+        _familyRegistered = widget.pageData['family_registered'] ?? '';
+        _familyPeriod = widget.pageData['family_period'] ?? '';
+
+        _revenueDisputes = widget.pageData['revenue_disputes'] ?? '';
+        _revenueRegistered = widget.pageData['revenue_registered'] ?? '';
+        _revenuePeriod = widget.pageData['revenue_period'] ?? '';
+
+        _criminalDisputes = widget.pageData['criminal_disputes'] ?? '';
+        _criminalRegistered = widget.pageData['criminal_registered'] ?? '';
+        _criminalPeriod = widget.pageData['criminal_period'] ?? '';
+
+        _otherDisputes = widget.pageData['other_disputes'] ?? '';
+        _otherDescription = widget.pageData['other_description'] ?? '';
+        _otherRegistered = widget.pageData['other_registered'] ?? '';
+        _otherPeriod = widget.pageData['other_period'] ?? '';
+      });
+    }
+  }
+
   void _updateData() {
     final data = {
       // Family Disputes

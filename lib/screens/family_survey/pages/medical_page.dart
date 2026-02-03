@@ -44,7 +44,9 @@ class _MedicalPageState extends State<MedicalPage> {
   void didUpdateWidget(MedicalPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.pageData != oldWidget.pageData) {
-      _initializeData();
+      setState(() {
+        _initializeData();
+      });
     }
   }
 

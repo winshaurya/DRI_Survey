@@ -73,6 +73,29 @@ class _LocationPageState extends State<LocationPage> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant LocationPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refresh controllers if pageData updated from parent/db
+    if (widget.pageData != oldWidget.pageData) {
+      villageNameController.text = widget.pageData['village_name'] ?? '';
+      panchayatController.text = widget.pageData['panchayat'] ?? '';
+      blockController.text = widget.pageData['block'] ?? '';
+      tehsilController.text = widget.pageData['tehsil'] ?? '';
+      postalAddressController.text = widget.pageData['postal_address'] ?? '';
+      pinCodeController.text = widget.pageData['pin_code'] ?? '';
+      
+      // Update state/district selection
+      if (widget.pageData['state'] != null) {
+        selectedState = widget.pageData['state'];
+        availableDistricts = Set<String>.from(stateDistrictData[selectedState] ?? []).toList()..sort();
+      }
+      if (widget.pageData['district'] != null) {
+        selectedDistrict = widget.pageData['district'];
+      }
+    }
+  }
+
   Future<void> _getCurrentLocation() async {
     try {
       bool serviceEnabled = await _location.serviceEnabled();

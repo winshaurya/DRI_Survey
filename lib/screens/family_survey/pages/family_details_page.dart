@@ -25,6 +25,13 @@ class _FamilyDetailsPageState extends State<FamilyDetailsPage> {
     _members = _initializeMembers();
   }
 
+  @override
+  void didUpdateWidget(covariant FamilyDetailsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload if parent data changed (navigation back/forth)
+    _members = _initializeMembers();
+  }
+
   List<Map<String, dynamic>> _initializeMembers() {
     final existing = widget.pageData['family_members'];
     if (existing != null && existing is List && existing.isNotEmpty) {

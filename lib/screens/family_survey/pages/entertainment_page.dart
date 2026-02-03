@@ -52,6 +52,31 @@ class _EntertainmentPageState extends State<EntertainmentPage> {
   }
 
   @override
+  void didUpdateWidget(covariant EntertainmentPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      setState(() {
+        _smartMobile = widget.pageData['smart_mobile'] ?? false;
+        _analogMobile = widget.pageData['analog_mobile'] ?? false;
+        _television = widget.pageData['television'] ?? false;
+        _radio = widget.pageData['radio'] ?? false;
+        _games = widget.pageData['games'] ?? false;
+        _otherEntertainment = widget.pageData['other_entertainment'] != null;
+
+        if (widget.pageData['smart_mobile_count']?.toString() != _smartMobileCountController.text) {
+             _smartMobileCountController.text = widget.pageData['smart_mobile_count']?.toString() ?? '';
+        }
+        if (widget.pageData['analog_mobile_count']?.toString() != _analogMobileCountController.text) {
+             _analogMobileCountController.text = widget.pageData['analog_mobile_count']?.toString() ?? '';
+        }
+        if (widget.pageData['other_entertainment'] != _otherEntertainmentController.text) {
+             _otherEntertainmentController.text = widget.pageData['other_entertainment'] ?? '';
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _smartMobileCountController.dispose();
     _analogMobileCountController.dispose();

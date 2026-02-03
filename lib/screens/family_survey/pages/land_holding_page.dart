@@ -46,6 +46,25 @@ class _LandHoldingPageState extends ConsumerState<LandHoldingPage> {
     _otherFruitTrees = _parseBool(widget.pageData['other_fruit_trees']);
   }
 
+  @override
+  void didUpdateWidget(covariant LandHoldingPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      _irrigatedAreaController.text = widget.pageData['irrigated_area']?.toString() ?? '';
+      _cultivableAreaController.text = widget.pageData['cultivable_area']?.toString() ?? '';
+      _otherOrchardController.text = widget.pageData['other_orchard_plants']?.toString() ?? '';
+      
+      setState(() {
+        _mangoTrees = _parseBool(widget.pageData['mango_trees']);
+        _guavaTrees = _parseBool(widget.pageData['guava_trees']);
+        _lemonTrees = _parseBool(widget.pageData['lemon_trees']);
+        _bananaPlants = _parseBool(widget.pageData['banana_plants']);
+        _papayaTrees = _parseBool(widget.pageData['papaya_trees']);
+        _otherFruitTrees = _parseBool(widget.pageData['other_fruit_trees']);
+      });
+    }
+  }
+
   bool _parseBool(dynamic value) {
     if (value is bool) return value;
     if (value is int) return value == 1;

@@ -28,15 +28,36 @@ class _BankAccountPageState extends ConsumerState<BankAccountPage> {
     _loadData();
   }
 
+  @override
+  void didUpdateWidget(covariant BankAccountPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      _loadFamilyMembers();
+      _loadData();
+    }
+  }
+
   void _loadFamilyMembers() {
-    final surveyState = ref.read(surveyProvider);
-    final familyMembers = surveyState.surveyData['family_members'] as List<dynamic>? ?? [];
-    setState(() {
-      _familyMembers = familyMembers
-          .map((member) => member['name'] as String? ?? '')
-          .where((name) => name.isNotEmpty)
-          .toList();
-    });
+    // Try to get family members from pageData first, then fallback to provider
+    List<dynamic> familyMembers = [];
+    
+    // First, check if family_members are in pageData (passed from SurveyPage)
+    if (widget.pageData['family_members'] != null) {
+      familyMembers = widget.pageData['family_members'] as List<dynamic>;
+    } else {
+      // Fallback to provider
+      final surveyState = ref.read(surveyProvider);
+      familyMembers = surveyState.surveyData['family_members'] as List<dynamic>? ?? [];
+    }
+    
+    if (mounted) {
+      setState(() {
+        _familyMembers = familyMembers
+            .map((member) => member['name'] as String? ?? '')
+            .where((name) => name.isNotEmpty)
+            .toList();
+      });
+    }
   }
 
   void _loadData() {

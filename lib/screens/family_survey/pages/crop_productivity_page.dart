@@ -52,9 +52,17 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
   @override
   void initState() {
     super.initState();
-    // Initialize with at least one crop
-    if (_crops.isEmpty) {
-      _crops.add({
+    _initializeCrops();
+  }
+
+  void _initializeCrops() {
+    final existingData = widget.pageData['crop_productivity'];
+    
+    if (existingData != null && existingData is List && existingData.isNotEmpty) {
+      _crops = List<Map<String, dynamic>>.from(existingData);
+      _cropNameControllers = _crops.map((c) => TextEditingController(text: c['name'])).toList();
+    } else {
+       _crops = [{
         'id': 1,
         'season': 'Kharif',
         'name': 'Rice',
@@ -62,8 +70,22 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
         'productivity': '',
         'total_production': '',
         'sold': ''
-      });
-      _cropNameControllers.add(TextEditingController(text: 'Rice'));
+      }];
+      _cropNameControllers = [TextEditingController(text: 'Rice')];
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CropProductivityPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+        // Dispose old controllers first? No, list might be different. 
+        // Simplest is to reload if structure changed. 
+        // Be careful not to lose focus if unrelated data changed.
+        // For now, assuming full page reload if data changed externally.
+        for (var c in _cropNameControllers) c.dispose();
+        _initializeCrops();
+        setState(() {});
     }
   }
 
@@ -90,6 +112,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
         });
         _cropNameControllers.add(TextEditingController(text: 'Rice'));
       });
+      _updateData();
     }
   }
 
@@ -100,12 +123,20 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
         _cropNameControllers[index].dispose();
         _cropNameControllers.removeAt(index);
       });
+      _updateData();
     }
   }
 
-  void _updateCropData(int cropId, String field, String value) {
-    widget.pageData['crop_${cropId}_$field'] = value;
-    widget.onDataChanged(widget.pageData);
+  void _updateCropData(int index, String field, String value) {
+    // index is the List index (0-based)
+    setState(() {
+       _crops[index][field] = value;
+    });
+    _updateData();
+  }
+
+  void _updateData() {
+    widget.onDataChanged({'crop_productivity': _crops});
   }
 
   @override
@@ -216,7 +247,11 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
     );
   }
 
-  Widget _buildCropCard(int cropNumber, AppLocalizations l10n, VoidCallback? onRemove) {
+  Widget _buildCropCard(int cropId, AppLocalizations l10n, VoidCallback? onRemove) {
+     final index = _crops.indexWhere((c) => c['id'] == cropId);
+     if (index == -1) return const SizedBox.shrink();
+     final crop = _crops[index];
+
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(
@@ -245,7 +280,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Crop ${cropNumber}',
+                    'Crop ${index + 1}',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -284,7 +319,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
             Container(
               width: double.infinity,
               child: DropdownButtonFormField<String>(
-                initialValue: widget.pageData['crop_${cropNumber}_season'] ?? 'Kharif',
+                value: crop['season'], // Use value instead of initialValue for controlled input
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -312,14 +347,16 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                   );
                 }).toList(),
                 onChanged: (value) {
-                  setState(() {
-                    widget.pageData['crop_${cropNumber}_season'] = value;
-                    // Reset crop name when season changes
-                    final defaultCrop = cropOptions[value]!.first;
-                    widget.pageData['crop_${cropNumber}_name'] = defaultCrop;
-                    _cropNameControllers[cropNumber - 1].text = defaultCrop;
-                  });
-                  widget.onDataChanged(widget.pageData);
+                  if (value != null) {
+                    setState(() {
+                      crop['season'] = value;
+                      // Reset crop name when season changes
+                      final defaultCrop = cropOptions[value]!.first;
+                      crop['name'] = defaultCrop;
+                      _cropNameControllers[index].text = defaultCrop;
+                    });
+                     _updateData();
+                  }
                 },
               ),
             ),
@@ -339,12 +376,11 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
             AutocompleteDropdown(
               label: 'Crop Type',
               hintText: 'Type or select crop name',
-              options: cropOptions[widget.pageData['crop_${cropNumber}_season'] ?? 'Kharif'] ?? cropOptions['Kharif']!,
-              controller: _cropNameControllers[cropNumber - 1],
-              initialValue: widget.pageData['crop_${cropNumber}_name'] ?? cropOptions['Kharif']!.first,
+              options: cropOptions[crop['season'] ?? 'Kharif'] ?? cropOptions['Kharif']!,
+              controller: _cropNameControllers[index],
+              initialValue: crop['name'] ?? '',
               onChanged: (value) {
-                widget.pageData['crop_${cropNumber}_name'] = value;
-                widget.onDataChanged(widget.pageData);
+                 _updateCropData(index, 'name', value);
               },
             ),
 
@@ -378,7 +414,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
-                        initialValue: widget.pageData['crop_${cropNumber}_area'],
+                        initialValue: crop['area']?.toString(),
                         decoration: InputDecoration(
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -389,8 +425,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                         ),
                         keyboardType: TextInputType.number,
                         onChanged: (value) {
-                          widget.pageData['crop_${cropNumber}_area'] = value;
-                          widget.onDataChanged(widget.pageData);
+                           _updateCropData(index, 'area', value);
                         },
                       ),
                     ],
@@ -411,7 +446,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
-                        initialValue: widget.pageData['crop_${cropNumber}_productivity'],
+                        initialValue: crop['productivity']?.toString(),
                         decoration: InputDecoration(
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -422,8 +457,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                         ),
                         keyboardType: TextInputType.number,
                         onChanged: (value) {
-                          widget.pageData['crop_${cropNumber}_productivity'] = value;
-                          widget.onDataChanged(widget.pageData);
+                           _updateCropData(index, 'productivity', value);
                         },
                       ),
                     ],
@@ -451,7 +485,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
-                        initialValue: widget.pageData['crop_${cropNumber}_total_production'],
+                        initialValue: crop['total_production']?.toString(),
                         decoration: InputDecoration(
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -462,8 +496,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                         ),
                         keyboardType: TextInputType.number,
                         onChanged: (value) {
-                          widget.pageData['crop_${cropNumber}_total_production'] = value;
-                          widget.onDataChanged(widget.pageData);
+                           _updateCropData(index, 'total_production', value);
                         },
                       ),
                     ],
@@ -484,7 +517,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
-                        initialValue: widget.pageData['crop_${cropNumber}_sold'],
+                        initialValue: crop['sold']?.toString(),
                         decoration: InputDecoration(
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -495,8 +528,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
                         ),
                         keyboardType: TextInputType.number,
                         onChanged: (value) {
-                          widget.pageData['crop_${cropNumber}_sold'] = value;
-                          widget.onDataChanged(widget.pageData);
+                           _updateCropData(index, 'sold', value);
                         },
                       ),
                     ],

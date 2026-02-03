@@ -36,6 +36,15 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
     _loadFamilyMembers();
   }
 
+  @override
+  void didUpdateWidget(covariant GovernmentSchemesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      _loadExistingData();
+      _loadFamilyMembers();
+    }
+  }
+
   void _loadExistingData() {
     _aadhaarMembers = List<Map<String, dynamic>>.from(widget.pageData['aadhaar_scheme_members'] ?? []);
     _tribalMembers = List<Map<String, dynamic>>.from(widget.pageData['tribal_scheme_members'] ?? []);
@@ -44,15 +53,23 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
   }
 
   void _loadFamilyMembers() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Try to get family members from pageData first, then fallback to provider
+    List<dynamic> familyMembers = [];
+    
+    // First, check if family_members are in pageData (passed from SurveyPage)
+    if (widget.pageData['family_members'] != null) {
+      familyMembers = widget.pageData['family_members'] as List<dynamic>;
+    } else {
+      // Fallback to provider
       final surveyState = ref.read(surveyProvider);
-      final familyMembers = surveyState.surveyData['family_members'] as List<dynamic>? ?? [];
-      if (mounted) {
-        setState(() {
-          _familyMemberNames = familyMembers.map((member) => member['name'] as String? ?? '').where((name) => name.isNotEmpty).toList();
-        });
-      }
-    });
+      familyMembers = surveyState.surveyData['family_members'] as List<dynamic>? ?? [];
+    }
+    
+    if (mounted) {
+      setState(() {
+        _familyMemberNames = familyMembers.map((member) => member['name'] as String? ?? '').where((name) => name.isNotEmpty).toList();
+      });
+    }
   }
 
   void _updateData() {

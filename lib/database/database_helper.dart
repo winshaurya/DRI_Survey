@@ -23,7 +23,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 24,
+      version: 27,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -72,6 +72,73 @@ class DatabaseHelper {
       try {
         await db.execute('ALTER TABLE training_data ADD COLUMN status TEXT DEFAULT "taken"');
       } catch (_) {}
+    }
+    if (oldVersion < 26) {
+      // Recreate social_consciousness table with new schema
+      await db.execute('DROP TABLE IF EXISTS social_consciousness');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS social_consciousness (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          survey_id INTEGER,
+          clothes_frequency TEXT,
+          clothes_other_specify TEXT,
+          food_waste_exists TEXT,
+          food_waste_amount TEXT,
+          waste_disposal TEXT,
+          waste_disposal_other TEXT,
+          separate_waste TEXT,
+          compost_pit TEXT,
+          recycle_used_items TEXT,
+          led_lights TEXT,
+          turn_off_devices TEXT,
+          fix_leaks TEXT,
+          avoid_plastics TEXT,
+          family_prayers TEXT,
+          family_meditation TEXT,
+          meditation_members TEXT,
+          family_yoga TEXT,
+          yoga_members TEXT,
+          community_activities TEXT,
+          spiritual_discourses TEXT,
+          discourses_members TEXT,
+          personal_happiness TEXT,
+          family_happiness TEXT,
+          happiness_family_who TEXT,
+          financial_problems TEXT,
+          family_disputes TEXT,
+          illness_issues TEXT,
+          unhappiness_reason TEXT,
+          addiction_smoke TEXT,
+          addiction_drink TEXT,
+          addiction_gutka TEXT,
+          addiction_gamble TEXT,
+          addiction_tobacco TEXT,
+          addiction_details TEXT,
+          created_at TEXT
+        )
+      ''');
+
+      // Update irrigation_facilities to match page keys
+      await db.execute('ALTER TABLE irrigation_facilities ADD COLUMN ponds TEXT');
+      await db.execute('ALTER TABLE irrigation_facilities ADD COLUMN other_facilities TEXT');
+      await db.execute('ALTER TABLE irrigation_facilities ADD COLUMN other_irrigation_specify TEXT');
+    }
+    if (oldVersion < 27) {
+      // Recreate medical_treatment table with proper schema
+      await db.execute('DROP TABLE IF EXISTS medical_treatment');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS medical_treatment (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          survey_id INTEGER,
+          allopathic TEXT,
+          ayurvedic TEXT,
+          homeopathy TEXT,
+          traditional TEXT,
+          other_treatment TEXT,
+          preferred_treatment TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      ''');
     }
   }
 
@@ -326,7 +393,19 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS drinking_water_sources (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, hand_pumps TEXT, hand_pumps_distance REAL, hand_pumps_quality TEXT, well TEXT, well_distance REAL, well_quality TEXT, tubewell TEXT, tubewell_distance REAL, tubewell_quality TEXT, nal_jaal TEXT, nal_jaal_quality TEXT, other_source TEXT, other_distance REAL, other_sources_quality TEXT, created_at TEXT)');
 
     // Medical Treatment
-    await db.execute('CREATE TABLE IF NOT EXISTS medical_treatment (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT NOT NULL, preferred_treatment TEXT CHECK (preferred_treatment IN ("allopathic", "ayurvedic", "homeopathy", "traditional", "others")), created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS medical_treatment (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        survey_id INTEGER,
+        allopathic TEXT,
+        ayurvedic TEXT,
+        homeopathy TEXT,
+        traditional TEXT,
+        other_treatment TEXT,
+        preferred_treatment TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
 
     // Disputes
     await db.execute('CREATE TABLE IF NOT EXISTS disputes (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, family_disputes TEXT, family_registered TEXT, family_period TEXT, revenue_disputes TEXT, revenue_registered TEXT, revenue_period TEXT, criminal_disputes TEXT, criminal_registered TEXT, criminal_period TEXT, other_disputes TEXT, other_description TEXT, other_registered TEXT, other_period TEXT, created_at TEXT)');
@@ -341,10 +420,10 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS diseases (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, disease_name TEXT, suffering_since TEXT, treatment_taken TEXT, treatment_from_when TEXT, treatment_from_where TEXT, treatment_taken_from TEXT, created_at TEXT)');
 
     // Folklore Medicine
-    await db.execute('CREATE TABLE IF NOT EXISTS folklore_medicine (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, disease_name TEXT, plant_name TEXT, part_used TEXT, method_of_use TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS folklore_medicine (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, person_name TEXT, plant_local_name TEXT, plant_botanical_name TEXT, uses TEXT, created_at TEXT)');
 
     // Health Programmes
-    await db.execute('CREATE TABLE IF NOT EXISTS health_programmes (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, vaccination TEXT, iron_folic_acid TEXT, deworming TEXT, family_planning TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS health_programmes (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, vaccination_pregnancy TEXT, child_vaccination TEXT, vaccination_schedule TEXT, balance_doses_schedule TEXT, family_planning_awareness TEXT, contraceptive_applied TEXT, created_at TEXT)');
     
     // Beneficiary Programs
     await db.execute('CREATE TABLE IF NOT EXISTS beneficiary_programs (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, program_type TEXT, beneficiary INTEGER, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, days_worked INTEGER, received INTEGER, created_at TEXT)');
@@ -356,7 +435,47 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS widow_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
 
     // Social Consciousness
-    await db.execute('CREATE TABLE IF NOT EXISTS social_consciousness (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, alcoholism TEXT, dowry TEXT, death_feast TEXT, child_marriage TEXT, untouchability TEXT, plantation TEXT, guests TEXT, education_boys TEXT, education_girls TEXT, created_at TEXT)');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS social_consciousness (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        survey_id INTEGER,
+        clothes_frequency TEXT,
+        clothes_other_specify TEXT,
+        food_waste_exists TEXT,
+        food_waste_amount TEXT,
+        waste_disposal TEXT,
+        waste_disposal_other TEXT,
+        separate_waste TEXT,
+        compost_pit TEXT,
+        recycle_used_items TEXT,
+        led_lights TEXT,
+        turn_off_devices TEXT,
+        fix_leaks TEXT,
+        avoid_plastics TEXT,
+        family_prayers TEXT,
+        family_meditation TEXT,
+        meditation_members TEXT,
+        family_yoga TEXT,
+        yoga_members TEXT,
+        community_activities TEXT,
+        spiritual_discourses TEXT,
+        discourses_members TEXT,
+        personal_happiness TEXT,
+        family_happiness TEXT,
+        happiness_family_who TEXT,
+        financial_problems TEXT,
+        family_disputes TEXT,
+        illness_issues TEXT,
+        unhappiness_reason TEXT,
+        addiction_smoke TEXT,
+        addiction_drink TEXT,
+        addiction_gutka TEXT,
+        addiction_gamble TEXT,
+        addiction_tobacco TEXT,
+        addiction_details TEXT,
+        created_at TEXT
+      )
+    ''');
 
     // Training Data
     await db.execute('CREATE TABLE IF NOT EXISTS training_data (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, member_name TEXT, training_topic TEXT, training_duration TEXT, training_date TEXT, status TEXT DEFAULT "taken", created_at TEXT)');
@@ -705,9 +824,183 @@ class DatabaseHelper {
               'survey_id': surveyId,
             });
             break;
-          // Add more cases as needed for other data types
+          case 'animals':
+            await txn.insert('animals', {
+              ...entry.value,
+              'survey_id': surveyId,
+            });
+            break;
+          case 'equipment':
+            await txn.insert('agricultural_equipment', {
+              ...entry.value,
+              'survey_id': surveyId,
+            });
+            break;
+          case 'entertainment':
+            await txn.insert('entertainment_facilities', {
+              ...entry.value,
+              'survey_id': surveyId,
+            });
+            break;
+          case 'transport':
+            await txn.insert('transport_facilities', {
+              ...entry.value,
+              'survey_id': surveyId,
+            });
+            break;
+          case 'water_sources':
+            await txn.insert('drinking_water_sources', {
+              ...entry.value,
+              'survey_id': surveyId,
+            });
+            break;
+          case 'medical':
+             // medical_treatment stores phone_number as ID, so create generic insert
+             // Data structure from page might be single Map
+            await txn.insert('medical_treatment', {
+               ...entry.value,
+               'phone_number': data['phone_number'] ?? 'unknown',
+             });
+            break;
+          case 'disputes':
+            await txn.insert('disputes', {
+              ...entry.value,
+              'survey_id': surveyId,
+            });
+            break;
+          case 'house_conditions':
+            await txn.insert('house_conditions', {
+              ...entry.value,
+              'survey_id': surveyId,
+            });
+            break;
+          case 'diseases':
+            if (entry.value is List) {
+              for (var disease in entry.value) {
+                await txn.insert('diseases', {
+                  ...disease,
+                  'survey_id': surveyId,
+                });
+              }
+            }
+            break;
+          case 'folklore_medicines':
+            if (entry.value is List) {
+              for (var medicine in entry.value) {
+                await txn.insert('folklore_medicine', {
+                  ...medicine,
+                  'survey_id': surveyId,
+                });
+              }
+            }
+            break;
+          case 'health_programme':
+            await txn.insert('health_programmes', {
+              ...entry.value,
+              'survey_id': surveyId,
+            });
+            break;
+          case 'training_members':
+            if (entry.value is List) {
+              for (var training in entry.value) {
+                await txn.insert('training_data', {
+                  ...training,
+                  'survey_id': surveyId,
+                });
+              }
+            }
+            break;
+          case 'shg_members':
+            if (entry.value is List) {
+              for (var shg in entry.value) {
+                await txn.insert('shg_members', {
+                  ...shg,
+                  'survey_id': surveyId,
+                });
+              }
+            }
+            break;
+          case 'fpo_members':
+            if (entry.value is List) {
+              for (var fpo in entry.value) {
+                await txn.insert('fpo_members', {
+                  ...fpo,
+                  'survey_id': surveyId,
+                });
+              }
+            }
+            break;
+          case 'children': // Data from ChildrenPage
+             // This needs mapping to children_data 
+             // Form: births_last_3_years, etc are Top Level keys in pageData?
+             // Let's check how they are passed.
+             // If key is 'children', it might be boolean? No.
+             break;
+          case 'malnourished_children_data':
+             if (entry.value is List) {
+               for (var child in entry.value) {
+                 await txn.insert('malnourished_children_data', {
+                   ...child,
+                   'survey_id': surveyId,
+                 });
+               }
+             }
+             break;
+           // TODO: Add cases for beneficiary schemes (vb_g_ram_g, etc) 
+           // and handle top-level children data separately (since it's not in a sub-map)
         }
       }
+
+      // Handle top-level fields that belong to separate tables but aren't in their own map
+      // Children Data
+      if (data.containsKey('births_last_3_years')) {
+        await txn.insert('children_data', {
+          'births_last_3_years': data['births_last_3_years'],
+          'infant_deaths_last_3_years': data['infant_deaths_last_3_years'],
+          'malnourished_children': data['malnourished_children'],
+          'survey_id': surveyId,
+        });
+      }
+
+      // Migration
+      if (data.containsKey('migration')) {
+         // If migration is strictly boolean, we might need to check other keys
+         await txn.insert('migration_data', {
+           'family_members_migrated': data['migration'] == true ? 1 : 0, // Simplification
+           'reason': data['migration_reason'], // Assumption
+           'survey_id': surveyId,
+         });
+      }
+
+      // Beneficiary Schemes
+      final schemes = [
+        {'key': 'vb_g_ram_g', 'type': 'VB-G-RAM-G'},
+        {'key': 'pm_kisan', 'type': 'PM Kisan'},
+        {'key': 'kisan_credit_card', 'type': 'Kisan Credit Card'},
+        {'key': 'swachh_bharat', 'type': 'Swachh Bharat'},
+        {'key': 'fasal_bima', 'type': 'Fasal Bima'},
+      ];
+
+      for (var scheme in schemes) {
+        if (data.containsKey(scheme['key'])) {
+          final schemeData = data[scheme['key']];
+          if (schemeData is Map) {
+             // Save main beneficiary status if needed? Table schema seems to support individual members?
+             // Table: beneficiary_programs (program_type, beneficiary, member_name...)
+             // schemeData usually has 'members' List inside
+             if (schemeData['members'] is List) {
+               for (var member in schemeData['members']) {
+                 await txn.insert('beneficiary_programs', {
+                   ...member,
+                   'program_type': scheme['type'],
+                   'survey_id': surveyId,
+                 });
+               }
+             }
+          }
+        }
+      }
+
     });
   }
 

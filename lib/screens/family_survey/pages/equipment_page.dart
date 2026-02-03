@@ -49,6 +49,22 @@ class _EquipmentPageState extends ConsumerState<EquipmentPage> {
     _otherEquipmentController = TextEditingController(text: widget.pageData['other_equipment']);
   }
 
+  @override
+  void didUpdateWidget(covariant EquipmentPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      setState(() {
+        for (final equipment in _equipmentTypes) {
+          _equipmentOwned[equipment] = _parseBool(widget.pageData[equipment]);
+          _equipmentCondition[equipment] = widget.pageData['${equipment}_condition'] ?? '';
+        }
+        if (widget.pageData['other_equipment'] != _otherEquipmentController.text) {
+             _otherEquipmentController.text = widget.pageData['other_equipment'] ?? '';
+        }
+      });
+    }
+  }
+
   bool _parseBool(dynamic value) {
     if (value is bool) return value;
     if (value is String) return value.toLowerCase() == 'yes' || value.toLowerCase() == 'true';
@@ -76,7 +92,6 @@ class _EquipmentPageState extends ConsumerState<EquipmentPage> {
     }
 
     widget.onDataChanged(data);
-    ref.read(surveyProvider.notifier).savePageData(10, data);
   }
 
   Widget _buildEquipmentRow(String equipmentKey, String label, int delay) {

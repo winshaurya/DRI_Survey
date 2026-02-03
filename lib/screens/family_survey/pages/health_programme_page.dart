@@ -1,8 +1,10 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../providers/survey_provider.dart';
 
-class HealthProgrammePage extends StatefulWidget {
+class HealthProgrammePage extends ConsumerStatefulWidget {
   final Map<String, dynamic> pageData;
   final Function(Map<String, dynamic>) onDataChanged;
 
@@ -13,10 +15,10 @@ class HealthProgrammePage extends StatefulWidget {
   });
 
   @override
-  State<HealthProgrammePage> createState() => _HealthProgrammePageState();
+  ConsumerState<HealthProgrammePage> createState() => _HealthProgrammePageState();
 }
 
-class _HealthProgrammePageState extends State<HealthProgrammePage> {
+class _HealthProgrammePageState extends ConsumerState<HealthProgrammePage> {
   String? _selectedFamilyMember;
   List<String> _familyMembers = [];
 
@@ -56,22 +58,41 @@ class _HealthProgrammePageState extends State<HealthProgrammePage> {
   }
 
   void _loadFamilyMembers() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final familyMembersData = widget.pageData['family_members'] as List<dynamic>? ?? [];
+    // Try to get family members from pageData first, then fallback to provider
+    List<dynamic> familyMembersData = [];
+    
+    if (widget.pageData['family_members'] != null) {
+      familyMembersData = widget.pageData['family_members'] as List<dynamic>;
+    } else {
+      final surveyData = ref.read(surveyProvider).surveyData;
+      familyMembersData = surveyData['family_members'] as List<dynamic>? ?? [];
+    }
 
-      if (familyMembersData.isNotEmpty && mounted) {
-        final members = familyMembersData
-            .map((member) => member['name'] as String)
-            .where((name) => name.isNotEmpty)
-            .toList();
+    if (familyMembersData.isNotEmpty) {
+      final members = familyMembersData
+          .map((member) {
+             if (member is Map) {
+              return member['name']?.toString() ?? '';
+            }
+            return '';
+          })
+          .where((name) => name.isNotEmpty)
+          .toList();
 
-        if (_familyMembers != members) {
-          setState(() {
-            _familyMembers = members;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _familyMembers = members;
+        });
       }
-    });
+    }
+  }
+  
+  @override
+  void didUpdateWidget(covariant HealthProgrammePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      _initializeData();
+    }
   }
 
   void _updateData() {

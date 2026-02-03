@@ -46,6 +46,13 @@ class _ChildrenPageState extends ConsumerState<ChildrenPage> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant ChildrenPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Always initialize data as pageData is mutated in place
+    _initializeData();
+  }
+
   void _updateData() {
     final data = {
       'births_last_3_years': _birthsLast3Years,
@@ -58,10 +65,17 @@ class _ChildrenPageState extends ConsumerState<ChildrenPage> {
 
   // Get family members under 19 years old
   List<Map<String, dynamic>> _getChildrenUnder19() {
-    final surveyData = ref.read(surveyProvider).surveyData;
-    final familyMembers = _toListOfMap(surveyData['family_members']);
+    // Try to get family members from pageData first, then fallback to provider
+    List<dynamic> familyMembers = [];
+    
+    if (widget.pageData['family_members'] != null) {
+      familyMembers = widget.pageData['family_members'] as List<dynamic>;
+    } else {
+      final surveyData = ref.read(surveyProvider).surveyData;
+      familyMembers = _toListOfMap(surveyData['family_members']);
+    }
 
-    return familyMembers.where((member) {
+    return _toListOfMap(familyMembers).where((member) {
       final age = int.tryParse(member['age']?.toString() ?? '');
       return age != null && age < 19;
     }).toList();

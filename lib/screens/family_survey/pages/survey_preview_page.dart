@@ -183,6 +183,22 @@ class SurveyPreviewPage extends StatelessWidget {
             ),
           ),
 
+          // Children & Malnutrition
+          FadeInUp(
+            delay: const Duration(milliseconds: 1050),
+            child: _buildSection(
+              title: 'Children & Health Stats',
+              icon: Icons.baby_changing_station,
+              color: Colors.pink,
+              children: [
+                _buildPreviewField('Births (Last 3 Years)', pageData['births_last_3_years']),
+                _buildPreviewField('Infant Deaths (Last 3 Years)', pageData['infant_deaths_last_3_years']),
+                _buildPreviewField('Malnourished Children Count', pageData['malnourished_children']),
+                _buildMalnourishedChildrenList(pageData['malnourished_children_data'] as List? ?? []),
+              ],
+            ),
+          ),
+
           // Disputes & Migration
           FadeInUp(
             delay: const Duration(milliseconds: 1100),
@@ -195,7 +211,6 @@ class SurveyPreviewPage extends StatelessWidget {
                 _buildBoolField('Migration Issues', pageData['migration']),
                 _buildBoolField('Government Schemes', pageData['government_schemes']),
                 _buildBoolField('House Conditions', pageData['house_conditions']),
-                _buildBoolField('Children Education', pageData['children']),
               ],
             ),
           ),
@@ -462,6 +477,53 @@ class SurveyPreviewPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMalnourishedChildrenList(List children) {
+    if (children.isEmpty) {
+      return const SizedBox.shrink(); 
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 12, bottom: 6),
+          child: Text('Malnourished Children Details:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        ),
+        ...List.generate(children.length, (index) {
+          final child = children[index] as Map<String, dynamic>?;
+          if (child == null) return const SizedBox.shrink();
+          
+          final diseases = child['diseases'] as List? ?? [];
+          final diseaseNames = diseases.map((d) => d['name']?.toString() ?? '').where((s) => s.isNotEmpty).join(', ');
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.pink[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.pink[100]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Child ID: ${child['child_id'] ?? 'Not selected'}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Text('Height: ${child['height'] ?? '-'} cm, Weight: ${child['weight'] ?? '-'} kg', style: const TextStyle(fontSize: 12)),
+                  if (diseaseNames.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text('Conditions: $diseaseNames', style: TextStyle(color: Colors.red[800], fontSize: 12, fontWeight: FontWeight.w500)),
+                    ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 }

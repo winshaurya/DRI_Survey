@@ -64,6 +64,39 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
   }
 
   @override
+  void didUpdateWidget(covariant WaterSourcesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      setState(() {
+        _handPumps = widget.pageData['hand_pumps'] == 1 || widget.pageData['hand_pumps'] == true;
+        _well = widget.pageData['well'] == 1 || widget.pageData['well'] == true;
+        _tubewell = widget.pageData['tubewell'] == 1 || widget.pageData['tubewell'] == true;
+        _nalJaal = widget.pageData['nal_jaal'] == 1 || widget.pageData['nal_jaal'] == true;
+        _otherSources = widget.pageData['other_source'] == 1 || widget.pageData['other_source'] == true || widget.pageData['other_sources'] == 1 || widget.pageData['other_sources'] == true; // Handle both keys
+
+        _handPumpsQuality = widget.pageData['hand_pumps_quality'] ?? '';
+        _wellQuality = widget.pageData['well_quality'] ?? '';
+        _tubewellQuality = widget.pageData['tubewell_quality'] ?? '';
+        _nalJaalQuality = widget.pageData['nal_jaal_quality'] ?? '';
+        _otherSourcesQuality = widget.pageData['other_sources_quality'] ?? '';
+
+        if (widget.pageData['hand_pumps_distance']?.toString() != _handPumpsDistanceController.text) {
+             _handPumpsDistanceController.text = widget.pageData['hand_pumps_distance']?.toString() ?? '';
+        }
+        if (widget.pageData['well_distance']?.toString() != _wellDistanceController.text) {
+             _wellDistanceController.text = widget.pageData['well_distance']?.toString() ?? '';
+        }
+        if (widget.pageData['tubewell_distance']?.toString() != _tubewellDistanceController.text) {
+             _tubewellDistanceController.text = widget.pageData['tubewell_distance']?.toString() ?? '';
+        }
+        if (widget.pageData['other_distance']?.toString() != _otherDistanceController.text) {
+             _otherDistanceController.text = widget.pageData['other_distance']?.toString() ?? '';
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _handPumpsDistanceController.dispose();
     _wellDistanceController.dispose();
@@ -78,7 +111,8 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
       'well': _well ? 1 : 0,
       'tubewell': _tubewell ? 1 : 0,
       'nal_jaal': _nalJaal ? 1 : 0,
-      'other_sources': _otherSources ? 1 : 0,
+      'other_source': _otherSources ? 1 : 0, // Match DB column
+      'other_sources': _otherSources ? 1 : 0, // Keep for backward compatibility if needed
       'hand_pumps_distance': double.tryParse(_handPumpsDistanceController.text),
       'well_distance': double.tryParse(_wellDistanceController.text),
       'tubewell_distance': double.tryParse(_tubewellDistanceController.text),

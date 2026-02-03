@@ -369,6 +369,9 @@ CREATE TABLE IF NOT EXISTS village_educational_facilities (
     -- Other facilities
     anganwadi_centers INTEGER DEFAULT 0,
     skill_development_centers INTEGER DEFAULT 0,
+    shiksha_guarantee_centers INTEGER DEFAULT 0,
+    other_facility_name TEXT,
+    other_facility_count INTEGER DEFAULT 0,
 
     UNIQUE(session_id)
 );
@@ -518,8 +521,10 @@ CREATE TABLE IF NOT EXISTS village_biodiversity_register (
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
 
-    register_available BOOLEAN DEFAULT FALSE,
-    total_entries INTEGER DEFAULT 0,
+    status TEXT,
+    details TEXT,
+    components TEXT,
+    knowledge TEXT,
 
     UNIQUE(session_id)
 );
@@ -588,6 +593,188 @@ CREATE TABLE IF NOT EXISTS village_unemployment (
 );
 
 -- ===========================================
+-- VILLAGE SURVEY DETAILS TABLE (Landscape & Biodiversity)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_survey_details (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    forest_details TEXT,
+    wasteland_details TEXT,
+    garden_details TEXT,
+    burial_ground_details TEXT,
+    crop_plants_details TEXT,
+    vegetables_details TEXT,
+    fruit_trees_details TEXT,
+    animals_details TEXT,
+    birds_details TEXT,
+    local_biodiversity_details TEXT,
+    traditional_knowledge_details TEXT,
+    special_features_details TEXT,
+
+    UNIQUE(session_id)
+);
+
+-- ===========================================
+-- VILLAGE CADASTRAL MAPS TABLE
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_cadastral_maps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    has_cadastral_map INTEGER DEFAULT 0,
+    map_details TEXT,
+    availability_status TEXT,
+
+    UNIQUE(session_id)
+);
+
+-- ===========================================
+-- VILLAGE INFRASTRUCTURE DETAILS TABLE (Schools, Water, Power etc)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_infrastructure_details (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    has_primary_school INTEGER DEFAULT 0,
+    primary_school_distance TEXT,
+    has_junior_school INTEGER DEFAULT 0,
+    junior_school_distance TEXT,
+    has_high_school INTEGER DEFAULT 0,
+    high_school_distance TEXT,
+    has_intermediate_school INTEGER DEFAULT 0,
+    intermediate_school_distance TEXT,
+    other_education_facilities TEXT,
+    boys_students_count INTEGER,
+    girls_students_count INTEGER,
+    has_playground INTEGER DEFAULT 0,
+    playground_remarks TEXT,
+    has_panchayat_bhavan INTEGER DEFAULT 0,
+    panchayat_remarks TEXT,
+    has_sharda_kendra INTEGER DEFAULT 0,
+    sharda_kendra_distance TEXT,
+    has_post_office INTEGER DEFAULT 0,
+    post_office_distance TEXT,
+    has_health_facility INTEGER DEFAULT 0,
+    health_facility_distance TEXT,
+    has_bank INTEGER DEFAULT 0,
+    bank_distance TEXT,
+    has_electrical_connection INTEGER DEFAULT 0,
+    num_wells INTEGER,
+    num_ponds INTEGER,
+    num_hand_pumps INTEGER,
+    num_tube_wells INTEGER,
+    num_tap_water INTEGER,
+
+    UNIQUE(session_id)
+);
+
+-- ===========================================
+-- VILLAGE INFRASTRUCTURE TABLE (Approach Roads & Internal Lanes)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_infrastructure (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    approach_roads_available INTEGER DEFAULT 0,
+    num_approach_roads INTEGER,
+    approach_condition TEXT,
+    approach_remarks TEXT,
+    internal_lanes_available INTEGER DEFAULT 0,
+    num_internal_lanes INTEGER,
+    internal_condition TEXT,
+    internal_remarks TEXT,
+
+    UNIQUE(session_id)
+);
+
+-- ===========================================
+-- VILLAGE IRRIGATION FACILITIES TABLE
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_irrigation_facilities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    has_canal INTEGER DEFAULT 0,
+    has_tube_well INTEGER DEFAULT 0,
+    has_ponds INTEGER DEFAULT 0,
+    has_river INTEGER DEFAULT 0,
+    has_well INTEGER DEFAULT 0,
+
+    UNIQUE(session_id)
+);
+
+-- ===========================================
+-- VILLAGE SEED CLUBS TABLE
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_seed_clubs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    clubs_available BOOLEAN DEFAULT FALSE,
+    total_clubs INTEGER DEFAULT 0,
+
+    UNIQUE(session_id)
+);
+
+-- ===========================================
+-- VILLAGE MAP POINTS TABLE
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_map_points (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    category TEXT,
+    remarks TEXT,
+    point_id INTEGER
+);
+
+-- ===========================================
+-- VILLAGE FOREST MAPS TABLE
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_forest_maps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    forest_area TEXT,
+    forest_types TEXT,
+    forest_resources TEXT,
+    conservation_status TEXT,
+    remarks TEXT,
+
+    UNIQUE(session_id)
+);
+
+-- ===========================================
+-- VILLAGE TRANSPORT FACILITIES TABLE (Counts)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS village_transport_facilities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    tractor_count INTEGER DEFAULT 0,
+    car_jeep_count INTEGER DEFAULT 0,
+    motorcycle_scooter_count INTEGER DEFAULT 0,
+    cycle_count INTEGER DEFAULT 0,
+    e_rickshaw_count INTEGER DEFAULT 0,
+    pickup_truck_count INTEGER DEFAULT 0,
+
+    UNIQUE(session_id)
+);
+
+-- ===========================================
 -- INDEXES FOR PERFORMANCE
 -- ===========================================
 CREATE INDEX IF NOT EXISTS idx_village_sessions_status ON village_survey_sessions(status);
@@ -625,10 +812,27 @@ ALTER TABLE village_malnutrition_data ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_bpl_families ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_kitchen_gardens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_seed_clubs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_signboards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_social_maps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_transport_facilities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_biodiversity_register ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_traditional_occupations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_drainage_waste ENABLE ROW LEVEL SECURITY;
 ALTER TABLE village_unemployment ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_survival_details ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_cadastral_maps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_map_points ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_forest_maps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_infrastructure_details ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_infrastructure ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_survey_details ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_survey_details ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_cadastral_maps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_map_points ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_forest_maps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_infrastructure_details ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_infrastructure ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_irrigation_facilities ENABLE ROW LEVEL SECURITY;
 
 -- SECURE RLS Policies: Users can only access their own village surveys based on surveyor_email
 DROP POLICY IF EXISTS "Users can access their own village surveys" ON village_survey_sessions;
@@ -836,6 +1040,36 @@ CREATE POLICY "Users can access village seed clubs from their surveys" ON villag
         )
     );
 
+DROP POLICY IF EXISTS "Users can access village signboards from their surveys" ON village_signboards;
+CREATE POLICY "Users can access village signboards from their surveys" ON village_signboards
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_signboards.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can access village social maps from their surveys" ON village_social_maps;
+CREATE POLICY "Users can access village social maps from their surveys" ON village_social_maps
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_social_maps.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can access village transport facilities from their surveys" ON village_transport_facilities;
+CREATE POLICY "Users can access village transport facilities from their surveys" ON village_transport_facilities
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_transport_facilities.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
 DROP POLICY IF EXISTS "Users can access village biodiversity register from their surveys" ON village_biodiversity_register;
 CREATE POLICY "Users can access village biodiversity register from their surveys" ON village_biodiversity_register
     FOR ALL USING (
@@ -872,6 +1106,76 @@ CREATE POLICY "Users can access village unemployment from their surveys" ON vill
         EXISTS (
             SELECT 1 FROM village_survey_sessions
             WHERE session_id = village_unemployment.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can access village survey details from their surveys" ON village_survey_details;
+CREATE POLICY "Users can access village survey details from their surveys" ON village_survey_details
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_survey_details.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can access village cadastral maps from their surveys" ON village_cadastral_maps;
+CREATE POLICY "Users can access village cadastral maps from their surveys" ON village_cadastral_maps
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_cadastral_maps.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can access village map points from their surveys" ON village_map_points;
+CREATE POLICY "Users can access village map points from their surveys" ON village_map_points
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_map_points.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can access village forest maps from their surveys" ON village_forest_maps;
+CREATE POLICY "Users can access village forest maps from their surveys" ON village_forest_maps
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_forest_maps.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can access village infrastructure details from their surveys" ON village_infrastructure_details;
+CREATE POLICY "Users can access village infrastructure details from their surveys" ON village_infrastructure_details
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_infrastructure_details.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can access village infrastructure from their surveys" ON village_infrastructure;
+CREATE POLICY "Users can access village infrastructure from their surveys" ON village_infrastructure
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_infrastructure.session_id
+            AND surveyor_email = auth.jwt() ->> 'email'
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can access village irrigation facilities from their surveys" ON village_irrigation_facilities;
+CREATE POLICY "Users can access village irrigation facilities from their surveys" ON village_irrigation_facilities
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM village_survey_sessions
+            WHERE session_id = village_irrigation_facilities.session_id
             AND surveyor_email = auth.jwt() ->> 'email'
         )
     );

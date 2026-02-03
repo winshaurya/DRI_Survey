@@ -1,9 +1,11 @@
 
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../providers/survey_provider.dart';
 
-class FolkloreMedicinePage extends StatefulWidget {
+class FolkloreMedicinePage extends ConsumerStatefulWidget {
   final Map<String, dynamic> pageData;
   final Function(Map<String, dynamic>) onDataChanged;
 
@@ -14,10 +16,10 @@ class FolkloreMedicinePage extends StatefulWidget {
   });
 
   @override
-  State<FolkloreMedicinePage> createState() => _FolkloreMedicinePageState();
+  ConsumerState<FolkloreMedicinePage> createState() => _FolkloreMedicinePageState();
 }
 
-class _FolkloreMedicinePageState extends State<FolkloreMedicinePage> {
+class _FolkloreMedicinePageState extends ConsumerState<FolkloreMedicinePage> {
   final List<Map<String, dynamic>> _folkloreMedicines = [];
   final _formKey = GlobalKey<FormState>();
 
@@ -49,22 +51,48 @@ class _FolkloreMedicinePageState extends State<FolkloreMedicinePage> {
   }
 
   void _loadFamilyMembers() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final familyMembersData = widget.pageData['family_members'] as List<dynamic>? ?? [];
+    // Try to get family members from pageData first, then fallback to provider
+    List<dynamic> familyMembersData = [];
+    
+    if (widget.pageData['family_members'] != null) {
+      familyMembersData = widget.pageData['family_members'] as List<dynamic>;
+    } else {
+      final surveyData = ref.read(surveyProvider).surveyData;
+      familyMembersData = surveyData['family_members'] as List<dynamic>? ?? [];
+    }
 
-      if (familyMembersData.isNotEmpty && mounted) {
-        final members = familyMembersData
-            .map((member) => member['name'] as String)
-            .where((name) => name.isNotEmpty)
-            .toList();
+    if (familyMembersData.isNotEmpty) {
+      final members = familyMembersData
+          .map((member) {
+            if (member is Map) {
+              return member['name']?.toString() ?? '';
+            }
+            return '';
+          })
+          .where((name) => name.isNotEmpty)
+          .toList();
 
-        if (_familyMembers != members) {
-          setState(() {
-            _familyMembers = members;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _familyMembers = members;
+        });
       }
-    });
+    }
+  }
+  
+  @override
+  void didUpdateWidget(covariant FolkloreMedicinePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      final existingData = widget.pageData['folklore_medicines'] as List<dynamic>?;
+      if (existingData != null) {
+        setState(() {
+          _folkloreMedicines.clear();
+          _folkloreMedicines.addAll(existingData.map((item) => Map<String, dynamic>.from(item)));
+        });
+      }
+      _loadFamilyMembers();
+    }
   }
 
   void _addFolkloreMedicine() {

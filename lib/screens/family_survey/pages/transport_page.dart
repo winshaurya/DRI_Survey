@@ -36,6 +36,21 @@ class _TransportPageState extends State<TransportPage> {
     _bullockCart = widget.pageData['bullock_cart'] ?? false;
   }
 
+  @override
+  void didUpdateWidget(covariant TransportPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      setState(() {
+        _carJeep = widget.pageData['car_jeep'] ?? false;
+        _motorcycleScooter = widget.pageData['motorcycle_scooter'] ?? false;
+        _eRickshaw = widget.pageData['e_rickshaw'] ?? false;
+        _cycle = widget.pageData['cycle'] ?? false;
+        _pickupTruck = widget.pageData['pickup_truck'] ?? false;
+        _bullockCart = widget.pageData['bullock_cart'] ?? false;
+      });
+    }
+  }
+
   void _updateData() {
     final data = {
       'car_jeep': _carJeep,

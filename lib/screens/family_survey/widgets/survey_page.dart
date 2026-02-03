@@ -74,6 +74,13 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
     });
   }
 
+  // Helper to update both local state and provider immediately
+  void _updateData(Map<String, dynamic> data) {
+    setState(() => _pageData.addAll(data));
+    // Critical: Update global provider immediately so navigation/save works correctly
+    ref.read(surveyProvider.notifier).updateSurveyDataMap(data);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -154,67 +161,67 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
   Widget _buildPageContent(int pageIndex, AppLocalizations l10n, double fontScale, WidgetRef ref) {
     switch (pageIndex) {
       case 0:
-        return LocationPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return LocationPage(pageData: _pageData, onDataChanged: _updateData);
       case 1:
-        return FamilyDetailsPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return FamilyDetailsPage(pageData: _pageData, onDataChanged: _updateData);
       case 2:
-        return SocialConsciousnessPage1(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return SocialConsciousnessPage1(pageData: _pageData, onDataChanged: _updateData);
       case 3:
-        return SocialConsciousnessPage2(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return SocialConsciousnessPage2(pageData: _pageData, onDataChanged: _updateData);
       case 4:
-        return SocialConsciousnessPage3(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return SocialConsciousnessPage3(pageData: _pageData, onDataChanged: _updateData);
       case 5:
-        return LandHoldingPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return LandHoldingPage(pageData: _pageData, onDataChanged: _updateData);
       case 6:
-        return IrrigationPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return IrrigationPage(pageData: _pageData, onDataChanged: _updateData);
       case 7:
-        return CropProductivityPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return CropProductivityPage(pageData: _pageData, onDataChanged: _updateData);
       case 8:
-        return FertilizerPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return FertilizerPage(pageData: _pageData, onDataChanged: _updateData);
       case 9:
-        return AnimalsPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return AnimalsPage(pageData: _pageData, onDataChanged: _updateData);
       case 10:
-        return EquipmentPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return EquipmentPage(pageData: _pageData, onDataChanged: _updateData);
       case 11:
-        return EntertainmentPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return EntertainmentPage(pageData: _pageData, onDataChanged: _updateData);
       case 12:
-        return TransportPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return TransportPage(pageData: _pageData, onDataChanged: _updateData);
       case 13:
-        return WaterSourcesPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return WaterSourcesPage(pageData: _pageData, onDataChanged: _updateData);
       case 14:
-        return MedicalPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return MedicalPage(pageData: _pageData, onDataChanged: _updateData);
       case 15:
-        return DisputesPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return DisputesPage(pageData: _pageData, onDataChanged: _updateData);
       case 16:
-        return HouseConditionsPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return HouseConditionsPage(pageData: _pageData, onDataChanged: _updateData);
       case 17:
-        return DiseasesPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return DiseasesPage(pageData: _pageData, onDataChanged: _updateData);
       case 18:
-        return GovernmentSchemesPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return GovernmentSchemesPage(pageData: _pageData, onDataChanged: _updateData);
       case 19:
-        return FolkloreMedicinePage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return FolkloreMedicinePage(pageData: _pageData, onDataChanged: _updateData);
       case 20:
-        return HealthProgrammePage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return HealthProgrammePage(pageData: _pageData, onDataChanged: _updateData);
       case 21:
-        return ChildrenPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return ChildrenPage(pageData: _pageData, onDataChanged: _updateData);
       case 22:
-        return MigrationPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return MigrationPage(pageData: _pageData, onDataChanged: _updateData);
       case 23:
-        return TrainingPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return TrainingPage(pageData: _pageData, onDataChanged: _updateData);
       case 24:
-        return VBGBeneficiaryPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return VBGBeneficiaryPage(pageData: _pageData, onDataChanged: _updateData);
       case 25:
-        return PMKisanSammanNidhiPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return PMKisanSammanNidhiPage(pageData: _pageData, onDataChanged: _updateData);
       case 26:
-        return KisanCreditCardPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return KisanCreditCardPage(pageData: _pageData, onDataChanged: _updateData);
       case 27:
-        return SwachhBharatMissionPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return SwachhBharatMissionPage(pageData: _pageData, onDataChanged: _updateData);
       case 28:
-        return FasalBimaPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return FasalBimaPage(pageData: _pageData, onDataChanged: _updateData);
       case 29:
-        return BankAccountPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return BankAccountPage(pageData: _pageData, onDataChanged: _updateData);
       case 30:
-        return SurveyPreviewPage(pageData: _pageData, onDataChanged: (data) => setState(() => _pageData.addAll(data)));
+        return SurveyPreviewPage(pageData: _pageData, onDataChanged: _updateData);
       default:
         return const Center(child: Text('Page not found'));
     }

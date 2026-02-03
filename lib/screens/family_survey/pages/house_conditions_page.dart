@@ -49,6 +49,14 @@ class _HouseConditionsPageState extends State<HouseConditionsPage> {
     _initializeData();
   }
 
+  @override
+  void didUpdateWidget(covariant HouseConditionsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageData != oldWidget.pageData) {
+      _initializeData();
+    }
+  }
+
   void _initializeData() {
     _katchaHouse = widget.pageData['katcha_house'] ?? false;
     _pakkaHouse = widget.pageData['pakka_house'] ?? false;
