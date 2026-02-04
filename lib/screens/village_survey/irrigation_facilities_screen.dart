@@ -94,7 +94,7 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
         border: Border.all(color: Colors.grey.shade300),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: Offset(0, 2),
           ),
@@ -229,7 +229,7 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
             decoration: BoxDecoration(
               color: Color(0xFFE6E6FA),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
+              border: Border.all(color: Color(0xFF800080).withValues(alpha: 0.3)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

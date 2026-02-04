@@ -448,7 +448,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
     // Map page numbers to database tables and save accordingly
     switch (page) {
       case 0: // Location page
-        await _databaseService.saveData('survey_sessions', {
+        await _databaseService.saveData('family_survey_sessions', {
           'phone_number': state.phoneNumber,
           'village_name': data['village_name'],
           'village_number': data['village_number'],
@@ -769,15 +769,12 @@ class SurveyNotifier extends Notifier<SurveyState> {
         }
         await _syncPageDataToSupabase(page, data);
         break;
-      case 23: // Malnutrition data
-        await _databaseService.saveData('malnutrition_data', {
-          'phone_number': state.phoneNumber,
-          ...data,
-        });
+      case 23: // Malnutrition data (handled in case 22 - children data)
+        // This case is a duplicate - malnourished children already saved in case 22
         await _syncPageDataToSupabase(page, data);
         break;
       case 24: // Migration
-        await _databaseService.saveData('migration', {
+        await _databaseService.saveData('migration_data', {
           'phone_number': state.phoneNumber,
           ...data,
         });
@@ -828,7 +825,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _syncPageDataToSupabase(page, data);
         break;
       case 28: // FPO membership
-        await _databaseService.saveData('fpo_membership', {
+        await _databaseService.saveData('fpo_members', {
           'phone_number': state.phoneNumber,
           ...data,
         });
@@ -847,7 +844,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _syncPageDataToSupabase(page, data);
         break;
       case 30: // Health programs
-        await _databaseService.saveData('health_programs', {
+        await _databaseService.saveData('health_programmes', {
           'phone_number': state.phoneNumber,
           ...data,
         });
@@ -860,11 +857,8 @@ class SurveyNotifier extends Notifier<SurveyState> {
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 32: // Tulsi plants
-        await _databaseService.saveData('tulsi_plants', {
-          'phone_number': state.phoneNumber,
-          ...data,
-        });
+      case 32: // Tulsi plants (Note: stored in house_facilities.tulsi_plants_available from page 16)
+        // Tulsi plants are part of house_facilities, already saved in page 16
         await _syncPageDataToSupabase(page, data);
         break;
     }

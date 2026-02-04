@@ -35,7 +35,7 @@ static Database? _database; // Added for database access
   Future<void> deleteSurveySession(String sessionId) async {
     final db = await database;
     await db.delete(
-      'survey_sessions',
+      'family_survey_sessions',
       where: 'phone_number = ?',
       whereArgs: [sessionId],
     );
@@ -44,7 +44,7 @@ static Database? _database; // Added for database access
   Future<int> createNewSurveyRecord(Map<String, dynamic> surveyData) async {
     final db = await database;
     return await db.insert(
-      'surveys',
+      'family_survey_sessions',
       surveyData,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -57,13 +57,13 @@ static Database? _database; // Added for database access
 
   Future<List<Map<String, dynamic>>> getAllSurveySessions() async {
     final db = await database;
-    return await db.query('survey_sessions', orderBy: 'created_at DESC');
+    return await db.query('family_survey_sessions', orderBy: 'created_at DESC');
   }
 
   Future<Map<String, dynamic>?> getSurveySession(String phoneNumber) async {
     final db = await database;
     final results = await db.query(
-      'survey_sessions',
+      'family_survey_sessions',
       where: 'phone_number = ?',
       whereArgs: [phoneNumber],
     );
@@ -73,10 +73,44 @@ static Database? _database; // Added for database access
   Future<void> updateSurveyStatus(String phoneNumber, String status) async {
     final db = await database;
     await db.update(
-      'survey_sessions',
-      {'status': status, 'updated_at': DateTime.now().toIso8601String()},
+      'family_survey_sessions',
+      {
+        'status': status,
+        'updated_at': DateTime.now().toIso8601String(),
+        'last_synced_at': status == 'completed' ? DateTime.now().toIso8601String() : null
+      },
       where: 'phone_number = ?',
       whereArgs: [phoneNumber],
+    );
+  }
+
+  Future<void> updateSurveySyncStatus(String phoneNumber, String syncStatus) async {
+    final db = await database;
+    // Update family_survey_sessions with sync status
+    await db.update(
+      'family_survey_sessions',
+      {
+        'status': syncStatus,
+        'last_synced_at': syncStatus == 'synced' ? DateTime.now().toIso8601String() : null,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'phone_number = ?',
+      whereArgs: [phoneNumber],
+    );
+  }
+
+  Future<void> updateVillageSurveySyncStatus(String sessionId, String syncStatus) async {
+    final db = await database;
+    // Update village_survey_sessions with sync status
+    await db.update(
+      'village_survey_sessions',
+      {
+        'status': syncStatus,
+        'last_synced_at': syncStatus == 'synced' ? DateTime.now().toIso8601String() : null,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
     );
   }
 
@@ -91,6 +125,24 @@ static Database? _database; // Added for database access
       tableName,
       where: 'phone_number = ?',
       whereArgs: [phoneNumber],
+    );
+  }
+
+  // Get all unsynced family surveys for sync operations
+  Future<List<Map<String, dynamic>>> getUnsyncedFamilySurveys() async {
+    final db = await database;
+    return await db.query(
+      'family_survey_sessions',
+      where: 'last_synced_at IS NULL OR status != "synced"',
+    );
+  }
+
+  // Get unsynced village surveys
+  Future<List<Map<String, dynamic>>> getUnsyncedVillageSurveys() async {
+    final db = await database;
+    return await db.query(
+      'village_survey_sessions',
+      where: 'last_synced_at IS NULL OR status != "synced"',
     );
   }
 

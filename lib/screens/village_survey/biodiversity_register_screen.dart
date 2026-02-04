@@ -448,7 +448,7 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(10), // Reduced from 12
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
+                        border: Border.all(color: Color(0xFF800080).withValues(alpha: 0.3)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

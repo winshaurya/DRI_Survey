@@ -94,19 +94,19 @@ class SyncService {
 
   Future<List<Map<String, dynamic>>> _getPendingSurveys() async {
     try {
-      // Get surveys that haven't been synced to Supabase yet
       final allSurveys = await _databaseService.getAllSurveySessions();
-      final pendingSurveys = <Map<String, dynamic>>[];
-
-      for (final survey in allSurveys) {
-        // Check if survey exists in Supabase
-        final existsInSupabase = await _checkSurveyExistsInSupabase(survey['phone_number']);
-        if (!existsInSupabase) {
-          pendingSurveys.add(survey);
+      
+      return allSurveys.where((survey) {
+        final phoneNumber = survey['phone_number']?.toString();
+        // 1. Must have a valid primary key (phone_number)
+        if (phoneNumber == null || phoneNumber.isEmpty) {
+          return false;
         }
-      }
 
-      return pendingSurveys;
+        // 2. Sync if status is NOT 'synced' (pending, failed, null)
+        final status = survey['sync_status'];
+        return status != 'synced';
+      }).toList();
     } catch (e) {
       debugPrint('Error getting pending surveys: $e');
       return [];
@@ -116,17 +116,18 @@ class SyncService {
   Future<List<Map<String, dynamic>>> _getPendingVillageSurveys() async {
     try {
       final allSurveys = await _databaseService.getAllVillageSurveySessions();
-      final pendingSurveys = <Map<String, dynamic>>[];
-
-      for (final survey in allSurveys) {
-        // Check if survey exists in Supabase
-        final existsInSupabase = await _checkVillageSurveyExistsInSupabase(survey['session_id']);
-        if (!existsInSupabase) {
-          pendingSurveys.add(survey);
+      
+      return allSurveys.where((survey) {
+        final sessionId = survey['session_id']?.toString();
+        // 1. Must have a valid primary key (session_id)
+        if (sessionId == null || sessionId.isEmpty) {
+          return false;
         }
-      }
 
-      return pendingSurveys;
+        // 2. Sync if status is NOT 'synced' (pending, failed, null)
+        final status = survey['sync_status'];
+        return status != 'synced';
+      }).toList();
     } catch (e) {
       debugPrint('Error getting pending village surveys: $e');
       return [];
@@ -171,8 +172,21 @@ class SyncService {
     try {
       final phoneNumber = survey['phone_number'];
 
+      // CRITICAL FIX: Validate local save BEFORE syncing to cloud
+      final localSessionData = await _databaseService.getSurveySession(phoneNumber);
+      if (localSessionData == null) {
+        debugPrint('⚠ WARNING: Survey $phoneNumber not found locally. Skipping cloud sync.');
+        return; // Data not saved locally, don't sync yet
+      }
+
       // Collect all survey data
       final surveyData = await _collectCompleteSurveyData(phoneNumber);
+
+      // Verify critical data exists before syncing
+      if (surveyData.isEmpty || surveyData['phone_number'] == null) {
+        debugPrint('✗ ERROR: Survey data incomplete for $phoneNumber. Not syncing.');
+        return;
+      }
 
       // Sync to Supabase with transaction
       await _supabaseService.syncFamilySurveyToSupabase(phoneNumber, surveyData);
@@ -183,10 +197,10 @@ class SyncService {
       // Update local sync metadata
       await _updateSyncMetadata(phoneNumber, surveyData);
 
-      debugPrint('Successfully synced survey: $phoneNumber');
+      debugPrint('✓ Successfully synced survey: $phoneNumber');
 
     } catch (e) {
-      debugPrint('Failed to sync survey ${survey['phone_number']}: $e');
+      debugPrint('✗ Failed to sync survey ${survey['phone_number']}: $e');
       // Queue for retry
       await queueSyncOperation('sync_survey', survey);
     }
@@ -198,21 +212,38 @@ class SyncService {
     try {
       final sessionId = survey['session_id'];
 
+      // CRITICAL FIX: Validate local save BEFORE syncing to cloud
+      final localSessionData = await _databaseService.getVillageSurveySession(sessionId);
+      if (localSessionData == null) {
+        debugPrint('⚠ WARNING: Village survey $sessionId not found locally. Skipping cloud sync.');
+        return;
+      }
+
       // Collect all survey data
       final surveyData = await _collectCompleteVillageSurveyData(sessionId);
+
+      // Verify critical data exists before syncing
+      if (surveyData.isEmpty || surveyData['session_id'] == null) {
+        debugPrint('✗ ERROR: Village survey data incomplete for $sessionId. Not syncing.');
+        return;
+      }
 
       // Sync to Supabase
       await _supabaseService.syncVillageSurveyToSupabase(sessionId, surveyData);
 
-      // Not marking as synced locally in separate field for now as we just check existence, 
-      // but ideally we should update a synced flag. Or simply rely on existence check.
-      debugPrint('Successfully synced village survey: $sessionId');
+      // Mark as synced locally
+      await _markVillageSurveyAsSynced(sessionId);
+
+      debugPrint('✓ Successfully synced village survey: $sessionId');
 
     } catch (e) {
-      debugPrint('Failed to sync village survey ${survey['session_id']}: $e');
-      // Queue for retry - reusing queueSyncOperation which might need adjustment or a new type
-      // await queueSyncOperation('sync_village_survey', survey); 
+      debugPrint('✗ Failed to sync village survey ${survey['session_id']}: $e');
+      await queueSyncOperation('sync_village_survey', survey); 
     }
+  }
+
+  Future<void> _markVillageSurveyAsSynced(String sessionId) async {
+    await _databaseService.updateVillageSurveySyncStatus(sessionId, 'synced');
   }
 
   Future<Map<String, dynamic>> _collectCompleteVillageSurveyData(String sessionId) async {
@@ -256,6 +287,15 @@ class SyncService {
       'village_traditional_occupations',
       'village_drainage_waste',
       'village_signboards',
+      'village_infrastructure',
+      'village_infrastructure_details',
+      'village_survey_details',
+      'village_map_points',
+      'village_forest_maps',
+      'village_cadastral_maps',
+      'village_unemployment',
+      'village_social_maps',
+      'village_transport_facilities',
     ];
 
     for (final table in tables) {
@@ -324,13 +364,12 @@ class SyncService {
       'folklore_medicine': 'folklore_medicine',
       'health_programmes': 'health_programmes',
       'malnutrition_data': 'malnutrition_data',
-      'migration_data': 'migration',
-      'training_data': 'training',
+      'migration_data': 'migration_data',
+      'training_data': 'training_data',
       'self_help_groups': 'self_help_groups',
-      'fpo_members': 'fpo_membership',
+      'fpo_members': 'fpo_members',
       'bank_accounts': 'bank_accounts',
-      'tulsi_plants': 'tulsi_plants',
-      'nutritional_garden': 'nutritional_garden',
+      // Note: tulsi_plants and nutritional_garden are stored in house_facilities table
     };
 
     for (final entry in dataMappings.entries) {
@@ -376,11 +415,7 @@ class SyncService {
   }
 
   Future<void> _markSurveyAsSynced(String phoneNumber) async {
-    await _databaseService.saveData('survey_sessions', {
-      'phone_number': phoneNumber,
-      'sync_status': 'synced',
-      'last_synced_at': DateTime.now().toIso8601String(),
-    });
+    await _databaseService.updateSurveySyncStatus(phoneNumber, 'synced');
   }
 
 
@@ -473,6 +508,9 @@ class SyncService {
       case 'sync_survey':
         await _syncSurveyToSupabase(data);
         break;
+      case 'sync_village_survey':
+        await _syncVillageSurveyToSupabase(data);
+        break;
       case 'update_survey_data':
         await _supabaseService.syncFamilySurveyToSupabase(data['phone_number'], data);
         break;
@@ -502,6 +540,18 @@ class SyncService {
     final survey = await _databaseService.getSurveySession(phoneNumber);
     if (survey != null) {
       await _syncSurveyToSupabase(survey);
+    }
+  }
+
+  Future<void> syncVillageSurveyImmediately(String sessionId) async {
+     if (!_isOnline) {
+      await queueSyncOperation('sync_village_survey', {'session_id': sessionId});
+      return;
+    }
+    
+    final survey = await _databaseService.getVillageSurveySession(sessionId);
+    if (survey != null) {
+      await _syncVillageSurveyToSupabase(survey);
     }
   }
 

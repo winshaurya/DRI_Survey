@@ -109,15 +109,14 @@ class SupabaseService {
       await _syncMalnutritionData(phoneNumber, surveyData['malnutrition_data']);
       await _syncMigration(phoneNumber, surveyData['migration']);
       await _syncTraining(phoneNumber, surveyData['training']);
-      await _syncSelfHelpGroups(phoneNumber, surveyData['self_help_groups']);
-      await _syncFpoMembership(phoneNumber, surveyData['fpo_membership']);
+      await _syncSelfHelpGroups(phoneNumber, surveyData['shg_entries']);
+      await _syncFpoMembership(phoneNumber, surveyData['fpo_entries']);
       await _syncBankAccounts(phoneNumber, surveyData['bank_accounts']);
       await _syncSocialConsciousness(phoneNumber, surveyData['social_consciousness']);
       await _syncTribalQuestions(phoneNumber, surveyData['tribal_questions']);
       await _syncHealthPrograms(phoneNumber, surveyData['health_programmes']);
       await _syncFolkloreMedicine(phoneNumber, surveyData['folklore_medicine']);
-      await _syncTulsiPlants(phoneNumber, surveyData['tulsi_plants']);
-      await _syncNutritionalGarden(phoneNumber, surveyData['nutritional_garden']);
+      // Note: tulsi_plants and nutritional_garden are stored in house_facilities table (synced via _syncHouseFacilities)
 
     } catch (e) {
       throw Exception('Failed to sync family survey to Supabase: $e');
@@ -338,15 +337,6 @@ await client.from('drinking_water_sources').upsert({
     await client.from('health_programmes').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncTulsiPlants(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await client.from('tulsi_plants').upsert({...data, 'phone_number': phoneNumber});
-  }
-
-  Future<void> _syncNutritionalGarden(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await client.from('nutritional_garden').upsert({...data, 'phone_number': phoneNumber});
-  }
 
   // Government scheme helper methods
   Future<void> _syncAadhaarInfo(String phoneNumber, Map<String, dynamic>? data) async {
@@ -681,7 +671,7 @@ await client.from('drinking_water_sources').upsert({
     final childTables = [
       'village_population', 'village_farm_families', 'village_housing',
       'village_agricultural_implements', 'village_crop_productivity', 'village_animals',
-      'vile fillelage_irrigation_facilities', 'village_drinking_water', 'village_transport',
+      'village_irrigation_facilities', 'village_drinking_water', 'village_transport',
       'village_entertainment', 'village_medical_treatment', 'village_disputes',
       'village_educational_facilities', 'village_social_consciousness',
       'village_children_data', 'village_malnutrition_data', 'village_bpl_families',

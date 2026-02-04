@@ -360,7 +360,7 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.9),
+                        color: Colors.orange.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -380,7 +380,7 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.9),
+                        color: Colors.green.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -400,7 +400,7 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.9),
+                        color: Colors.red.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(

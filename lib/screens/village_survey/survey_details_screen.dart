@@ -120,7 +120,7 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
           Container(
             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Color(0xFF800080).withOpacity(0.1),
+              color: Color(0xFF800080).withValues(alpha: 0.1),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(6),
                 topRight: Radius.circular(6),

@@ -6,6 +6,7 @@ import '../../form_template.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
 import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 import 'educational_facilities_screen.dart';
 
 class InfrastructureAvailabilityScreen extends StatefulWidget {
@@ -103,11 +104,8 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
     try {
       await DatabaseHelper().insert('village_infrastructure_details', data);
       
-      try {
-        await supabaseService.saveVillageData('village_infrastructure_details', data);
-      } catch (e) {
-        print('Supabase sync warning: $e');
-      }
+      // Trigger background sync immediately
+      SyncService.instance.syncVillageSurveyImmediately(sessionId);
 
       if (mounted) {
         Navigator.push(
@@ -122,6 +120,7 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => EducationalFacilitiesScreen()),
+
         );
       }
     }
