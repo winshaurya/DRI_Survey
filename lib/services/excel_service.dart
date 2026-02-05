@@ -4,6 +4,8 @@ import 'package:excel/excel.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
+import '../database/database_helper.dart';
+import '../services/database_service.dart';
 
 class ExcelService {
   static final ExcelService _instance = ExcelService._internal();
@@ -14,12 +16,15 @@ class ExcelService {
 
   ExcelService._internal();
 
+  final DatabaseService _databaseService = DatabaseService();
+
   // Cell Styles
   final CellStyle _headerStyle = CellStyle(
     bold: true,
+    fontSize: 14,
     horizontalAlign: HorizontalAlign.Center,
     verticalAlign: VerticalAlign.Center,
-    backgroundColorHex: ExcelColor.fromHexString('#D3D3D3'), // Light Grey
+    backgroundColorHex: ExcelColor.fromHexString('#D3D3D3'),
     fontFamily: getFontFamily(FontFamily.Arial),
   );
 
@@ -27,86 +32,251 @@ class ExcelService {
     bold: true,
     horizontalAlign: HorizontalAlign.Left,
     verticalAlign: VerticalAlign.Center,
-    backgroundColorHex: ExcelColor.fromHexString('#EFEFEF'), // Lighter Grey
+    backgroundColorHex: ExcelColor.fromHexString('#EFEFEF'),
     fontFamily: getFontFamily(FontFamily.Arial),
   );
 
   final CellStyle _labelStyle = CellStyle(
     bold: true,
     horizontalAlign: HorizontalAlign.Left,
-     verticalAlign: VerticalAlign.Center,
+    verticalAlign: VerticalAlign.Center,
   );
 
-   final CellStyle _valueStyle = CellStyle(
+  final CellStyle _valueStyle = CellStyle(
     horizontalAlign: HorizontalAlign.Left,
-     verticalAlign: VerticalAlign.Center,
-     textWrapping: TextWrapping.WrapText,
+    verticalAlign: VerticalAlign.Center,
+    textWrapping: TextWrapping.WrapText,
   );
-  
+
+  final CellStyle _tableHeaderStyle = CellStyle(
+    bold: true,
+    horizontalAlign: HorizontalAlign.Left,
+    verticalAlign: VerticalAlign.Center,
+    backgroundColorHex: ExcelColor.fromHexString('#F0F0F0'),
+  );
+
   // Track current row index manually to stack tables
   int _rowIndex = 0;
 
+  /// Export complete survey data from SQLite to Excel
+  Future<void> exportCompleteSurveyToExcel(String phoneNumber) async {
+    try {
+      // Fetch ALL data from SQLite
+      final surveyData = await fetchCompleteSurveyData(phoneNumber);
+
+      if (surveyData.isEmpty) {
+        throw Exception('No survey data found for phone number: $phoneNumber');
+      }
+
+      var excel = Excel.createExcel();
+      String sheetName = 'Complete Survey Report';
+      if (excel.sheets.containsKey('Sheet1')) {
+        excel.rename('Sheet1', sheetName);
+      }
+
+      Sheet sheet = excel[sheetName];
+      _rowIndex = 0; // Reset row index
+
+      // Create comprehensive report
+      await createComprehensiveReport(sheet, surveyData);
+
+      // Save file
+      await _saveExcelFile(excel, 'complete_survey_${phoneNumber}_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+
+    } catch (e) {
+      throw Exception('Failed to export complete survey: $e');
+    }
+  }
+
+  /// Fetch ALL survey data from SQLite database
+  Future<Map<String, dynamic>> fetchCompleteSurveyData(String phoneNumber) async {
+    final data = <String, dynamic>{};
+    final missingTables = <String>[];
+    final errorTables = <String, String>{};
+
+    try {
+      // 1. Get main survey session data
+      final sessionData = await _databaseService.getSurveySession(phoneNumber);
+      if (sessionData != null) {
+        data.addAll(sessionData);
+      } else {
+        throw Exception('Survey session not found for phone: $phoneNumber');
+      }
+
+      // 2. Get all related data tables
+      final dataMappings = {
+        'family_members': 'family_members',
+        'land_holding': 'land_holding',
+        'irrigation_facilities': 'irrigation_facilities',
+        'crop_productivity': 'crop_productivity',
+        'fertilizer_usage': 'fertilizer_usage',
+        'animals': 'animals',
+        'agricultural_equipment': 'agricultural_equipment',
+        'entertainment_facilities': 'entertainment_facilities',
+        'transport_facilities': 'transport_facilities',
+        'drinking_water_sources': 'drinking_water_sources',
+        'medical_treatment': 'medical_treatment',
+        'disputes': 'disputes',
+        'house_conditions': 'house_conditions',
+        'house_facilities': 'house_facilities',
+        'diseases': 'diseases',
+        'social_consciousness': 'social_consciousness',
+        'children_data': 'children_data',
+        'malnourished_children_data': 'malnourished_children_data',
+        'child_diseases': 'child_diseases',
+        'folklore_medicine': 'folklore_medicine',
+        'health_programmes': 'health_programmes',
+        'migration_data': 'migration_data',
+        'training_data': 'training_data',
+        'shg_members': 'shg_members',
+        'fpo_members': 'fpo_members',
+        'bank_accounts': 'bank_accounts',
+        'tulsi_plants': 'tulsi_plants',
+        'nutritional_garden': 'nutritional_garden',
+        'malnutrition_data': 'malnutrition_data',
+      };
+
+      for (final entry in dataMappings.entries) {
+        try {
+          final tableData = await _databaseService.getData(entry.key, phoneNumber);
+          if (tableData.isNotEmpty) {
+            data[entry.value] = tableData;
+          } else {
+            missingTables.add(entry.key);
+          }
+        } catch (e) {
+          errorTables[entry.key] = e.toString();
+          print('⚠ Warning: Could not fetch data from ${entry.key}: $e');
+        }
+      }
+
+      // 3. Get government schemes data
+      await _fetchGovernmentSchemesData(phoneNumber, data);
+
+      // Log summary
+      if (missingTables.isNotEmpty) {
+        print('ℹ Info: Empty tables for $phoneNumber: ${missingTables.join(", ")}');
+      }
+      if (errorTables.isNotEmpty) {
+        print('⚠ Warning: Failed to fetch ${errorTables.length} tables for $phoneNumber');
+        errorTables.forEach((table, error) {
+          print('  ✗ $table: $error');
+        });
+      }
+
+      // Store metadata about data completeness
+      data['_export_metadata'] = {
+        'export_timestamp': DateTime.now().toIso8601String(),
+        'missing_tables_count': missingTables.length,
+        'error_tables_count': errorTables.length,
+        'total_tables_attempted': dataMappings.length,
+        'data_completeness_percentage': 
+            ((dataMappings.length - missingTables.length - errorTables.length) / dataMappings.length * 100).toStringAsFixed(1),
+      };
+
+    } catch (e) {
+      print('✗ Error fetching complete survey data: $e');
+      throw Exception('Failed to fetch survey data: $e');
+    }
+
+    return data;
+  }
+
+  /// Fetch all government schemes data
+  Future<void> _fetchGovernmentSchemesData(String phoneNumber, Map<String, dynamic> data) async {
+    final schemeTables = [
+      'aadhaar_info', 'aadhaar_scheme_members',
+      'ayushman_card', 'ayushman_scheme_members',
+      'family_id', 'family_id_scheme_members',
+      'ration_card', 'ration_scheme_members',
+      'samagra_id', 'samagra_scheme_members',
+      'tribal_card', 'tribal_scheme_members',
+      'handicapped_allowance', 'handicapped_scheme_members',
+      'pension_allowance', 'pension_scheme_members',
+      'widow_allowance', 'widow_scheme_members',
+      'vb_gram', 'vb_gram_members',
+      'pm_kisan_nidhi', 'pm_kisan_members',
+      'merged_govt_schemes',
+    ];
+
+    for (final table in schemeTables) {
+      final tableData = await _databaseService.getData(table, phoneNumber);
+      if (tableData.isNotEmpty) {
+        data[table] = tableData;
+      }
+    }
+  }
+
+  /// Create comprehensive Excel report
+  Future<void> createComprehensiveReport(Sheet sheet, Map<String, dynamic> data) async {
+    // Set column widths dynamically based on content (more columns supported)
+    for (int i = 0; i < 15; i++) {
+      double width = 20; // Default width
+      if (i == 0) width = 30; // First column wider for labels
+      sheet.setColumnWidth(i, width);
+    }
+
+    // 1. Report Header
+    _addReportHeader(sheet, data);
+
+    // 2. Family Members
+    _addFamilyMembersSection(sheet, data);
+
+    // 3. Agriculture & Land
+    _addAgricultureSection(sheet, data);
+
+    // 4. Livestock & Equipment
+    _addLivestockSection(sheet, data);
+
+    // 5. Health Information
+    _addHealthSection(sheet, data);
+
+    // 6. Government Schemes & Benefits
+    _addGovernmentSchemesSection(sheet, data);
+
+    // 7. Social Consciousness
+    _addSocialConsciousnessSection(sheet, data);
+
+    // 8. Training & Groups
+    _addTrainingSection(sheet, data);
+
+    // 9. Financial Information
+    _addFinancialSection(sheet, data);
+
+    // 10. Infrastructure & Facilities
+    _addInfrastructureSection(sheet, data);
+
+    // 11. Other Information
+    _addOtherInformationSection(sheet, data);
+  }
+
+  /// Legacy method for backward compatibility
   Future<void> exportSurveyToExcel(Map<String, dynamic> surveyData) async {
+    // If phone number is available, use the new comprehensive method
+    if (surveyData['phone_number'] != null) {
+      await exportCompleteSurveyToExcel(surveyData['phone_number']);
+      return;
+    }
+
+    // Otherwise use the old method
     var excel = Excel.createExcel();
-    
-    // Rename default sheet or use a new one
     String sheetName = 'Survey Report';
     if (excel.sheets.containsKey('Sheet1')) {
       excel.rename('Sheet1', sheetName);
-    } 
-    
+    }
+
     Sheet sheet = excel[sheetName];
-    _rowIndex = 0; // Reset row index
+    _rowIndex = 0;
 
-    // --- 1. Report Header (Location Info) ---
     _addReportHeader(sheet, surveyData);
-    
-    // --- 2. Family Members ---
     _addFamilySection(sheet, surveyData);
-    
-    // --- 3. Agriculture ---
     _addAgricultureSection(sheet, surveyData);
-    
-    // 4. Livestock & Assets
     _addLivestockSection(sheet, surveyData);
-    
-    // 5. Health Details
     _addHealthSection(sheet, surveyData);
-    
-    // 6. Social Schemes
     _addSchemesSection(sheet, surveyData);
-
-    // 7. Other Details
     _addOtherSection(sheet, surveyData);
 
-    // Save
-    var fileBytes = excel.save();
-    if (fileBytes == null) return;
-    Uint8List data = Uint8List.fromList(fileBytes);
-
-    String fileName = 'survey_${surveyData['village_name'] ?? 'export'}_${surveyData['head_of_family'] ?? 'family'}.xlsx';
-    
-    if (Platform.isAndroid || Platform.isIOS) {
-       await FilePicker.platform.saveFile(
-        dialogTitle: 'Save Survey Report',
-        fileName: fileName,
-        bytes: data,
-      );
-    } else {
-      String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save Survey Report',
-        fileName: fileName,
-      );
-
-      if (outputFile != null) {
-        if (!outputFile.endsWith('.xlsx')) {
-          outputFile += '.xlsx';
-        }
-        File(outputFile)
-          ..createSync(recursive: true)
-          ..writeAsBytesSync(data);
-      }
-    }
+    await _saveExcelFile(excel, 'survey_${surveyData['village_name'] ?? 'export'}_${surveyData['head_of_family'] ?? 'family'}.xlsx');
   }
 
   // --- Helper Methods ---
@@ -407,5 +577,322 @@ class ExcelService {
        cell.cellStyle = _valueStyle;
     }
     _rowIndex++;
+  }
+
+  // --- New Comprehensive Section Methods ---
+
+  void _addFamilyMembersSection(Sheet sheet, Map<String, dynamic> data) {
+    _writeSectionHeader(sheet, "FAMILY MEMBERS DETAILS");
+
+    List<String> headers = ['Name', 'Relation', 'Age', 'Sex', 'Education', 'Occupation', 'Income'];
+    _writeTableHeader(sheet, headers);
+
+    if (data['family_members'] != null && data['family_members'] is List) {
+      for (var member in data['family_members']) {
+        List<CellValue> row = [
+          TextCellValue(member['name']?.toString() ?? ''),
+          TextCellValue(member['relationship_with_head']?.toString() ?? ''),
+          IntCellValue(int.tryParse(member['age']?.toString() ?? '0') ?? 0),
+          TextCellValue(member['sex']?.toString() ?? ''),
+          TextCellValue(member['educational_qualification']?.toString() ?? ''),
+          TextCellValue(member['occupation']?.toString() ?? ''),
+          DoubleCellValue(double.tryParse(member['income']?.toString() ?? '0') ?? 0.0),
+        ];
+        _writeTableRow(sheet, row);
+      }
+    }
+    _rowIndex++;
+  }
+
+  void _addGovernmentSchemesSection(Sheet sheet, Map<String, dynamic> data) {
+    _writeSectionHeader(sheet, "GOVERNMENT SCHEMES & BENEFITS");
+
+    // Aadhaar
+    _writeSchemeTable(sheet, "Aadhaar Cards", data['aadhaar_scheme_members']);
+
+    // Ayushman Bharat
+    _writeSchemeTable(sheet, "Ayushman Bharat", data['ayushman_scheme_members']);
+
+    // Family ID - THIS WAS MISSING!
+    _writeSchemeTable(sheet, "Family ID", data['family_id_scheme_members']);
+
+    // Ration Card
+    _writeSchemeTable(sheet, "Ration Card", data['ration_scheme_members']);
+
+    // Samagra ID
+    _writeSchemeTable(sheet, "Samagra ID", data['samagra_scheme_members']);
+
+    // Tribal Card
+    _writeSchemeTable(sheet, "Tribal Card", data['tribal_scheme_members']);
+
+    // Pension Schemes
+    _writeSchemeTable(sheet, "Pension Schemes", data['pension_scheme_members']);
+
+    // Widow Allowance
+    _writeSchemeTable(sheet, "Widow Allowance", data['widow_scheme_members']);
+
+    // Handicapped Allowance
+    _writeSchemeTable(sheet, "Handicapped Allowance", data['handicapped_scheme_members']);
+
+    // VB Gram - Fixed: use vb_gram main table (no vb_gram_members)
+    if (data['vb_gram'] != null && data['vb_gram'] is Map) {
+      _writeSubSectionHeader(sheet, "VB Gram Membership");
+      final vbGram = data['vb_gram'];
+      _writeKeyValuePair(sheet, "Is Member:", vbGram['is_member'] ?? '-');
+      _writeKeyValuePair(sheet, "Total Members:", vbGram['total_members'] ?? '-');
+    }
+
+    // PM Kisan Nidhi - Fixed: use pm_kisan_nidhi main table (no pm_kisan_members)
+    if (data['pm_kisan_nidhi'] != null && data['pm_kisan_nidhi'] is Map) {
+      _writeSubSectionHeader(sheet, "PM Kisan Nidhi");
+      final pmKisan = data['pm_kisan_nidhi'];
+      _writeKeyValuePair(sheet, "Is Beneficiary:", pmKisan['is_beneficiary'] ?? '-');
+      _writeKeyValuePair(sheet, "Total Members:", pmKisan['total_members'] ?? '-');
+    }
+  }
+
+  void _addSocialConsciousnessSection(Sheet sheet, Map<String, dynamic> data) {
+    _writeSectionHeader(sheet, "SOCIAL CONSCIOUSNESS");
+
+    if (data['social_consciousness'] != null && data['social_consciousness'] is Map) {
+      final sc = data['social_consciousness'];
+      _writeKeyValuePair(sheet, "Clothes Purchase Frequency:", sc['clothes_frequency']);
+      _writeKeyValuePair(sheet, "Food Waste Level:", sc['food_waste_amount']);
+      _writeKeyValuePair(sheet, "Waste Disposal Method:", sc['waste_disposal']);
+      _writeKeyValuePair(sheet, "Separate Waste Collection:", sc['separate_waste']);
+      _writeKeyValuePair(sheet, "LED Lights Usage:", sc['led_lights']);
+      _writeKeyValuePair(sheet, "Family Prayers:", sc['family_prayers']);
+      _writeKeyValuePair(sheet, "Family Meditation:", sc['family_meditation']);
+      _writeKeyValuePair(sheet, "Family Yoga:", sc['family_yoga']);
+      _writeKeyValuePair(sheet, "Addiction Issues:", _formatAddictions(sc));
+    }
+    _rowIndex++;
+  }
+
+  void _addTrainingSection(Sheet sheet, Map<String, dynamic> data) {
+    _writeSectionHeader(sheet, "TRAINING & GROUP MEMBERSHIPS");
+
+    // Training Data
+    _writeSubSectionHeader(sheet, "Training Programs");
+    List<String> trainingHeaders = ['Member Name', 'Training Topic', 'Duration', 'Date'];
+    _writeTableHeader(sheet, trainingHeaders);
+
+    if (data['training_data'] != null && data['training_data'] is List) {
+      for (var training in data['training_data']) {
+        _writeTableRow(sheet, [
+          TextCellValue(training['member_name']?.toString() ?? ''),
+          TextCellValue(training['training_topic']?.toString() ?? ''),
+          TextCellValue(training['training_duration']?.toString() ?? ''),
+          TextCellValue(training['training_date']?.toString() ?? ''),
+        ]);
+      }
+    }
+    _rowIndex++;
+
+    // SHG Members
+    _writeSubSectionHeader(sheet, "Self Help Group (SHG) Members");
+    List<String> shgHeaders = ['Member Name', 'SHG Name', 'Purpose', 'Monthly Saving'];
+    _writeTableHeader(sheet, shgHeaders);
+
+    if (data['shg_members'] != null && data['shg_members'] is List) {
+      for (var shg in data['shg_members']) {
+        _writeTableRow(sheet, [
+          TextCellValue(shg['member_name']?.toString() ?? ''),
+          TextCellValue(shg['shg_name']?.toString() ?? ''),
+          TextCellValue(shg['purpose']?.toString() ?? ''),
+          DoubleCellValue(double.tryParse(shg['monthly_saving']?.toString() ?? '0') ?? 0.0),
+        ]);
+      }
+    }
+    _rowIndex++;
+
+    // FPO Members
+    _writeSubSectionHeader(sheet, "Farmer Producer Organization (FPO) Members");
+    List<String> fpoHeaders = ['Member Name', 'FPO Name', 'Purpose', 'Share Capital'];
+    _writeTableHeader(sheet, fpoHeaders);
+
+    if (data['fpo_members'] != null && data['fpo_members'] is List) {
+      for (var fpo in data['fpo_members']) {
+        _writeTableRow(sheet, [
+          TextCellValue(fpo['member_name']?.toString() ?? ''),
+          TextCellValue(fpo['fpo_name']?.toString() ?? ''),
+          TextCellValue(fpo['purpose']?.toString() ?? ''),
+          DoubleCellValue(double.tryParse(fpo['share_capital']?.toString() ?? '0') ?? 0.0),
+        ]);
+      }
+    }
+    _rowIndex++;
+  }
+
+  void _addFinancialSection(Sheet sheet, Map<String, dynamic> data) {
+    _writeSectionHeader(sheet, "FINANCIAL INFORMATION");
+
+    // Bank Accounts
+    _writeSubSectionHeader(sheet, "Bank Accounts");
+    List<String> bankHeaders = ['Member Name', 'Account Number', 'Bank Name', 'IFSC Code'];
+    _writeTableHeader(sheet, bankHeaders);
+
+    if (data['bank_accounts'] != null && data['bank_accounts'] is List) {
+      for (var account in data['bank_accounts']) {
+        _writeTableRow(sheet, [
+          TextCellValue(account['member_name']?.toString() ?? ''),
+          TextCellValue(account['account_number']?.toString() ?? ''),
+          TextCellValue(account['bank_name']?.toString() ?? ''),
+          TextCellValue(account['ifsc_code']?.toString() ?? ''),
+        ]);
+      }
+    }
+    _rowIndex++;
+  }
+
+  void _addInfrastructureSection(Sheet sheet, Map<String, dynamic> data) {
+    _writeSectionHeader(sheet, "INFRASTRUCTURE & FACILITIES");
+
+    // House Conditions
+    _writeSubSectionHeader(sheet, "House Conditions");
+    if (data['house_conditions'] != null && data['house_conditions'] is Map) {
+      final house = data['house_conditions'];
+      _writeKeyValuePair(sheet, "House Type (Katcha/Pakka):", _formatHouseType(house));
+      _writeKeyValuePair(sheet, "Toilet Available:", house['toilet_in_use']);
+      _writeKeyValuePair(sheet, "Toilet Condition:", house['toilet_condition']);
+    }
+
+    // House Facilities
+    _writeSubSectionHeader(sheet, "House Facilities");
+    if (data['house_facilities'] != null && data['house_facilities'] is Map) {
+      final facilities = data['house_facilities'];
+      _writeKeyValuePair(sheet, "Electricity Connection:", facilities['electric_connection']);
+      _writeKeyValuePair(sheet, "LPG Gas:", facilities['lpg_gas']);
+      _writeKeyValuePair(sheet, "Biogas:", facilities['biogas']);
+      _writeKeyValuePair(sheet, "Solar Cooking:", facilities['solar_cooking']);
+      _writeKeyValuePair(sheet, "Nutritional Garden:", facilities['nutritional_garden_available']);
+      _writeKeyValuePair(sheet, "Tulsi Plants:", facilities['tulsi_plants_available']);
+    }
+
+    // Drinking Water
+    _writeSubSectionHeader(sheet, "Drinking Water Sources");
+    if (data['drinking_water_sources'] != null && data['drinking_water_sources'] is Map) {
+      final water = data['drinking_water_sources'];
+      _writeKeyValuePair(sheet, "Primary Source:", water['hand_pumps']);
+      _writeKeyValuePair(sheet, "Distance to Source:", water['hand_pumps_distance']);
+      _writeKeyValuePair(sheet, "Water Quality:", water['hand_pumps_quality']);
+    }
+
+    // Entertainment & Transport
+    _writeSubSectionHeader(sheet, "Entertainment & Transport");
+    if (data['entertainment_facilities'] != null && data['entertainment_facilities'] is Map) {
+      final entertainment = data['entertainment_facilities'];
+      _writeKeyValuePair(sheet, "Smart Mobile Phones:", entertainment['smart_mobile']);
+      _writeKeyValuePair(sheet, "Television:", entertainment['television']);
+      _writeKeyValuePair(sheet, "Radio:", entertainment['radio']);
+    }
+
+    if (data['transport_facilities'] != null && data['transport_facilities'] is Map) {
+      final transport = data['transport_facilities'];
+      _writeKeyValuePair(sheet, "Car/Jeep:", transport['car_jeep']);
+      _writeKeyValuePair(sheet, "Motorcycle/Scooter:", transport['motorcycle_scooter']);
+      _writeKeyValuePair(sheet, "Bullock Cart:", transport['bullock_cart']);
+    }
+
+    _rowIndex++;
+  }
+
+  void _addOtherInformationSection(Sheet sheet, Map<String, dynamic> data) {
+    _writeSectionHeader(sheet, "ADDITIONAL INFORMATION");
+
+    // Children Data
+    _writeSubSectionHeader(sheet, "Children Statistics");
+    if (data['children_data'] != null && data['children_data'] is Map) {
+      final children = data['children_data'];
+      _writeKeyValuePair(sheet, "Births (Last 3 Years):", children['births_last_3_years']);
+      _writeKeyValuePair(sheet, "Infant Deaths (Last 3 Years):", children['infant_deaths_last_3_years']);
+      _writeKeyValuePair(sheet, "Malnourished Children:", children['malnourished_children']);
+    }
+
+    // Migration
+    _writeSubSectionHeader(sheet, "Migration Data");
+    if (data['migration_data'] != null && data['migration_data'] is Map) {
+      final migration = data['migration_data'];
+      _writeKeyValuePair(sheet, "Family Members Migrated:", migration['family_members_migrated']);
+      _writeKeyValuePair(sheet, "Migration Reason:", migration['reason']);
+      _writeKeyValuePair(sheet, "Migration Duration:", migration['duration']);
+      _writeKeyValuePair(sheet, "Destination:", migration['destination']);
+    }
+
+    // Disputes
+    _writeSubSectionHeader(sheet, "Legal Disputes");
+    if (data['disputes'] != null && data['disputes'] is Map) {
+      final disputes = data['disputes'];
+      _writeKeyValuePair(sheet, "Family Disputes:", disputes['family_disputes']);
+      _writeKeyValuePair(sheet, "Revenue Disputes:", disputes['revenue_disputes']);
+      _writeKeyValuePair(sheet, "Criminal Disputes:", disputes['criminal_disputes']);
+    }
+
+    // Folklore Medicine
+    _writeSubSectionHeader(sheet, "Traditional Medicine Knowledge");
+    List<String> folkloreHeaders = ['Person Name', 'Plant Name', 'Botanical Name', 'Uses'];
+    _writeTableHeader(sheet, folkloreHeaders);
+
+    if (data['folklore_medicine'] != null && data['folklore_medicine'] is List) {
+      for (var medicine in data['folklore_medicine']) {
+        _writeTableRow(sheet, [
+          TextCellValue(medicine['person_name']?.toString() ?? ''),
+          TextCellValue(medicine['plant_local_name']?.toString() ?? ''),
+          TextCellValue(medicine['plant_botanical_name']?.toString() ?? ''),
+          TextCellValue(medicine['uses']?.toString() ?? ''),
+        ]);
+      }
+    }
+
+    _rowIndex++;
+  }
+
+  // --- Helper Methods ---
+
+  String _formatAddictions(Map<String, dynamic> sc) {
+    List<String> addictions = [];
+    if (sc['addiction_smoke'] == 'yes') addictions.add('Smoking');
+    if (sc['addiction_drink'] == 'yes') addictions.add('Drinking');
+    if (sc['addiction_gutka'] == 'yes') addictions.add('Gutka');
+    if (sc['addiction_gamble'] == 'yes') addictions.add('Gambling');
+    if (sc['addiction_tobacco'] == 'yes') addictions.add('Tobacco');
+    return addictions.isEmpty ? 'None' : addictions.join(', ');
+  }
+
+  String _formatHouseType(Map<String, dynamic> house) {
+    List<String> types = [];
+    if (house['katcha'] == 'yes') types.add('Katcha');
+    if (house['pakka'] == 'yes') types.add('Pakka');
+    if (house['katcha_pakka'] == 'yes') types.add('Katcha-Pakka');
+    if (house['hut'] == 'yes') types.add('Hut');
+    return types.isEmpty ? 'Not specified' : types.join(', ');
+  }
+
+  Future<void> _saveExcelFile(Excel excel, String fileName) async {
+    var fileBytes = excel.save();
+    if (fileBytes == null) return;
+    Uint8List data = Uint8List.fromList(fileBytes);
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Complete Survey Report',
+        fileName: fileName,
+        bytes: data,
+      );
+    } else {
+      String? outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Complete Survey Report',
+        fileName: fileName,
+      );
+
+      if (outputFile != null) {
+        if (!outputFile.endsWith('.xlsx')) {
+          outputFile += '.xlsx';
+        }
+        File(outputFile)
+          ..createSync(recursive: true)
+          ..writeAsBytesSync(data);
+      }
+    }
   }
 }

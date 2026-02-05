@@ -98,6 +98,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
             tooltip: 'Sync Status',
             onPressed: () => _showSyncStatusDialog(context),
           ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadSessions,
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(100),
@@ -127,12 +131,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
             ],
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadSessions,
-          ),
-        ],
       ),
       body: Column(
         children: [

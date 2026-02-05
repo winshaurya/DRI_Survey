@@ -179,6 +179,8 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                                   phoneNumber: surveyState.surveyData['phone_number'],
                                 );
                               }
+                              // CRITICAL FIX: Save current page data before navigation
+                              await surveyNotifier.saveCurrentPageData();
                               _jumpToPage(index + 1);
                             } else {
                               // Complete survey

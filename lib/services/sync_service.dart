@@ -22,6 +22,10 @@ class SyncService {
   final List<Map<String, dynamic>> _syncQueue = [];
   bool _isProcessingQueue = false;
 
+  // Sync error tracking
+  final Map<String, List<String>> _syncErrors = {};
+  final Map<String, Map<String, bool>> _tableSyncStatus = {};
+
   SyncService._internal() {
     _initializeConnectivityMonitoring();
   }
@@ -104,7 +108,7 @@ class SyncService {
         }
 
         // 2. Sync if status is NOT 'synced' (pending, failed, null)
-        final status = survey['sync_status'];
+        final status = survey['status'];
         return status != 'synced';
       }).toList();
     } catch (e) {
@@ -125,7 +129,7 @@ class SyncService {
         }
 
         // 2. Sync if status is NOT 'synced' (pending, failed, null)
-        final status = survey['sync_status'];
+        final status = survey['status'];
         return status != 'synced';
       }).toList();
     } catch (e) {
@@ -169,39 +173,76 @@ class SyncService {
   Future<void> _syncSurveyToSupabase(Map<String, dynamic> survey) async {
     if (!_isOnline) return;
 
-    try {
-      final phoneNumber = survey['phone_number'];
+    final phoneNumber = survey['phone_number'];
+    _syncErrors[phoneNumber] = [];
+    _tableSyncStatus[phoneNumber] = {};
 
+    try {
       // CRITICAL FIX: Validate local save BEFORE syncing to cloud
       final localSessionData = await _databaseService.getSurveySession(phoneNumber);
       if (localSessionData == null) {
-        debugPrint('⚠ WARNING: Survey $phoneNumber not found locally. Skipping cloud sync.');
-        return; // Data not saved locally, don't sync yet
-      }
-
-      // Collect all survey data
-      final surveyData = await _collectCompleteSurveyData(phoneNumber);
-
-      // Verify critical data exists before syncing
-      if (surveyData.isEmpty || surveyData['phone_number'] == null) {
-        debugPrint('✗ ERROR: Survey data incomplete for $phoneNumber. Not syncing.');
+        final error = 'Survey not found locally';
+        _syncErrors[phoneNumber]!.add(error);
+        debugPrint('⚠ WARNING: $phoneNumber - $error. Skipping cloud sync.');
         return;
       }
 
-      // Sync to Supabase with transaction
-      await _supabaseService.syncFamilySurveyToSupabase(phoneNumber, surveyData);
+      // Collect all survey data (complete dataset for full sync)
+      final surveyData = await _collectCompleteSurveyDataWithTracking(phoneNumber);
 
-      // Mark as synced locally with timestamp
-      await _markSurveyAsSynced(phoneNumber);
+      // Verify critical data exists before syncing
+      if (surveyData.isEmpty || surveyData['phone_number'] == null) {
+        final error = 'Survey data incomplete';
+        _syncErrors[phoneNumber]!.add(error);
+        debugPrint('✗ ERROR: $phoneNumber - $error. Not syncing.');
+        return;
+      }
 
-      // Update local sync metadata
-      await _updateSyncMetadata(phoneNumber, surveyData);
+      // Validate data completeness before sync
+      final validationErrors = _validateSurveyCompleteness(surveyData);
+      if (validationErrors.isNotEmpty) {
+        _syncErrors[phoneNumber]!.addAll(validationErrors);
+        debugPrint('⚠ WARNING: $phoneNumber has ${validationErrors.length} validation issues:');
+        for (final error in validationErrors) {
+          debugPrint('  - $error');
+        }
+      }
 
-      debugPrint('✓ Successfully synced survey: $phoneNumber');
+      // Sync to Supabase with complete data and error tracking
+      final syncResult = await _supabaseService.syncFamilySurveyToSupabaseWithTracking(
+        phoneNumber, 
+        surveyData,
+        _tableSyncStatus[phoneNumber]!,
+      );
 
-    } catch (e) {
-      debugPrint('✗ Failed to sync survey ${survey['phone_number']}: $e');
-      // Queue for retry
+      // Check if sync was truly complete
+      final failedTables = _tableSyncStatus[phoneNumber]!.entries
+          .where((e) => !e.value)
+          .map((e) => e.key)
+          .toList();
+
+      if (failedTables.isEmpty && _syncErrors[phoneNumber]!.isEmpty) {
+        // Mark as synced only if ALL tables succeeded
+        await _markSurveyAsSynced(phoneNumber);
+        await _updateSyncMetadata(phoneNumber, surveyData);
+        debugPrint('✓ Successfully synced survey: $phoneNumber (${_tableSyncStatus[phoneNumber]!.length} tables)');
+      } else {
+        // Partial sync - mark as failed
+        await _markSurveyAsFailed(phoneNumber, failedTables);
+        debugPrint('⚠ PARTIAL SYNC: $phoneNumber - ${failedTables.length} tables failed:');
+        for (final table in failedTables) {
+          debugPrint('  ✗ $table');
+        }
+      }
+
+    } catch (e, stackTrace) {
+      final error = 'Sync exception: $e';
+      _syncErrors[phoneNumber]!.add(error);
+      debugPrint('✗ Failed to sync survey $phoneNumber: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      // Mark survey as failed and queue for retry
+      await _markSurveyAsFailed(phoneNumber, ['SYNC_EXCEPTION']);
       await queueSyncOperation('sync_survey', survey);
     }
   }
@@ -219,7 +260,7 @@ class SyncService {
         return;
       }
 
-      // Collect all survey data
+      // Collect all survey data (all related tables for this session)
       final surveyData = await _collectCompleteVillageSurveyData(sessionId);
 
       // Verify critical data exists before syncing
@@ -366,7 +407,7 @@ class SyncService {
       'malnutrition_data': 'malnutrition_data',
       'migration_data': 'migration_data',
       'training_data': 'training_data',
-      'self_help_groups': 'self_help_groups',
+      'shg_members': 'shg_members',
       'fpo_members': 'fpo_members',
       'bank_accounts': 'bank_accounts',
       // Note: tulsi_plants and nutritional_garden are stored in house_facilities table
@@ -390,17 +431,17 @@ class SyncService {
     final schemesData = <String, dynamic>{};
 
     final schemeTables = [
-      'aadhaar_info', 'aadhaar_members',
-      'ayushman_card', 'ayushman_members',
-      'family_id', 'family_id_members',
-      'ration_card', 'ration_card_members',
-      'samagra_id', 'samagra_children',
-      'tribal_card', 'tribal_card_members',
-      'handicapped_allowance', 'handicapped_members',
-      'pension_allowance', 'pension_members',
-      'widow_allowance', 'widow_members',
-      'vb_gram', 'vb_gram_members',
-      'pm_kisan_nidhi', 'pm_kisan_members',
+      'aadhaar_info', 'aadhaar_scheme_members',
+      'ayushman_card', 'ayushman_scheme_members',
+      'family_id', 'family_id_scheme_members',
+      'ration_card', 'ration_scheme_members',
+      'samagra_id', 'samagra_scheme_members',
+      'tribal_card', 'tribal_scheme_members',
+      'handicapped_allowance', 'handicapped_scheme_members',
+      'pension_allowance', 'pension_scheme_members',
+      'widow_allowance', 'widow_scheme_members',
+      'vb_gram',
+      'pm_kisan_nidhi',
       'merged_govt_schemes', // Merged table for small schemes
     ];
 
@@ -412,6 +453,169 @@ class SyncService {
     }
 
     return schemesData;
+  }
+
+  /// Collect survey data with error tracking
+  Future<Map<String, dynamic>> _collectCompleteSurveyDataWithTracking(String phoneNumber) async {
+    final surveyData = <String, dynamic>{};
+    final errors = _syncErrors[phoneNumber]!;
+
+    // Get session data
+    try {
+      final sessionData = await _databaseService.getSurveySession(phoneNumber);
+      if (sessionData != null) {
+        surveyData.addAll(sessionData);
+      } else {
+        errors.add('Session data not found');
+      }
+    } catch (e) {
+      errors.add('Failed to fetch session data: $e');
+    }
+
+    // Get all related data
+    final dataMappings = {
+      'family_members': 'family_members',
+      'land_holding': 'land_holding',
+      'irrigation_facilities': 'irrigation_facilities',
+      'crop_productivity': 'crop_productivity',
+      'fertilizer_usage': 'fertilizer_usage',
+      'animals': 'animals',
+      'agricultural_equipment': 'agricultural_equipment',
+      'entertainment_facilities': 'entertainment_facilities',
+      'transport_facilities': 'transport_facilities',
+      'drinking_water_sources': 'drinking_water_sources',
+      'medical_treatment': 'medical_treatment',
+      'disputes': 'disputes',
+      'house_conditions': 'house_conditions',
+      'house_facilities': 'house_facilities',
+      'diseases': 'diseases',
+      'social_consciousness': 'social_consciousness',
+      'children_data': 'children_data',
+      'malnourished_children_data': 'malnourished_children_data',
+      'child_diseases': 'child_diseases',
+      'folklore_medicine': 'folklore_medicine',
+      'health_programmes': 'health_programmes',
+      'malnutrition_data': 'malnutrition_data',
+      'migration_data': 'migration_data',
+      'training_data': 'training_data',
+      'shg_members': 'shg_members',
+      'fpo_members': 'fpo_members',
+      'bank_accounts': 'bank_accounts',
+    };
+
+    for (final entry in dataMappings.entries) {
+      try {
+        final data = await _databaseService.getData(entry.key, phoneNumber);
+        if (data.isNotEmpty) {
+          surveyData[entry.value] = data;
+        }
+      } catch (e) {
+        errors.add('Failed to fetch ${entry.key}: $e');
+        debugPrint('⚠ Warning: Could not fetch ${entry.key} for $phoneNumber: $e');
+      }
+    }
+
+    // Get government schemes data with tracking
+    try {
+      final governmentSchemes = await _collectGovernmentSchemesDataWithTracking(phoneNumber);
+      surveyData.addAll(governmentSchemes);
+    } catch (e) {
+      errors.add('Failed to fetch government schemes: $e');
+    }
+
+    return surveyData;
+  }
+
+  /// Collect government schemes with error tracking
+  Future<Map<String, dynamic>> _collectGovernmentSchemesDataWithTracking(String phoneNumber) async {
+    final schemesData = <String, dynamic>{};
+    final errors = _syncErrors[phoneNumber]!;
+
+    final schemeTables = [
+      'aadhaar_info', 'aadhaar_scheme_members',
+      'ayushman_card', 'ayushman_scheme_members',
+      'family_id', 'family_id_scheme_members',
+      'ration_card', 'ration_scheme_members',
+      'samagra_id', 'samagra_scheme_members',
+      'tribal_card', 'tribal_scheme_members',
+      'handicapped_allowance', 'handicapped_scheme_members',
+      'pension_allowance', 'pension_scheme_members',
+      'widow_allowance', 'widow_scheme_members',
+      'vb_gram',
+      'pm_kisan_nidhi',
+      'merged_govt_schemes',
+    ];
+
+    for (final table in schemeTables) {
+      try {
+        final data = await _databaseService.getData(table, phoneNumber);
+        if (data.isNotEmpty) {
+          schemesData[table] = data;
+        }
+      } catch (e) {
+        errors.add('Failed to fetch $table: $e');
+        debugPrint('⚠ Warning: Could not fetch $table for $phoneNumber: $e');
+      }
+    }
+
+    return schemesData;
+  }
+
+  /// Validate survey data completeness before sync
+  List<String> _validateSurveyCompleteness(Map<String, dynamic> surveyData) {
+    final errors = <String>[];
+
+    // Check critical fields in session data
+    if (surveyData['village_name'] == null || surveyData['village_name'].toString().isEmpty) {
+      errors.add('Missing village_name');
+    }
+    if (surveyData['district'] == null || surveyData['district'].toString().isEmpty) {
+      errors.add('Missing district');
+    }
+    if (surveyData['surveyor_email'] == null || surveyData['surveyor_email'].toString().isEmpty) {
+      errors.add('Missing surveyor_email');
+    }
+
+    // Check for family members (required for family survey)
+    if (surveyData['family_members'] == null || 
+        (surveyData['family_members'] as List).isEmpty) {
+      errors.add('Missing family_members data');
+    }
+
+    // Warn about missing optional but important tables
+    final importantTables = [
+      'land_holding',
+      'house_conditions',
+      'social_consciousness',
+    ];
+
+    for (final table in importantTables) {
+      if (surveyData[table] == null) {
+        errors.add('Missing optional but important table: $table');
+      }
+    }
+
+    return errors;
+  }
+
+  /// Mark survey as failed with failed tables list
+  Future<void> _markSurveyAsFailed(String phoneNumber, List<String> failedTables) async {
+    try {
+      await _databaseService.updateSurveySyncStatus(phoneNumber, 'failed');
+      
+      // Store failed tables info for debugging
+      final failureInfo = {
+        'phone_number': phoneNumber,
+        'failed_at': DateTime.now().toIso8601String(),
+        'failed_tables': failedTables.join(', '),
+        'error_count': _syncErrors[phoneNumber]?.length ?? 0,
+      };
+      
+      await _databaseService.saveData('sync_failures', failureInfo);
+      debugPrint('✗ Marked $phoneNumber as failed. Failed tables: ${failedTables.join(", ")}');
+    } catch (e) {
+      debugPrint('Error marking survey as failed: $e');
+    }
   }
 
   Future<void> _markSurveyAsSynced(String phoneNumber) async {
@@ -520,7 +724,6 @@ class SyncService {
   }
 
   Future<void> _saveSyncQueue() async {
-    final queueJson = jsonEncode(_syncQueue);
     // Save to local storage (you might want to use shared_preferences or similar)
     debugPrint('Sync queue saved with ${_syncQueue.length} operations');
   }

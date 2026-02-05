@@ -54,7 +54,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   SurveyState build() {
     return const SurveyState(
       currentPage: 0,
-      totalPages: 31, // Based on survey_page.dart switch cases (0-30)
+      totalPages: 31, // Pages indexed 0-30 in survey_page.dart
       surveyData: {},
       isLoading: false,
     );
@@ -98,9 +98,11 @@ class SurveyNotifier extends Notifier<SurveyState> {
       // Create survey in Supabase if online
       if (await _supabaseService.isOnline()) {
         try {
-          final surveyResponse = await _supabaseService.client
-              .from('surveys')
+          await _supabaseService.client
+              .from('family_survey_sessions')
               .insert({
+                'phone_number': phoneNumber,
+                'surveyor_email': surveyorEmail ?? _supabaseService.currentUser?.email ?? 'unknown',
                 'village_name': villageName,
                 'village_number': villageNumber,
                 'panchayat': panchayat,
@@ -114,11 +116,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
                 'created_at': DateTime.now().toIso8601String(),
                 'updated_at': DateTime.now().toIso8601String(),
                 'user_id': _supabaseService.currentUser?.id,
-              })
-              .select()
-              .single();
-          final supabaseId = surveyResponse['id'] as int;
-          state = state.copyWith(supabaseSurveyId: supabaseId);
+              });
         } catch (e) {
           print('Error creating survey in Supabase: $e');
         }
@@ -417,7 +415,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
           }
 
           // Load SHG data
-          final shgData = await _databaseService.getData('self_help_groups', state.phoneNumber!);
+          final shgData = await _databaseService.getData('shg_members', state.phoneNumber!);
           if (shgData.isNotEmpty) {
             data['shg_entries'] = shgData;
           }
@@ -800,7 +798,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         // Save SHG data
         if (data['shg_entries'] != null) {
           for (final shg in data['shg_entries']) {
-            await _databaseService.saveData('self_help_groups', {
+            await _databaseService.saveData('shg_members', {
               'phone_number': state.phoneNumber,
               ...shg,
             });
@@ -818,7 +816,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _syncPageDataToSupabase(page, data);
         break;
       case 27: // Self help groups
-        await _databaseService.saveData('self_help_groups', {
+        await _databaseService.saveData('shg_members', {
           'phone_number': state.phoneNumber,
           ...data,
         });
@@ -932,16 +930,15 @@ class SurveyNotifier extends Notifier<SurveyState> {
       await _databaseService.updateSurveyStatus(state.phoneNumber!, 'completed');
       
       // Sync complete survey to Supabase if online
-      if (await _supabaseService.isOnline() && state.supabaseSurveyId != null) {
+      if (await _supabaseService.isOnline()) {
         try {
           await _supabaseService.client
-              .from('surveys')
+              .from('family_survey_sessions')
               .update({
                 'status': 'completed',
-                'completed_at': DateTime.now().toIso8601String(),
                 'updated_at': DateTime.now().toIso8601String(),
               })
-              .eq('id', state.supabaseSurveyId!);
+              .eq('phone_number', state.phoneNumber!);
         } catch (e) {
           print('Error updating survey completion status in Supabase: $e');
         }
@@ -1008,7 +1005,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   void reset() {
     state = const SurveyState(
       currentPage: 0,
-      totalPages: 23, // Based on survey_page.dart switch cases (0-22)
+      totalPages: 23, // Pages indexed 0-22 in survey_page.dart
       surveyData: {},
       isLoading: false,
     );

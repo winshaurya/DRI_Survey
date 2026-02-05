@@ -3,7 +3,7 @@ import '../database/database_helper.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
-static Database? _database; // Added for database access
+static Database? _database;
 
   factory DatabaseService() => _instance;
 
@@ -32,12 +32,12 @@ static Database? _database; // Added for database access
     );
   }
 
-  Future<void> deleteSurveySession(String sessionId) async {
+  Future<void> deleteSurveySession(String phoneNumber) async {
     final db = await database;
     await db.delete(
       'family_survey_sessions',
       where: 'phone_number = ?',
-      whereArgs: [sessionId],
+      whereArgs: [phoneNumber],
     );
   }
 

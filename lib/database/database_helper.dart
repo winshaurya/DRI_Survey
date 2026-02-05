@@ -28,6 +28,22 @@ class DatabaseHelper {
     );
   }
 
+  /// Generic update method for village survey screens
+  Future<int> update(
+    String tableName,
+    Map<String, dynamic> data, {
+    String? where,
+    List<Object?>? whereArgs,
+  }) async {
+    final db = await database;
+    return await db.update(
+      tableName,
+      data,
+      where: where,
+      whereArgs: whereArgs,
+    );
+  }
+
   Future<Database> _initDatabase() async {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
     String path = join(documentsDirectory.path, 'family_survey.db');
@@ -45,482 +61,7 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 20) {
-       // Ensure all tables are created (idempotent due to IF NOT EXISTS)
-       await _createVillageTables(db);
-    }
-    if (oldVersion < 21) {
-      // Add missing columns to surveys table
-      await db.execute('ALTER TABLE surveys ADD COLUMN village_number TEXT');
-      await db.execute('ALTER TABLE surveys ADD COLUMN surveyor_name TEXT');
-      await db.execute('ALTER TABLE surveys ADD COLUMN phone_number TEXT');
-      await db.execute('ALTER TABLE surveys ADD COLUMN surveyor_email TEXT');
-    }
-    if (oldVersion < 22) {
-      await db.execute('ALTER TABLE pending_uploads ADD COLUMN status TEXT DEFAULT "pending"');
-    }
-    if (oldVersion < 23) {
-      // Add missing columns to self_help_groups and fpo_members tables
-      // For SHG members
-      try {
-        await db.execute('ALTER TABLE self_help_groups ADD COLUMN purpose TEXT');
-      } catch (_) {}
-      try {
-        await db.execute('ALTER TABLE self_help_groups ADD COLUMN agency TEXT');
-      } catch (_) {}
-      
-      // For FPO members
-      try {
-        await db.execute('ALTER TABLE fpo_members ADD COLUMN purpose TEXT');
-      } catch (_) {}
-      try {
-        await db.execute('ALTER TABLE fpo_members ADD COLUMN agency TEXT');
-      } catch (_) {}
-    }
-    if (oldVersion < 24) {
-      // Add status column to training_data to distinguish between taken and needed
-      try {
-        await db.execute('ALTER TABLE training_data ADD COLUMN status TEXT DEFAULT "taken"');
-      } catch (_) {}
-    }
-    if (oldVersion < 26) {
-      // Recreate social_consciousness table with new schema
-      await db.execute('DROP TABLE IF EXISTS social_consciousness');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS social_consciousness (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          survey_id INTEGER,
-          clothes_frequency TEXT,
-          clothes_other_specify TEXT,
-          food_waste_exists TEXT,
-          food_waste_amount TEXT,
-          waste_disposal TEXT,
-          waste_disposal_other TEXT,
-          separate_waste TEXT,
-          compost_pit TEXT,
-          recycle_used_items TEXT,
-          led_lights TEXT,
-          turn_off_devices TEXT,
-          fix_leaks TEXT,
-          avoid_plastics TEXT,
-          family_prayers TEXT,
-          family_meditation TEXT,
-          meditation_members TEXT,
-          family_yoga TEXT,
-          yoga_members TEXT,
-          community_activities TEXT,
-          spiritual_discourses TEXT,
-          discourses_members TEXT,
-          personal_happiness TEXT,
-          family_happiness TEXT,
-          happiness_family_who TEXT,
-          financial_problems TEXT,
-          family_disputes TEXT,
-          illness_issues TEXT,
-          unhappiness_reason TEXT,
-          addiction_smoke TEXT,
-          addiction_drink TEXT,
-          addiction_gutka TEXT,
-          addiction_gamble TEXT,
-          addiction_tobacco TEXT,
-          addiction_details TEXT,
-          created_at TEXT
-        )
-      ''');
-
-      // Update irrigation_facilities to match page keys
-      await db.execute('ALTER TABLE irrigation_facilities ADD COLUMN ponds TEXT');
-      await db.execute('ALTER TABLE irrigation_facilities ADD COLUMN other_facilities TEXT');
-      await db.execute('ALTER TABLE irrigation_facilities ADD COLUMN other_irrigation_specify TEXT');
-    }
-    if (oldVersion < 27) {
-      // Recreate medical_treatment table with proper schema
-      await db.execute('DROP TABLE IF EXISTS medical_treatment');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS medical_treatment (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          survey_id INTEGER,
-          allopathic TEXT,
-          ayurvedic TEXT,
-          homeopathy TEXT,
-          traditional TEXT,
-          other_treatment TEXT,
-          preferred_treatment TEXT,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      ''');
-    }
-    if (oldVersion < 28) {
-      // Recreate all village survey tables to ensure schema consistency
-      // 1. Village Irrigation
-      await db.execute('DROP TABLE IF EXISTS village_irrigation_facilities');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_irrigation_facilities (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          has_canal INTEGER DEFAULT 0,
-          has_tube_well INTEGER DEFAULT 0,
-          has_ponds INTEGER DEFAULT 0,
-          has_river INTEGER DEFAULT 0,
-          has_well INTEGER DEFAULT 0
-        )
-      ''');
-    }
-    if (oldVersion < 33) {
-      // CRITICAL MIGRATION: Remove surveys table and standardize to phone_number FKs
-      
-      // 1. Drop the legacy surveys table (replaced by family_survey_sessions)
-      await db.execute('DROP TABLE IF EXISTS surveys');
-      
-      // 2. For each child table, drop survey_id column and add phone_number FK
-      // Note: This migration assumes fresh install or acceptable data loss
-      // For production with existing data, you would need to:
-      // a) Create new columns
-      // b) Migrate data from survey_id -> phone_number lookup
-      // c) Drop old columns
-      
-      // Since user confirmed "OK to lose data", we proceed with clean slate approach
-      final childTables = [
-        'family_members', 'land_holding', 'irrigation_facilities', 'crop_productivity',
-        'fertilizer_usage', 'animals', 'agricultural_equipment', 'entertainment_facilities',
-        'transport_facilities', 'drinking_water_sources', 'medical_treatment', 'disputes',
-        'house_conditions', 'house_facilities', 'diseases', 'folklore_medicine',
-        'health_programmes', 'beneficiary_programs', 'social_consciousness', 'training_data',
-        'self_help_groups', 'fpo_members', 'children_data', 'malnourished_children_data',
-        'child_diseases', 'migration_data', 'tribal_questions', 'bank_accounts',
-        'tulsi_plants', 'nutritional_garden', 'malnutrition_data',
-        // Government scheme tables
-        'aadhaar_info', 'aadhaar_members', 'ayushman_card', 'ayushman_members',
-        'family_id', 'family_id_members', 'ration_card', 'ration_card_members',
-        'samagra_id', 'samagra_children', 'tribal_card', 'tribal_card_members',
-        'handicapped_allowance', 'handicapped_members', 'pension_allowance', 'pension_members',
-        'widow_allowance', 'widow_members', 'vb_gram', 'vb_gram_members',
-        'pm_kisan_nidhi', 'pm_kisan_members', 'merged_govt_schemes',
-        // Scheme member tables
-        'aadhaar_scheme_members', 'tribal_scheme_members', 'pension_scheme_members',
-        'widow_scheme_members', 'ayushman_scheme_members', 'ration_scheme_members',
-        'family_id_scheme_members', 'samagra_scheme_members', 'handicapped_scheme_members',
-      ];
-      
-      for (final table in childTables) {
-        try {
-          // Check if table exists
-          final result = await db.rawQuery(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-            [table]
-          );
-          
-          if (result.isNotEmpty) {
-            // Drop survey_id column if exists (SQLite doesn't support DROP COLUMN directly)
-            // We'll recreate the table structure properly on next clean install
-            // For now, add phone_number if missing
-            try {
-              await db.execute('ALTER TABLE $table ADD COLUMN phone_number TEXT');
-            } catch (_) {
-              // Column might already exist, ignore error
-            }
-          }
-        } catch (e) {
-          db.print('Migration warning for $table: $e');
-        }
-      }
-      
-      // 3. Create indexes for performance
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_family_members_phone ON family_members(phone_number)');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_land_holding_phone ON land_holding(phone_number)');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_bank_accounts_phone ON bank_accounts(phone_number)');
-      
-      debugPrint('✓ Migration to v33 complete: phone_number standardization applied');
-    }
-    
-    if (oldVersion < 34) {
-      debugPrint('Running migration to v34: Adding banana_plants and papaya_trees to land_holding...');
-      
-      // Add missing fruit tree columns to land_holding
-      try {
-        await db.execute('ALTER TABLE land_holding ADD COLUMN banana_plants INTEGER DEFAULT 0');
-      } catch (_) {
-        // Column might already exist, ignore
-      }
-      
-      try {
-        await db.execute('ALTER TABLE land_holding ADD COLUMN papaya_trees INTEGER DEFAULT 0');
-      } catch (_) {
-        // Column might already exist, ignore
-      }
-      
-      debugPrint('✓ Migration to v34 complete: banana_plants and papaya_trees columns added');
-    }
-
-      // 2. Village Survey Details (Landscape & Biodiversity)
-      await db.execute('DROP TABLE IF EXISTS village_survey_details');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_survey_details (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          forest_details TEXT,
-          wasteland_details TEXT,
-          garden_details TEXT,
-          burial_ground_details TEXT,
-          crop_plants_details TEXT,
-          vegetables_details TEXT,
-          fruit_trees_details TEXT,
-          animals_details TEXT,
-          birds_details TEXT,
-          local_biodiversity_details TEXT,
-          traditional_knowledge_details TEXT,
-          special_features_details TEXT
-        )
-      ''');
-
-      // 3. Cadastral Maps
-      await db.execute('DROP TABLE IF EXISTS village_cadastral_maps');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_cadastral_maps (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          has_cadastral_map INTEGER DEFAULT 0,
-          map_details TEXT,
-          availability_status TEXT
-        )
-      ''');
-
-      // 4. Map Points
-      await db.execute('DROP TABLE IF EXISTS village_map_points');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_map_points (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          latitude REAL,
-          longitude REAL,
-          category TEXT,
-          remarks TEXT,
-          point_id INTEGER
-        )
-      ''');
-
-      // 5. Forest Maps
-      await db.execute('DROP TABLE IF EXISTS village_forest_maps');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_forest_maps (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          forest_area TEXT,
-          forest_types TEXT,
-          forest_resources TEXT,
-          conservation_status TEXT,
-          remarks TEXT
-        )
-      ''');
-
-      // 6. Infrastructure Details
-      await db.execute('DROP TABLE IF EXISTS village_infrastructure_details');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_infrastructure_details (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          has_primary_school INTEGER DEFAULT 0,
-          primary_school_distance TEXT,
-          has_junior_school INTEGER DEFAULT 0,
-          junior_school_distance TEXT,
-          has_high_school INTEGER DEFAULT 0,
-          high_school_distance TEXT,
-          has_intermediate_school INTEGER DEFAULT 0,
-          intermediate_school_distance TEXT,
-          other_education_facilities TEXT,
-          boys_students_count INTEGER,
-          girls_students_count INTEGER,
-          has_playground INTEGER DEFAULT 0,
-          playground_remarks TEXT,
-          has_panchayat_bhavan INTEGER DEFAULT 0,
-          panchayat_remarks TEXT,
-          has_sharda_kendra INTEGER DEFAULT 0,
-          sharda_kendra_distance TEXT,
-          has_post_office INTEGER DEFAULT 0,
-          post_office_distance TEXT,
-          has_health_facility INTEGER DEFAULT 0,
-          health_facility_distance TEXT,
-          has_bank INTEGER DEFAULT 0,
-          bank_distance TEXT,
-          has_electrical_connection INTEGER DEFAULT 0,
-          num_wells INTEGER,
-          num_ponds INTEGER,
-          num_hand_pumps INTEGER,
-          num_tube_wells INTEGER,
-          num_tap_water INTEGER
-        )
-      ''');
-
-      // 7. Infrastructure (Roads)
-      await db.execute('DROP TABLE IF EXISTS village_infrastructure');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_infrastructure (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          approach_roads_available INTEGER DEFAULT 0,
-          num_approach_roads INTEGER,
-          approach_condition TEXT,
-          approach_remarks TEXT,
-          internal_lanes_available INTEGER DEFAULT 0,
-          num_internal_lanes INTEGER,
-          internal_condition TEXT,
-          internal_remarks TEXT
-        )
-      ''');
-
-      // 8. Educational Facilities (Update)
-      await db.execute('DROP TABLE IF EXISTS village_educational_facilities');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_educational_facilities (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          primary_schools INTEGER DEFAULT 0,
-          middle_schools INTEGER DEFAULT 0,
-          secondary_schools INTEGER DEFAULT 0,
-          higher_secondary_schools INTEGER DEFAULT 0,
-          anganwadi_centers INTEGER DEFAULT 0,
-          skill_development_centers INTEGER DEFAULT 0,
-          shiksha_guarantee_centers INTEGER DEFAULT 0,
-          other_facility_name TEXT,
-          other_facility_count INTEGER DEFAULT 0
-        )
-      ''');
-
-      // 9. Seed Clubs
-      await db.execute('DROP TABLE IF EXISTS village_seed_clubs');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_seed_clubs (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          clubs_available INTEGER DEFAULT 0,
-          total_clubs INTEGER DEFAULT 0
-        )
-      ''');
-
-      // 10. Signboards
-      await db.execute('DROP TABLE IF EXISTS village_signboards');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_signboards (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          signboards TEXT,
-          info_boards TEXT,
-          wall_writing TEXT
-        )
-      ''');
-
-      // 11. Social Maps
-      await db.execute('DROP TABLE IF EXISTS village_social_maps');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_social_maps (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          remarks TEXT
-        )
-      ''');
-
-      // 12. Transport Facilities (Count)
-      await db.execute('DROP TABLE IF EXISTS village_transport_facilities');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_transport_facilities (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          tractor_count INTEGER DEFAULT 0,
-          car_jeep_count INTEGER DEFAULT 0,
-          motorcycle_scooter_count INTEGER DEFAULT 0,
-          cycle_count INTEGER DEFAULT 0,
-          e_rickshaw_count INTEGER DEFAULT 0,
-          pickup_truck_count INTEGER DEFAULT 0
-        )
-      ''');
-      
-      // 13. Drainage (Ensure up to date)
-      await db.execute('DROP TABLE IF EXISTS village_drainage_waste');
-       await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_drainage_waste (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          earthen_drain INTEGER DEFAULT 0,
-          masonry_drain INTEGER DEFAULT 0,
-          covered_drain INTEGER DEFAULT 0,
-          open_channel INTEGER DEFAULT 0,
-          no_drainage_system INTEGER DEFAULT 0,
-          drainage_destination TEXT,
-          drainage_remarks TEXT,
-          waste_collected_regularly INTEGER DEFAULT 0,
-          waste_segregated INTEGER DEFAULT 0,
-          waste_remarks TEXT
-        )
-      ''');
-    }
-    if (oldVersion < 29) {
-      // Recreate pending_uploads with correct schema for file uploads
-      await db.execute('DROP TABLE IF EXISTS pending_uploads');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS pending_uploads (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          local_file_path TEXT,
-          file_name TEXT,
-          file_type TEXT,
-          village_smile_code TEXT,
-          page_type TEXT,
-          component TEXT,
-          status TEXT DEFAULT 'pending',
-          upload_attempts INTEGER DEFAULT 0,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      ''');
-    }
-    if (oldVersion < 30) {
-      // Add missing columns to pending_uploads for error tracking
-      try {
-        await db.execute('ALTER TABLE pending_uploads ADD COLUMN last_attempt_at TEXT');
-      } catch (_) {}
-      try {
-        await db.execute('ALTER TABLE pending_uploads ADD COLUMN error_message TEXT');
-      } catch (_) {}
-    }
-    if (oldVersion < 31) {
-      // Add missing government scheme tables
-      await db.execute('CREATE TABLE IF NOT EXISTS ayushman_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
-      await db.execute('CREATE TABLE IF NOT EXISTS ration_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
-      await db.execute('CREATE TABLE IF NOT EXISTS family_id_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
-      await db.execute('CREATE TABLE IF NOT EXISTS samagra_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
-      await db.execute('CREATE TABLE IF NOT EXISTS handicapped_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, survey_id INTEGER, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
-    }
-    if (oldVersion < 32) {
-      // Fix Village Irrigation Facilities schema (ensure has_canal columns exist)
-      await db.execute('DROP TABLE IF EXISTS village_irrigation_facilities');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS village_irrigation_facilities (
-          id TEXT PRIMARY KEY,
-          session_id TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          has_canal INTEGER DEFAULT 0,
-          has_tube_well INTEGER DEFAULT 0,
-          has_ponds INTEGER DEFAULT 0,
-          has_river INTEGER DEFAULT 0,
-          has_well INTEGER DEFAULT 0
-        )
-      ''');
-    }
+    // Legacy migrations commented out. Current schema is defined in _createTables/_createVillageTables.
   }
 
   Future<void> _createTables(Database db) async {
@@ -616,13 +157,14 @@ class DatabaseHelper {
         postal_address TEXT,
         pin_code TEXT,
         shine_code TEXT,
-        latitude REAL,
-        longitude REAL,
-        location_accuracy REAL,
+        latitude DECIMAL(10,8),
+        longitude DECIMAL(11,8),
+        location_accuracy DECIMAL(5,2),
         location_timestamp TEXT,
         survey_date TEXT DEFAULT CURRENT_DATE,
         surveyor_name TEXT,
-        status TEXT DEFAULT 'in_progress',
+        status TEXT DEFAULT 'in_progress' CHECK (status IN ('in_progress', 'completed', 'exported')),
+        sync_status TEXT DEFAULT 'pending',
         device_info TEXT,
         app_version TEXT,
         created_by TEXT,
@@ -654,7 +196,7 @@ class DatabaseHelper {
         inclination_self_employment TEXT,
         occupation TEXT,
         days_employed INTEGER,
-        income REAL,
+        income DECIMAL(10,2),
         awareness_about_village TEXT,
         participate_gram_sabha TEXT,
         insured TEXT DEFAULT 'no',
@@ -668,10 +210,10 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        irrigated_area REAL,
-        cultivable_area REAL,
-        unirrigated_area REAL,
-        barren_land REAL,
+        irrigated_area DECIMAL(8,2),
+        cultivable_area DECIMAL(8,2),
+        unirrigated_area DECIMAL(8,2),
+        barren_land DECIMAL(8,2),
         mango_trees INTEGER DEFAULT 0,
         guava_trees INTEGER DEFAULT 0,
         lemon_trees INTEGER DEFAULT 0,
@@ -707,42 +249,11 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_family_members_phone ON family_members(phone_number)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_bank_accounts_phone ON bank_accounts(phone_number)');
 
-    // Village Survey Tables
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS village_survey_sessions (
-        session_id TEXT PRIMARY KEY,
-        village_name TEXT,
-        village_code TEXT,
-        state TEXT,
-        district TEXT,
-        block TEXT,
-        panchayat TEXT,
-        tehsil TEXT,
-        ldg_code TEXT,
-        gps_link TEXT,
-        shine_code TEXT,
-        latitude REAL,
-        longitude REAL,
-        location_accuracy REAL,
-        location_timestamp TEXT,
-        status TEXT DEFAULT 'in_progress',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0,
-        last_synced_at TEXT,
-        current_version INTEGER DEFAULT 1,
-        last_edited_at TEXT
-      )
-    ''');
-    
     await _createRemainingTables(db);
     await _createVillageTables(db);
   }
 
   Future<void> _createRemainingTables(Database db) async {
-    // Land Holding (if not already created)
-    await db.execute('CREATE TABLE IF NOT EXISTS land_holding (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, irrigated_area REAL, cultivable_area REAL, unirrigated_area REAL, barren_land REAL, mango_trees INTEGER, guava_trees INTEGER, lemon_trees INTEGER, pomegranate_trees INTEGER, other_fruit_trees_name TEXT, other_fruit_trees_count INTEGER, created_at TEXT)');
-    
     // Irrigation Facilities
     await db.execute('CREATE TABLE IF NOT EXISTS irrigation_facilities (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, primary_source TEXT, canal TEXT, tube_well TEXT, river TEXT, pond TEXT, well TEXT, hand_pump TEXT, submersible TEXT, rainwater_harvesting TEXT, check_dam TEXT, other_sources TEXT, created_at TEXT)');
 
@@ -860,8 +371,8 @@ class DatabaseHelper {
     // Training Data
     await db.execute('CREATE TABLE IF NOT EXISTS training_data (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, member_name TEXT, training_topic TEXT, training_duration TEXT, training_date TEXT, status TEXT DEFAULT "taken", created_at TEXT)');
 
-    // SHG Members (self_help_groups)
-    await db.execute('CREATE TABLE IF NOT EXISTS self_help_groups (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, member_name TEXT, shg_name TEXT, purpose TEXT, agency TEXT, position TEXT, monthly_saving REAL, created_at TEXT)');
+    // SHG Members
+    await db.execute('CREATE TABLE IF NOT EXISTS shg_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, member_name TEXT, shg_name TEXT, purpose TEXT, agency TEXT, position TEXT, monthly_saving REAL, created_at TEXT)');
 
     // FPO Members
     await db.execute('CREATE TABLE IF NOT EXISTS fpo_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, member_name TEXT, fpo_name TEXT, purpose TEXT, agency TEXT, share_capital REAL, created_at TEXT)');
@@ -880,559 +391,37 @@ class DatabaseHelper {
     
     // Tribal Questions
     await db.execute('CREATE TABLE IF NOT EXISTS tribal_questions (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, deity_name TEXT, festival_name TEXT, dance_name TEXT, language TEXT, created_at TEXT)');
+
+    // Tulsi Plants (separate from house_facilities in Supabase)
+    await db.execute('CREATE TABLE IF NOT EXISTS tulsi_plants (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_plants TEXT, plant_count INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+
+    // Nutritional Garden (separate from house_facilities in Supabase)
+    await db.execute('CREATE TABLE IF NOT EXISTS nutritional_garden (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_garden TEXT, garden_size REAL, vegetables_grown TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+
+    // Malnutrition Data (separate table in Supabase)
+    await db.execute('CREATE TABLE IF NOT EXISTS malnutrition_data (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, child_name TEXT, age INTEGER, weight REAL, height REAL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
+
+    // Government Scheme Info Tables (main info tables)
+    await db.execute('CREATE TABLE IF NOT EXISTS aadhaar_info (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_aadhaar TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS ayushman_card (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_card TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS family_id (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_id TEXT, family_id TEXT, total_children INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS ration_card (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_card TEXT, card_type TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS samagra_id (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_id TEXT, family_id TEXT, total_children INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS tribal_card (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_card TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS handicapped_allowance (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_allowance TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS pension_allowance (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_pension TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS widow_allowance (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_allowance TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS vb_gram (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, is_member TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_nidhi (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, is_beneficiary TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+
+    // Merged Government Schemes (for small schemes)
+    await db.execute('CREATE TABLE IF NOT EXISTS merged_govt_schemes (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, scheme_data TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
   }
 
-  // Generic CRUD operations
-  Future<int> insert(String table, Map<String, dynamic> data) async {
-    Database db = await database;
-    return await db.insert(table, data);
-  }
-
-  Future<List<Map<String, dynamic>>> query(String table, {String? where, List<dynamic>? whereArgs}) async {
-    Database db = await database;
-    return await db.query(table, where: where, whereArgs: whereArgs);
-  }
-
-  Future<int> update(String table, Map<String, dynamic> data, {String? where, List<dynamic>? whereArgs}) async {
-    Database db = await database;
-    return await db.update(table, data, where: where, whereArgs: whereArgs);
-  }
-
-  Future<int> delete(String table, {String? where, List<dynamic>? whereArgs}) async {
-    Database db = await database;
-    return await db.delete(table, where: where, whereArgs: whereArgs);
-  }
-
-  // Survey specific operations
-  Future<int> createSurvey(Map<String, dynamic> surveyData) async {
-    Database db = await database;
-    return await db.insert('surveys', surveyData);
-  }
-
-  Future<List<Map<String, dynamic>>> getAllSurveys() async {
-    Database db = await database;
-    return await db.query('surveys', orderBy: 'created_at DESC');
-  }
-
-  Future<Map<String, dynamic>?> getSurvey(int surveyId) async {
-    Database db = await database;
-    List<Map<String, dynamic>> results = await db.query(
-      'surveys',
-      where: 'id = ?',
-      whereArgs: [surveyId],
-    );
-    return results.isNotEmpty ? results.first : null;
-  }
-
-  Future<void> updateSurveySyncStatus(int surveyId, bool synced) async {
-    Database db = await database;
-    await db.update(
-      'surveys',
-      {'synced': synced ? 1 : 0, 'updated_at': DateTime.now().toIso8601String()},
-      where: 'id = ?',
-      whereArgs: [surveyId],
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getUnsyncedSurveys() async {
-    Database db = await database;
-    return await db.query('surveys', where: 'synced = 0');
-  }
-
-  // Survey data saving method
-  Future<void> saveSurveyData(Map<String, dynamic> data) async {
-    // Skip database operations on web
-    if (kIsWeb) {
-      print('Web platform detected - skipping database save');
-      return;
-    }
-
-    Database db = await database;
-
-    await db.transaction((txn) async {
-      // Insert or update main survey data
-      int surveyId = await txn.insert('surveys', {
-        'village_name': data['village_name'],
-        'panchayat': data['panchayat'],
-        'block': data['block'],
-        'district': data['district'],
-        'postal_address': data['postal_address'],
-        'pin_code': data['pin_code'],
-        'survey_date': data['survey_date'] ?? DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-
-      // Save data to appropriate tables based on keys
-      for (var entry in data.entries) {
-        switch (entry.key) {
-          case 'family_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                final memberData = Map<String, dynamic>.from(member);
-                // memberData.remove('sr_no'); // Keep sr_no if essential, but existing schema had it.
-
-                await txn.insert('family_members', { // FIXED: family_details -> family_members
-                  ...memberData,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'land_holding':
-            await txn.insert('land_holding', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'irrigation_facilities':
-            await txn.insert('irrigation_facilities', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'crop_productivity':
-            if (entry.value is List) {
-              for (var crop in entry.value) {
-                await txn.insert('crop_productivity', {
-                  ...crop,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'fertilizer_usage':
-            await txn.insert('fertilizer_usage', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'animals':
-            if (entry.value is List) {
-              for (var animal in entry.value) {
-                final animalData = Map<String, dynamic>.from(animal);
-                animalData.remove('sr_no');
-
-                await txn.insert('animals', {
-                  ...animalData,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'agricultural_equipment':
-            await txn.insert('agricultural_equipment', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'entertainment_facilities':
-            await txn.insert('entertainment_facilities', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'transport_facilities':
-            await txn.insert('transport_facilities', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'drinking_water_sources':
-            await txn.insert('drinking_water_sources', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'medical_treatment':
-            await txn.insert('medical_treatment', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'disputes':
-            await txn.insert('disputes', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'house_conditions':
-            await txn.insert('house_conditions', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'house_facilities':
-            await txn.insert('house_facilities', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'diseases':
-            if (entry.value is List) {
-              for (var disease in entry.value) {
-                await txn.insert('diseases', {
-                  ...disease,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'government_schemes':
-            if (entry.value is List) {
-              for (var scheme in entry.value) {
-                await txn.insert('government_schemes', {
-                  ...scheme,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'beneficiary_programs':
-            if (entry.value is List) {
-              for (var program in entry.value) {
-                await txn.insert('beneficiary_programs', {
-                  ...program,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'aadhaar_scheme_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('aadhaar_scheme_members', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'tribal_scheme_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('tribal_scheme_members', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'pension_scheme_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('pension_scheme_members', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'widow_scheme_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('widow_scheme_members', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'ayushman_scheme_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('ayushman_scheme_members', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'ration_scheme_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('ration_scheme_members', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'family_id_scheme_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('family_id_scheme_members', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'samagra_scheme_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('samagra_scheme_members', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'handicapped_scheme_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('handicapped_scheme_members', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'training_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('training_data', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'self_help_groups':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('self_help_groups', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'fpo_members':
-            if (entry.value is List) {
-              for (var member in entry.value) {
-                await txn.insert('fpo_members', {
-                  ...member,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'vb_gram_g':
-          case 'pm_kisan_nidhi':
-          case 'pm_kisan_samman_nidhi':
-          case 'kisan_credit_card':
-          case 'swachh_bharat_mission':
-          case 'fasal_bima':
-            var data = entry.value as Map<String, dynamic>;
-            bool isBeneficiary = data['is_beneficiary'] ?? false;
-            if (isBeneficiary) {
-              var members = data['members'] as List;
-              for (var m in members) {
-                await txn.insert('beneficiary_programs', {
-                  'survey_id': surveyId,
-                  'program_type': entry.key,
-                  'beneficiary': 1,
-                  'member_name': m['name'],
-                  'name_included': (m['name_included'] == true) ? 1 : 0,
-                  'details_correct': (m['details_correct'] == true) ? 1 : 0,
-                  'incorrect_details': m['incorrect_details'],
-                  'days_worked': int.tryParse(m['days']?.toString() ?? '0'),
-                  'received': (m['received'] == true) ? 1 : 0,
-                });
-              }
-            } else {
-               await txn.insert('beneficiary_programs', {
-                  'survey_id': surveyId,
-                  'program_type': entry.key,
-                  'beneficiary': 0,
-               });
-            }
-            break;
-          case 'social_consciousness':
-            await txn.insert('social_consciousness', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'animals':
-            await txn.insert('animals', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'equipment':
-            await txn.insert('agricultural_equipment', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'entertainment':
-            await txn.insert('entertainment_facilities', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'transport':
-            await txn.insert('transport_facilities', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'water_sources':
-            await txn.insert('drinking_water_sources', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'medical':
-             // medical_treatment stores phone_number as ID, so create generic insert
-             // Data structure from page might be single Map
-            await txn.insert('medical_treatment', {
-               ...entry.value,
-               'phone_number': data['phone_number'] ?? 'unknown',
-             });
-            break;
-          case 'disputes':
-            await txn.insert('disputes', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'house_conditions':
-            await txn.insert('house_conditions', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'diseases':
-            if (entry.value is List) {
-              for (var disease in entry.value) {
-                await txn.insert('diseases', {
-                  ...disease,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'folklore_medicines':
-            if (entry.value is List) {
-              for (var medicine in entry.value) {
-                await txn.insert('folklore_medicine', {
-                  ...medicine,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'health_programme':
-            await txn.insert('health_programmes', {
-              ...entry.value,
-              'survey_id': surveyId,
-            });
-            break;
-          case 'training_members':
-            if (entry.value is List) {
-              for (var training in entry.value) {
-                await txn.insert('training_data', {
-                  ...training,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'self_help_groups':
-            if (entry.value is List) {
-              for (var shg in entry.value) {
-                await txn.insert('self_help_groups', {
-                  ...shg,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'fpo_members':
-            if (entry.value is List) {
-              for (var fpo in entry.value) {
-                await txn.insert('fpo_members', {
-                  ...fpo,
-                  'survey_id': surveyId,
-                });
-              }
-            }
-            break;
-          case 'children': // Data from ChildrenPage
-             // This needs mapping to children_data 
-             // Form: births_last_3_years, etc are Top Level keys in pageData?
-             // Let's check how they are passed.
-             // If key is 'children', it might be boolean? No.
-             break;
-          case 'malnourished_children_data':
-             if (entry.value is List) {
-               for (var child in entry.value) {
-                 await txn.insert('malnourished_children_data', {
-                   ...child,
-                   'survey_id': surveyId,
-                 });
-               }
-             }
-             break;
-           // TODO: Add cases for beneficiary schemes (vb_g_ram_g, etc) 
-           // and handle top-level children data separately (since it's not in a sub-map)
-        }
-      }
-
-      // Handle top-level fields that belong to separate tables but aren't in their own map
-      // Children Data
-      if (data.containsKey('births_last_3_years')) {
-        await txn.insert('children_data', {
-          'births_last_3_years': data['births_last_3_years'],
-          'infant_deaths_last_3_years': data['infant_deaths_last_3_years'],
-          'malnourished_children': data['malnourished_children'],
-          'survey_id': surveyId,
-        });
-      }
-
-      // Migration
-      if (data.containsKey('migration')) {
-         // If migration is strictly boolean, we might need to check other keys
-         await txn.insert('migration_data', {
-           'family_members_migrated': data['migration'] == true ? 1 : 0, // Simplification
-           'reason': data['migration_reason'], // Assumption
-           'survey_id': surveyId,
-         });
-      }
-
-      // Beneficiary Schemes
-      final schemes = [
-        {'key': 'vb_g_ram_g', 'type': 'VB-G-RAM-G'},
-        {'key': 'pm_kisan', 'type': 'PM Kisan'},
-        {'key': 'kisan_credit_card', 'type': 'Kisan Credit Card'},
-        {'key': 'swachh_bharat', 'type': 'Swachh Bharat'},
-        {'key': 'fasal_bima', 'type': 'Fasal Bima'},
-      ];
-
-      for (var scheme in schemes) {
-        if (data.containsKey(scheme['key'])) {
-          final schemeData = data[scheme['key']];
-          if (schemeData is Map) {
-             // Save main beneficiary status if needed? Table schema seems to support individual members?
-             // Table: beneficiary_programs (program_type, beneficiary, member_name...)
-             // schemeData usually has 'members' List inside
-             if (schemeData['members'] is List) {
-               for (var member in schemeData['members']) {
-                 await txn.insert('beneficiary_programs', {
-                   ...member,
-                   'program_type': scheme['type'],
-                   'survey_id': surveyId,
-                 });
-               }
-             }
-          }
-        }
-      }
-
-    });
-  }
+  /*
+  // Legacy CRUD and survey-specific operations (surveys table is deprecated)
+  // Commented out to avoid duplicate method signatures and legacy table usage.
+  */
 
   // Bank Account & Family Member Helpers
   Future<List<String>> getFamilyMembers(int surveyId) async {

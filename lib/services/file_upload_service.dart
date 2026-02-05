@@ -308,7 +308,7 @@ class FileUploadService {
         fileType,
         driveResult['fileId'],
         driveResult['shareLink'],
-        null, // TODO: Get phone number from context
+        shineCode, // Use shineCode as proxy for phone number if not available in context
       );
 
       // Update status to uploaded

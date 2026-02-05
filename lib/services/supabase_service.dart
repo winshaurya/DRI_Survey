@@ -52,74 +52,115 @@ class SupabaseService {
     }
   }
 
-  // Sync family survey data to Supabase
+  // Sync family survey data to Supabase (legacy method - kept for compatibility)
   Future<void> syncFamilySurveyToSupabase(String phoneNumber, Map<String, dynamic> surveyData) async {
+    final trackingMap = <String, bool>{};
+    await syncFamilySurveyToSupabaseWithTracking(phoneNumber, surveyData, trackingMap);
+  }
+
+  // Sync family survey data to Supabase with error tracking
+  Future<bool> syncFamilySurveyToSupabaseWithTracking(
+    String phoneNumber, 
+    Map<String, dynamic> surveyData,
+    Map<String, bool> tableSyncStatus,
+  ) async {
+    bool overallSuccess = true;
+
     try {
       // Get current user email for audit trail
       final userEmail = currentUser?.email ?? surveyData['surveyor_email'];
 
       // Insert main survey session data
-      await client
-          .from('family_survey_sessions')
-          .upsert({
-            'phone_number': phoneNumber,
-            'surveyor_email': userEmail, // For RLS and audit trails
-            'village_name': surveyData['village_name'],
-            'village_number': surveyData['village_number'],
-            'panchayat': surveyData['panchayat'],
-            'block': surveyData['block'],
-            'tehsil': surveyData['tehsil'],
-            'district': surveyData['district'],
-            'postal_address': surveyData['postal_address'],
-            'pin_code': surveyData['pin_code'],
-            'shine_code': surveyData['shine_code'],
-            'latitude': surveyData['latitude'],
-            'longitude': surveyData['longitude'],
-            'location_accuracy': surveyData['location_accuracy'],
-            'location_timestamp': surveyData['location_timestamp'],
-            'surveyor_name': surveyData['surveyor_name'],
-            'status': 'completed',
-            'created_by': userEmail,
-            'updated_by': userEmail,
-            'user_id': currentUser?.id,
-          });
+      try {
+        await client
+            .from('family_survey_sessions')
+            .upsert({
+              'phone_number': phoneNumber,
+              'surveyor_email': userEmail,
+              'village_name': surveyData['village_name'],
+              'village_number': surveyData['village_number'],
+              'panchayat': surveyData['panchayat'],
+              'block': surveyData['block'],
+              'tehsil': surveyData['tehsil'],
+              'district': surveyData['district'],
+              'postal_address': surveyData['postal_address'],
+              'pin_code': surveyData['pin_code'],
+              'shine_code': surveyData['shine_code'],
+              'latitude': surveyData['latitude'],
+              'longitude': surveyData['longitude'],
+              'location_accuracy': surveyData['location_accuracy'],
+              'location_timestamp': surveyData['location_timestamp'],
+              'surveyor_name': surveyData['surveyor_name'],
+              'status': surveyData['status'] ?? 'in_progress',
+              'created_by': userEmail,
+              'updated_by': userEmail,
+              'user_id': currentUser?.id,
+            });
+        tableSyncStatus['family_survey_sessions'] = true;
+      } catch (e) {
+        tableSyncStatus['family_survey_sessions'] = false;
+        overallSuccess = false;
+        print('✗ Failed to sync family_survey_sessions: $e');
+      }
 
-      // Sync related data tables using phone_number as foreign key
-      await _syncFamilyMembers(phoneNumber, surveyData['family_members']);
-      await _syncLandHolding(phoneNumber, surveyData['land_holding']);
-      await _syncIrrigationFacilities(phoneNumber, surveyData['irrigation_facilities']);
-      await _syncCropProductivity(phoneNumber, surveyData['crop_productivity']);
-      await _syncFertilizerUsage(phoneNumber, surveyData['fertilizer_usage']);
-      await _syncAnimals(phoneNumber, surveyData['animals']);
-      await _syncAgriculturalEquipment(phoneNumber, surveyData['agricultural_equipment']);
-      await _syncEntertainmentFacilities(phoneNumber, surveyData['entertainment_facilities']);
-      await _syncTransportFacilities(phoneNumber, surveyData['transport_facilities']);
-      await _syncDrinkingWaterSources(phoneNumber, surveyData['drinking_water_sources']);
-      await _syncMedicalTreatment(phoneNumber, surveyData['medical_treatment']);
-      await _syncDisputes(phoneNumber, surveyData['disputes']);
-      await _syncHouseConditions(phoneNumber, surveyData['house_conditions']);
-      await _syncHouseFacilities(phoneNumber, surveyData['house_facilities']);
-      await _syncDiseases(phoneNumber, surveyData['diseases']);
-      await _syncGovernmentSchemes(phoneNumber, surveyData);
-      await _syncChildrenData(phoneNumber, surveyData['children_data']);
-      await _syncMalnourishedChildrenData(phoneNumber, surveyData['malnourished_children_data']);
-      await _syncChildDiseases(phoneNumber, surveyData['child_diseases']);
-      await _syncFolkloreMedicine(phoneNumber, surveyData['folklore_medicine']);
-      await _syncHealthProgrammes(phoneNumber, surveyData['health_programmes']);
-      await _syncMalnutritionData(phoneNumber, surveyData['malnutrition_data']);
-      await _syncMigration(phoneNumber, surveyData['migration']);
-      await _syncTraining(phoneNumber, surveyData['training']);
-      await _syncSelfHelpGroups(phoneNumber, surveyData['shg_entries']);
-      await _syncFpoMembership(phoneNumber, surveyData['fpo_entries']);
-      await _syncBankAccounts(phoneNumber, surveyData['bank_accounts']);
-      await _syncSocialConsciousness(phoneNumber, surveyData['social_consciousness']);
-      await _syncTribalQuestions(phoneNumber, surveyData['tribal_questions']);
-      await _syncHealthPrograms(phoneNumber, surveyData['health_programmes']);
-      await _syncFolkloreMedicine(phoneNumber, surveyData['folklore_medicine']);
-      // Note: tulsi_plants and nutritional_garden are stored in house_facilities table (synced via _syncHouseFacilities)
+      // Sync related data tables in parallel for speed
+      final syncTasks = <Future<void>>[];
+      
+      // Helper to wrap sync calls with error tracking
+      Future<void> syncWithTracking(String tableName, Future<void> Function() syncFn) async {
+        try {
+          await syncFn();
+          tableSyncStatus[tableName] = true;
+        } catch (e) {
+          tableSyncStatus[tableName] = false;
+          overallSuccess = false;
+          print('✗ Failed to sync $tableName: $e');
+        }
+      }
+
+      // Add all sync tasks (parallel execution)
+      syncTasks.add(syncWithTracking('family_members', () => _syncFamilyMembers(phoneNumber, surveyData['family_members'])));
+      syncTasks.add(syncWithTracking('land_holding', () => _syncLandHolding(phoneNumber, surveyData['land_holding'])));
+      syncTasks.add(syncWithTracking('irrigation_facilities', () => _syncIrrigationFacilities(phoneNumber, surveyData['irrigation_facilities'])));
+      syncTasks.add(syncWithTracking('crop_productivity', () => _syncCropProductivity(phoneNumber, surveyData['crop_productivity'])));
+      syncTasks.add(syncWithTracking('fertilizer_usage', () => _syncFertilizerUsage(phoneNumber, surveyData['fertilizer_usage'])));
+      syncTasks.add(syncWithTracking('animals', () => _syncAnimals(phoneNumber, surveyData['animals'])));
+      syncTasks.add(syncWithTracking('agricultural_equipment', () => _syncAgriculturalEquipment(phoneNumber, surveyData['agricultural_equipment'])));
+      syncTasks.add(syncWithTracking('entertainment_facilities', () => _syncEntertainmentFacilities(phoneNumber, surveyData['entertainment_facilities'])));
+      syncTasks.add(syncWithTracking('transport_facilities', () => _syncTransportFacilities(phoneNumber, surveyData['transport_facilities'])));
+      syncTasks.add(syncWithTracking('drinking_water_sources', () => _syncDrinkingWaterSources(phoneNumber, surveyData['drinking_water_sources'])));
+      syncTasks.add(syncWithTracking('medical_treatment', () => _syncMedicalTreatment(phoneNumber, surveyData['medical_treatment'])));
+      syncTasks.add(syncWithTracking('disputes', () => _syncDisputes(phoneNumber, surveyData['disputes'])));
+      syncTasks.add(syncWithTracking('house_conditions', () => _syncHouseConditions(phoneNumber, surveyData['house_conditions'])));
+      syncTasks.add(syncWithTracking('house_facilities', () => _syncHouseFacilities(phoneNumber, surveyData['house_facilities'])));
+      syncTasks.add(syncWithTracking('diseases', () => _syncDiseases(phoneNumber, surveyData['diseases'])));
+      syncTasks.add(syncWithTracking('children_data', () => _syncChildrenData(phoneNumber, surveyData['children_data'])));
+      syncTasks.add(syncWithTracking('malnourished_children_data', () => _syncMalnourishedChildrenData(phoneNumber, surveyData['malnourished_children_data'])));
+      syncTasks.add(syncWithTracking('child_diseases', () => _syncChildDiseases(phoneNumber, surveyData['child_diseases'])));
+      syncTasks.add(syncWithTracking('folklore_medicine', () => _syncFolkloreMedicine(phoneNumber, surveyData['folklore_medicine'])));
+      syncTasks.add(syncWithTracking('health_programmes', () => _syncHealthProgrammes(phoneNumber, surveyData['health_programmes'])));
+      syncTasks.add(syncWithTracking('malnutrition_data', () => _syncMalnutritionData(phoneNumber, surveyData['malnutrition_data'])));
+      syncTasks.add(syncWithTracking('migration_data', () => _syncMigration(phoneNumber, surveyData['migration_data'])));
+      syncTasks.add(syncWithTracking('training_data', () => _syncTraining(phoneNumber, surveyData['training_data'])));
+      syncTasks.add(syncWithTracking('shg_members', () => _syncSelfHelpGroups(phoneNumber, surveyData['shg_members'])));
+      syncTasks.add(syncWithTracking('fpo_members', () => _syncFpoMembership(phoneNumber, surveyData['fpo_members'])));
+      syncTasks.add(syncWithTracking('bank_accounts', () => _syncBankAccounts(phoneNumber, surveyData['bank_accounts'])));
+      syncTasks.add(syncWithTracking('social_consciousness', () => _syncSocialConsciousness(phoneNumber, surveyData['social_consciousness'])));
+      syncTasks.add(syncWithTracking('tribal_questions', () => _syncTribalQuestions(phoneNumber, surveyData['tribal_questions'])));
+      syncTasks.add(syncWithTracking('tulsi_plants', () => _syncTulsiPlants(phoneNumber, surveyData['house_facilities'])));
+      syncTasks.add(syncWithTracking('nutritional_garden', () => _syncNutritionalGarden(phoneNumber, surveyData['house_facilities'])));
+
+      // Sync government schemes (tracked separately)
+      syncTasks.add(syncWithTracking('government_schemes', () => _syncGovernmentSchemesParallel(phoneNumber, surveyData, tableSyncStatus)));
+
+      // Execute all syncs in parallel (don't fail fast - collect all errors)
+      await Future.wait(syncTasks, eagerError: false);
+
+      return overallSuccess;
 
     } catch (e) {
-      throw Exception('Failed to sync family survey to Supabase: $e');
+      print('✗ CRITICAL: Failed to sync family survey to Supabase: $e');
+      return false;
     }
   }
 
@@ -133,7 +174,25 @@ class SupabaseService {
 
   Future<void> _syncLandHolding(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('land_holding').upsert({...data, 'phone_number': phoneNumber});
+    final allowedKeys = <String>{
+      'id',
+      'created_at',
+      'irrigated_area',
+      'cultivable_area',
+      'unirrigated_area',
+      'barren_land',
+      'mango_trees',
+      'guava_trees',
+      'lemon_trees',
+      'pomegranate_trees',
+      'other_fruit_trees_name',
+      'other_fruit_trees_count',
+    };
+    final filtered = <String, dynamic>{
+      for (final entry in data.entries)
+        if (allowedKeys.contains(entry.key)) entry.key: entry.value,
+    };
+    await client.from('land_holding').upsert({...filtered, 'phone_number': phoneNumber});
   }
 
   Future<void> _syncIrrigationFacilities(String phoneNumber, Map<String, dynamic>? data) async {
@@ -224,31 +283,56 @@ await client.from('drinking_water_sources').upsert({
   }
 
   Future<void> _syncGovernmentSchemes(String phoneNumber, Map<String, dynamic> surveyData) async {
-    // Sync individual government scheme tables
-    await _syncAadhaarInfo(phoneNumber, surveyData['aadhaar_info']);
-    await _syncAadhaarMembers(phoneNumber, surveyData['aadhaar_members']);
-    await _syncAyushmanCard(phoneNumber, surveyData['ayushman_card']);
-    await _syncAyushmanMembers(phoneNumber, surveyData['ayushman_members']);
-    await _syncFamilyId(phoneNumber, surveyData['family_id']);
-    await _syncFamilyIdMembers(phoneNumber, surveyData['family_id_members']);
-    await _syncRationCard(phoneNumber, surveyData['ration_card']);
-    await _syncRationCardMembers(phoneNumber, surveyData['ration_card_members']);
-    await _syncSamagraId(phoneNumber, surveyData['samagra_id']);
-    await _syncSamagraChildren(phoneNumber, surveyData['samagra_children']);
-    await _syncTribalCard(phoneNumber, surveyData['tribal_card']);
-    await _syncTribalCardMembers(phoneNumber, surveyData['tribal_card_members']);
-    await _syncHandicappedAllowance(phoneNumber, surveyData['handicapped_allowance']);
-    await _syncHandicappedMembers(phoneNumber, surveyData['handicapped_members']);
-    await _syncPensionAllowance(phoneNumber, surveyData['pension_allowance']);
-    await _syncPensionMembers(phoneNumber, surveyData['pension_members']);
-    await _syncWidowAllowance(phoneNumber, surveyData['widow_allowance']);
-    await _syncWidowMembers(phoneNumber, surveyData['widow_members']);
-    await _syncVbGram(phoneNumber, surveyData['vb_gram']);
-    await _syncVbGramMembers(phoneNumber, surveyData['vb_gram_members']);
-    await _syncPmKisanNidhi(phoneNumber, surveyData['pm_kisan_nidhi']);
-    await _syncPmKisanMembers(phoneNumber, surveyData['pm_kisan_members']);
-    // Merged small schemes into one table
-    await _syncMergedGovtSchemes(phoneNumber, surveyData['merged_govt_schemes']);
+    // Legacy sequential method - kept for compatibility
+    await _syncGovernmentSchemesParallel(phoneNumber, surveyData, {});
+  }
+
+  // Parallel sync for government schemes with error tracking
+  Future<void> _syncGovernmentSchemesParallel(
+    String phoneNumber, 
+    Map<String, dynamic> surveyData,
+    Map<String, bool> tableSyncStatus,
+  ) async {
+    final syncTasks = <Future<void>>[];
+
+    // Helper to wrap sync with tracking
+    Future<void> syncWithTracking(String tableName, Future<void> Function() syncFn) async {
+      try {
+        await syncFn();
+        tableSyncStatus[tableName] = true;
+      } catch (e) {
+        tableSyncStatus[tableName] = false;
+        print('✗ Failed to sync $tableName: $e');
+      }
+    }
+
+    // Sync all government scheme tables in parallel
+    syncTasks.add(syncWithTracking('aadhaar_info', () => _syncAadhaarInfo(phoneNumber, surveyData['aadhaar_info'])));
+    syncTasks.add(syncWithTracking('aadhaar_scheme_members', () => _syncAadhaarSchemeMembers(phoneNumber, surveyData['aadhaar_scheme_members'])));
+    syncTasks.add(syncWithTracking('ayushman_card', () => _syncAyushmanCard(phoneNumber, surveyData['ayushman_card'])));
+    syncTasks.add(syncWithTracking('ayushman_scheme_members', () => _syncAyushmanSchemeMembers(phoneNumber, surveyData['ayushman_scheme_members'])));
+    syncTasks.add(syncWithTracking('family_id', () => _syncFamilyId(phoneNumber, surveyData['family_id'])));
+    syncTasks.add(syncWithTracking('family_id_scheme_members', () => _syncFamilyIdSchemeMembers(phoneNumber, surveyData['family_id_scheme_members'])));
+    syncTasks.add(syncWithTracking('ration_card', () => _syncRationCard(phoneNumber, surveyData['ration_card'])));
+    syncTasks.add(syncWithTracking('ration_scheme_members', () => _syncRationSchemeMembers(phoneNumber, surveyData['ration_scheme_members'])));
+    syncTasks.add(syncWithTracking('samagra_id', () => _syncSamagraId(phoneNumber, surveyData['samagra_id'])));
+    syncTasks.add(syncWithTracking('samagra_scheme_members', () => _syncSamagraSchemeMembers(phoneNumber, surveyData['samagra_scheme_members'])));
+    syncTasks.add(syncWithTracking('tribal_card', () => _syncTribalCard(phoneNumber, surveyData['tribal_card'])));
+    syncTasks.add(syncWithTracking('tribal_scheme_members', () => _syncTribalSchemeMembers(phoneNumber, surveyData['tribal_scheme_members'])));
+    syncTasks.add(syncWithTracking('handicapped_allowance', () => _syncHandicappedAllowance(phoneNumber, surveyData['handicapped_allowance'])));
+    syncTasks.add(syncWithTracking('handicapped_scheme_members', () => _syncHandicappedSchemeMembers(phoneNumber, surveyData['handicapped_scheme_members'])));
+    syncTasks.add(syncWithTracking('pension_allowance', () => _syncPensionAllowance(phoneNumber, surveyData['pension_allowance'])));
+    syncTasks.add(syncWithTracking('pension_scheme_members', () => _syncPensionSchemeMembers(phoneNumber, surveyData['pension_scheme_members'])));
+    syncTasks.add(syncWithTracking('widow_allowance', () => _syncWidowAllowance(phoneNumber, surveyData['widow_allowance'])));
+    syncTasks.add(syncWithTracking('widow_scheme_members', () => _syncWidowSchemeMembers(phoneNumber, surveyData['widow_scheme_members'])));
+    syncTasks.add(syncWithTracking('vb_gram', () => _syncVbGram(phoneNumber, surveyData['vb_gram'])));
+    syncTasks.add(syncWithTracking('vb_gram_members', () => _syncVbGramMembers(phoneNumber, surveyData['vb_gram_members'])));
+    syncTasks.add(syncWithTracking('pm_kisan_nidhi', () => _syncPmKisanNidhi(phoneNumber, surveyData['pm_kisan_nidhi'])));
+    syncTasks.add(syncWithTracking('pm_kisan_members', () => _syncPmKisanMembers(phoneNumber, surveyData['pm_kisan_members'])));
+    syncTasks.add(syncWithTracking('merged_govt_schemes', () => _syncMergedGovtSchemes(phoneNumber, surveyData['merged_govt_schemes'])));
+
+    // Execute all in parallel
+    await Future.wait(syncTasks, eagerError: false);
   }
 
   Future<void> _syncChildrenData(String phoneNumber, Map<String, dynamic>? data) async {
@@ -320,11 +404,6 @@ await client.from('drinking_water_sources').upsert({
     await client.from('tribal_questions').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncHealthPrograms(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await client.from('health_programmes').upsert({...data, 'phone_number': phoneNumber});
-  }
-
   Future<void> _syncFolkloreMedicine(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
     await client.from('folklore_medicine').upsert(
@@ -344,9 +423,9 @@ await client.from('drinking_water_sources').upsert({
     await client.from('aadhaar_info').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncAadhaarMembers(String phoneNumber, List<dynamic>? data) async {
+  Future<void> _syncAadhaarSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('aadhaar_members').upsert(
+    await client.from('aadhaar_scheme_members').upsert(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
   }
@@ -356,9 +435,9 @@ await client.from('drinking_water_sources').upsert({
     await client.from('ayushman_card').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncAyushmanMembers(String phoneNumber, List<dynamic>? data) async {
+  Future<void> _syncAyushmanSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('ayushman_members').upsert(
+    await client.from('ayushman_scheme_members').upsert(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
   }
@@ -368,9 +447,9 @@ await client.from('drinking_water_sources').upsert({
     await client.from('family_id').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncFamilyIdMembers(String phoneNumber, List<dynamic>? data) async {
+  Future<void> _syncFamilyIdSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('family_id_members').upsert(
+    await client.from('family_id_scheme_members').upsert(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
   }
@@ -380,9 +459,9 @@ await client.from('drinking_water_sources').upsert({
     await client.from('ration_card').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncRationCardMembers(String phoneNumber, List<dynamic>? data) async {
+  Future<void> _syncRationSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('ration_card_members').upsert(
+    await client.from('ration_scheme_members').upsert(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
   }
@@ -392,9 +471,9 @@ await client.from('drinking_water_sources').upsert({
     await client.from('samagra_id').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncSamagraChildren(String phoneNumber, List<dynamic>? data) async {
+  Future<void> _syncSamagraSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('samagra_children').upsert(
+    await client.from('samagra_scheme_members').upsert(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
   }
@@ -404,9 +483,9 @@ await client.from('drinking_water_sources').upsert({
     await client.from('tribal_card').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncTribalCardMembers(String phoneNumber, List<dynamic>? data) async {
+  Future<void> _syncTribalSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('tribal_card_members').upsert(
+    await client.from('tribal_scheme_members').upsert(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
   }
@@ -416,9 +495,9 @@ await client.from('drinking_water_sources').upsert({
     await client.from('handicapped_allowance').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncHandicappedMembers(String phoneNumber, List<dynamic>? data) async {
+  Future<void> _syncHandicappedSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('handicapped_members').upsert(
+    await client.from('handicapped_scheme_members').upsert(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
   }
@@ -428,9 +507,9 @@ await client.from('drinking_water_sources').upsert({
     await client.from('pension_allowance').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncPensionMembers(String phoneNumber, List<dynamic>? data) async {
+  Future<void> _syncPensionSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('pension_members').upsert(
+    await client.from('pension_scheme_members').upsert(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
   }
@@ -440,9 +519,9 @@ await client.from('drinking_water_sources').upsert({
     await client.from('widow_allowance').upsert({...data, 'phone_number': phoneNumber});
   }
 
-  Future<void> _syncWidowMembers(String phoneNumber, List<dynamic>? data) async {
+  Future<void> _syncWidowSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('widow_members').upsert(
+    await client.from('widow_scheme_members').upsert(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
   }
@@ -494,6 +573,33 @@ await client.from('drinking_water_sources').upsert({
   Future<void> _syncMergedGovtSchemes(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
     await client.from('merged_govt_schemes').upsert({...data, 'phone_number': phoneNumber});
+  }
+
+  // Extract and sync tulsi_plants from house_facilities
+  Future<void> _syncTulsiPlants(String phoneNumber, Map<String, dynamic>? houseFacilitiesData) async {
+    if (houseFacilitiesData == null || houseFacilitiesData.isEmpty) return;
+
+    final tulsiData = {
+      'phone_number': phoneNumber,
+      'has_plants': houseFacilitiesData['tulsi_plants_available'] ?? 'no',
+      'plant_count': houseFacilitiesData['tulsi_plants_count'] ?? 0,
+    };
+
+    await client.from('tulsi_plants').upsert(tulsiData);
+  }
+
+  // Extract and sync nutritional_garden from house_facilities
+  Future<void> _syncNutritionalGarden(String phoneNumber, Map<String, dynamic>? houseFacilitiesData) async {
+    if (houseFacilitiesData == null || houseFacilitiesData.isEmpty) return;
+
+    final gardenData = {
+      'phone_number': phoneNumber,
+      'has_garden': houseFacilitiesData['nutritional_garden_available'] ?? 'no',
+      'garden_size': houseFacilitiesData['garden_size'] ?? 0.0,
+      'vegetables_grown': houseFacilitiesData['vegetables_grown'] ?? '',
+    };
+
+    await client.from('nutritional_garden').upsert(gardenData);
   }
 
   // Village survey helper methods

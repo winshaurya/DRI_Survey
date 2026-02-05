@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:universal_html/html.dart' as html;
 
 import '../services/database_service.dart';
+import '../services/excel_service.dart';
 
 class DataExportService {
   static final DataExportService _instance = DataExportService._internal();
@@ -16,12 +17,9 @@ class DataExportService {
 
   DataExportService._internal();
 
-  // Export all surveys to Excel
+  // Export all surveys to Excel - Now exports complete data for each survey
   Future<void> exportAllSurveysToExcel() async {
     try {
-      final excel = Excel.createExcel();
-      final sheet = excel['Surveys'];
-
       // Get all survey sessions
       final sessions = await _db.getAllSurveySessions();
 
@@ -29,135 +27,139 @@ class DataExportService {
         throw Exception('No survey data found to export');
       }
 
-      // Add header row
-      sheet.appendRow([
+      // Create a master Excel file with multiple sheets
+      final excel = Excel.createExcel();
+
+      // Sheet 1: Survey Overview
+      final overviewSheet = excel['Survey Overview'];
+      overviewSheet.appendRow([
         TextCellValue('Phone Number'),
         TextCellValue('Village Name'),
-        TextCellValue('Village Number'),
         TextCellValue('Panchayat'),
         TextCellValue('Block'),
-        TextCellValue('Tehsil'),
         TextCellValue('District'),
-        TextCellValue('Postal Address'),
-        TextCellValue('Pin Code'),
         TextCellValue('Surveyor Name'),
-        TextCellValue('Surveyor Email'),
-        TextCellValue('SHINE Code'),
-        TextCellValue('Latitude'),
-        TextCellValue('Longitude'),
-        TextCellValue('Location Accuracy'),
         TextCellValue('Survey Date'),
         TextCellValue('Status'),
-        TextCellValue('Created At'),
-        TextCellValue('Updated At')
+        TextCellValue('Family Members'),
+        TextCellValue('Total Income'),
+        TextCellValue('Export Status'),
       ]);
 
-      // Add survey data
+      int successCount = 0;
+      int skipCount = 0;
+      int errorCount = 0;
+
+      // Add overview data and create individual sheets
       for (final session in sessions) {
-        sheet.appendRow([
-          TextCellValue(session['phone_number'] ?? ''),
-          TextCellValue(session['village_name'] ?? ''),
-          TextCellValue(session['village_number'] ?? ''),
-          TextCellValue(session['panchayat'] ?? ''),
-          TextCellValue(session['block'] ?? ''),
-          TextCellValue(session['tehsil'] ?? ''),
-          TextCellValue(session['district'] ?? ''),
-          TextCellValue(session['postal_address'] ?? ''),
-          TextCellValue(session['pin_code'] ?? ''),
-          TextCellValue(session['surveyor_name'] ?? ''),
-          TextCellValue(session['surveyor_email'] ?? ''),
-          TextCellValue(session['shine_code'] ?? ''),
-          TextCellValue(session['latitude']?.toString() ?? ''),
-          TextCellValue(session['longitude']?.toString() ?? ''),
-          TextCellValue(session['location_accuracy']?.toString() ?? ''),
-          TextCellValue(session['survey_date'] ?? ''),
-          TextCellValue(session['status'] ?? ''),
-          TextCellValue(session['created_at'] ?? ''),
-          TextCellValue(session['updated_at'] ?? '')
-        ]);
+        final phoneNumber = session['phone_number'];
+        
+        // Better null handling - still export if phone is null (use ID as fallback)
+        final identifier = phoneNumber ?? session['id'] ?? 'unknown_${DateTime.now().millisecondsSinceEpoch}';
+        String exportStatus = 'Success';
+        
+        try {
+          // Add to overview
+          final members = await _db.getData('family_members', identifier);
+          final totalIncome = members.fold<double>(0.0, (sum, member) =>
+            sum + (double.tryParse(member['income']?.toString() ?? '0') ?? 0.0));
+
+          overviewSheet.appendRow([
+            TextCellValue(phoneNumber?.toString() ?? 'N/A'),
+            TextCellValue(session['village_name'] ?? 'N/A'),
+            TextCellValue(session['panchayat'] ?? ''),
+            TextCellValue(session['block'] ?? ''),
+            TextCellValue(session['district'] ?? ''),
+            TextCellValue(session['surveyor_name'] ?? ''),
+            TextCellValue(session['survey_date'] ?? ''),
+            TextCellValue(session['status'] ?? ''),
+            IntCellValue(members.length),
+            DoubleCellValue(totalIncome),
+            TextCellValue(exportStatus),
+          ]);
+
+          // Create individual comprehensive sheet for each survey
+          if (phoneNumber != null) {
+            try {
+              await _createIndividualSurveySheet(excel, phoneNumber);
+              successCount++;
+            } catch (e) {
+              exportStatus = 'Sheet Error: $e';
+              errorCount++;
+              print('⚠ Warning: Could not create detailed sheet for $phoneNumber: $e');
+            }
+          } else {
+            exportStatus = 'Skipped - No phone number';
+            skipCount++;
+            print('⚠ Warning: Survey has no phone number, skipping detailed export');
+          }
+
+        } catch (e) {
+          exportStatus = 'Error: $e';
+          errorCount++;
+          print('✗ Error processing survey $identifier: $e');
+          
+          // Still add to overview with error status
+          overviewSheet.appendRow([
+            TextCellValue(phoneNumber?.toString() ?? 'N/A'),
+            TextCellValue('ERROR'),
+            TextCellValue(''),
+            TextCellValue(''),
+            TextCellValue(''),
+            TextCellValue(''),
+            TextCellValue(''),
+            TextCellValue('error'),
+            IntCellValue(0),
+            DoubleCellValue(0),
+            TextCellValue(exportStatus),
+          ]);
+        }
       }
 
+      print('\n📊 Export Summary:');
+      print('  ✓ Successfully exported: $successCount surveys');
+      print('  ⚠ Skipped (no phone): $skipCount surveys');
+      print('  ✗ Errors: $errorCount surveys');
+      print('  📄 Total in overview: ${sessions.length} surveys\n');
+
       // Save and share file
-      await _saveExcelFile(excel, 'all_surveys.xlsx');
+      await _saveExcelFile(excel, 'all_complete_surveys_${DateTime.now().millisecondsSinceEpoch}.xlsx');
 
     } catch (e) {
       throw Exception('Failed to export surveys: $e');
     }
   }
 
+  // Create individual comprehensive sheet for a survey
+  Future<void> _createIndividualSurveySheet(Excel excel, String phoneNumber) async {
+    try {
+      final excelService = ExcelService();
+      final surveyData = await excelService.fetchCompleteSurveyData(phoneNumber);
+
+      if (surveyData.isEmpty) {
+        print('⚠ WARNING: No data found for survey $phoneNumber. Skipping sheet creation.');
+        return;
+      }
+
+      final sheetName = 'Survey_${phoneNumber.replaceAll('+', '').replaceAll('-', '')}';
+      final sheet = excel[sheetName];
+
+      // Create comprehensive report for this survey
+      await excelService.createComprehensiveReport(sheet, surveyData);
+
+    } catch (e) {
+      print('✗ Error creating individual survey sheet for $phoneNumber: $e');
+    }
+  }
+
   // Export complete survey data with all details to Excel
   Future<void> exportCompleteSurveyData(String phoneNumber) async {
     try {
-      final excel = Excel.createExcel();
-
-      // Get survey session
-      final session = await _db.getSurveySession(phoneNumber);
-      if (session == null) {
-        throw Exception('Survey session not found');
-      }
-
-      // Sheet 1: Survey Session
-      final sessionSheet = excel['Survey Session'];
-      sessionSheet.appendRow([TextCellValue('Field'), TextCellValue('Value')]);
-      session.forEach((key, value) {
-        sessionSheet.appendRow([TextCellValue(key), TextCellValue(value?.toString() ?? '')]);
-      });
-
-      // Sheet 2: Family Members
-      final membersSheet = excel['Family Members'];
-      final members = await _db.getData('family_members', phoneNumber);
-      if (members.isNotEmpty) {
-        membersSheet.appendRow(members.first.keys.map((k) => TextCellValue(k)).toList());
-        for (final member in members) {
-          membersSheet.appendRow(member.values.map((v) => TextCellValue(v?.toString() ?? '')).toList());
-        }
-      }
-
-      // Sheet 3: Agriculture Data
-      final agricultureSheet = excel['Agriculture'];
-      final agricultureData = await _db.getData('agriculture_data', phoneNumber);
-      if (agricultureData.isNotEmpty) {
-        agricultureSheet.appendRow(agricultureData.first.keys.map((k) => TextCellValue(k)).toList());
-        for (final data in agricultureData) {
-          agricultureSheet.appendRow(data.values.map((v) => TextCellValue(v?.toString() ?? '')).toList());
-        }
-      }
-
-      // Sheet 4: Crop Productivity
-      final cropsSheet = excel['Crop Productivity'];
-      final crops = await _db.getData('crop_productivity', phoneNumber);
-      if (crops.isNotEmpty) {
-        cropsSheet.appendRow(crops.first.keys.map((k) => TextCellValue(k)).toList());
-        for (final crop in crops) {
-          cropsSheet.appendRow(crop.values.map((v) => TextCellValue(v?.toString() ?? '')).toList());
-        }
-      }
-
-      // Sheet 5: Animals
-      final animalsSheet = excel['Animals'];
-      final animals = await _db.getData('animals', phoneNumber);
-      if (animals.isNotEmpty) {
-        animalsSheet.appendRow(animals.first.keys.map((k) => TextCellValue(k)).toList());
-        for (final animal in animals) {
-          animalsSheet.appendRow(animal.values.map((v) => TextCellValue(v?.toString() ?? '')).toList());
-        }
-      }
-
-      // Sheet 6: Government Schemes
-      final schemesSheet = excel['Government Schemes'];
-      final schemes = await _db.getData('merged_govt_schemes', phoneNumber);
-      if (schemes.isNotEmpty) {
-        schemesSheet.appendRow(schemes.first.keys.map((k) => TextCellValue(k)).toList());
-        for (final scheme in schemes) {
-          schemesSheet.appendRow(scheme.values.map((v) => TextCellValue(v?.toString() ?? '')).toList());
-        }
-      }
-
-      // Save and share file
-      await _saveExcelFile(excel, 'complete_survey_${phoneNumber}.xlsx');
-
+      // Use the comprehensive ExcelService method instead of duplicating logic
+      final excelService = ExcelService();
+      await excelService.exportCompleteSurveyToExcel(phoneNumber);
     } catch (e) {
-      throw Exception('Failed to export complete survey data: $e');
+      throw Exception('Failed to export complete survey: $e');
     }
   }
 
