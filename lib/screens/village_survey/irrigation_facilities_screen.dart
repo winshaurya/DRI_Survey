@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import 'seed_clubs_screen.dart';
@@ -26,7 +26,6 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
 
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;
 
     if (sessionId == null) {
@@ -53,13 +52,8 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
       await DatabaseHelper().insert('village_irrigation_facilities', data);
       print('Saved irrigation facilities to SQLite');
 
-      // 2. Save to Supabase (Non-blocking)
-      try {
-        await supabaseService.saveVillageData('village_irrigation_facilities', data);
-        print('Saved irrigation facilities to Supabase');
-      } catch (e) {
-        print('Supabase sync warning: $e');
-      }
+      await databaseService.markVillagePageCompleted(sessionId, 5);
+      await SyncService.instance.syncVillagePageData(sessionId, 5, data);
 
       if (mounted) {
         Navigator.push(

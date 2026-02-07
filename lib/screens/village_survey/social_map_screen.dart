@@ -8,7 +8,7 @@ import 'survey_details_screen.dart';
 import '../../services/file_upload_service.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 
 class SocialMapScreen extends StatefulWidget {
   const SocialMapScreen({super.key});
@@ -193,7 +193,8 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
   }
 
   Future<void> _submitForm() async {
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final syncService = SyncService.instance;
 
     if (_currentSessionId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -211,12 +212,9 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
 
     try {
       await DatabaseHelper().insert('village_social_maps', data);
-      
-      try {
-        await supabaseService.saveVillageData('village_social_maps', data);
-      } catch (e) {
-        print('Supabase sync failed (non-fatal): $e');
-      }
+
+      await databaseService.markVillagePageCompleted(_currentSessionId!, 8);
+      await syncService.syncVillagePageData(_currentSessionId!, 8, data);
 
       if (mounted) {
         Navigator.push(

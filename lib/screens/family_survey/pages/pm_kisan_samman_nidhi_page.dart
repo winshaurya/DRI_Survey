@@ -75,16 +75,28 @@ class _PMKisanSammanNidhiPageState extends ConsumerState<PMKisanSammanNidhiPage>
       title: 'PM Kisan Samman Nidhi Beneficiary',
       familyMemberNames: _familyMemberNames,
       data: _schemeData,
-      showNameIncluded: false,
+      showNameIncluded: true,
       showDetailsCorrect: true,
-      showReceived: true,
-      showDays: false,
+      showDays: true,
+      daysLabel: 'No. of days',
       onDataChanged: (newData) {
         setState(() {
           _schemeData = newData;
         });
         widget.onDataChanged({_schemeKey: newData});
       },
+    );
+  }
+}
+
+class PMKisanSammanNidhiRouteScreen extends StatelessWidget {
+  const PMKisanSammanNidhiRouteScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PMKisanSammanNidhiPage(
+      pageData: const {},
+      onDataChanged: (_) {},
     );
   }
 }

@@ -1,10 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:excel/excel.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
-import '../database/database_helper.dart';
 import '../services/database_service.dart';
 
 class ExcelService {
@@ -17,6 +15,9 @@ class ExcelService {
   ExcelService._internal();
 
   final DatabaseService _databaseService = DatabaseService();
+
+  static const int _maxEstimatedRows = 30000;
+  bool _isExporting = false;
 
   // Cell Styles
   final CellStyle _headerStyle = CellStyle(
@@ -48,24 +49,29 @@ class ExcelService {
     textWrapping: TextWrapping.WrapText,
   );
 
-  final CellStyle _tableHeaderStyle = CellStyle(
-    bold: true,
-    horizontalAlign: HorizontalAlign.Left,
-    verticalAlign: VerticalAlign.Center,
-    backgroundColorHex: ExcelColor.fromHexString('#F0F0F0'),
-  );
-
   // Track current row index manually to stack tables
   int _rowIndex = 0;
 
   /// Export complete survey data from SQLite to Excel
   Future<void> exportCompleteSurveyToExcel(String phoneNumber) async {
     try {
+      if (_isExporting) {
+        throw Exception('Another export is already in progress. Please wait.');
+      }
+      _isExporting = true;
+
       // Fetch ALL data from SQLite
       final surveyData = await fetchCompleteSurveyData(phoneNumber);
 
       if (surveyData.isEmpty) {
         throw Exception('No survey data found for phone number: $phoneNumber');
+      }
+
+      final estimatedRows = _estimateRowCount(surveyData);
+      if (estimatedRows > _maxEstimatedRows) {
+        throw Exception('Survey is too large to export safely ($estimatedRows rows). Please export a smaller subset.');
+      } else if (estimatedRows > (_maxEstimatedRows * 0.7)) {
+        print('⚠ Warning: Large export ($estimatedRows rows). This may take time.');
       }
 
       var excel = Excel.createExcel();
@@ -81,14 +87,154 @@ class ExcelService {
       await createComprehensiveReport(sheet, surveyData);
 
       // Save file
-      await _saveExcelFile(excel, 'complete_survey_${phoneNumber}_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+      await _saveExcelFile(excel, _safeFileName('complete_survey_${phoneNumber}_${DateTime.now().millisecondsSinceEpoch}.xlsx'));
 
     } catch (e) {
       throw Exception('Failed to export complete survey: $e');
+    } finally {
+      _isExporting = false;
     }
   }
 
-  /// Fetch ALL survey data from SQLite database
+
+  /// Export all surveys to a single comprehensive Excel file
+  Future<void> exportAllSurveysToExcel() async {
+    try {
+      if (_isExporting) {
+        throw Exception('Another export is already in progress. Please wait.');
+      }
+      _isExporting = true;
+
+      final db = DatabaseService();
+      final sessions = await db.getAllSurveySessions();
+
+      if (sessions.isEmpty) {
+        throw Exception('No survey data found to export');
+      }
+
+      final excel = Excel.createExcel();
+      final overviewSheet = excel['Survey Overview'];
+      
+      // Add headers
+      overviewSheet.appendRow([
+        TextCellValue('Phone Number'),
+        TextCellValue('Village Name'),
+        TextCellValue('Panchayat'),
+        TextCellValue('Block'),
+        TextCellValue('District'),
+        TextCellValue('Surveyor Name'),
+        TextCellValue('Survey Date'),
+        TextCellValue('Status'),
+        TextCellValue('Family Members'),
+        TextCellValue('Total Income'),
+        TextCellValue('Export Status'),
+      ]);
+
+      for (final session in sessions) {
+        final phoneNumber = session['phone_number'];
+        final identifier = phoneNumber ?? session['id'] ?? 'unknown_${DateTime.now().millisecondsSinceEpoch}';
+        String exportStatus = 'Success';
+        
+        try {
+          final members = await db.getData('family_members', identifier);
+          final totalIncome = members.fold<double>(0.0, (sum, member) =>
+            sum + (double.tryParse(member['income']?.toString() ?? '0') ?? 0.0));
+
+          if (phoneNumber == null) {
+            exportStatus = 'Skipped - No phone number';
+          }
+
+          overviewSheet.appendRow([
+            TextCellValue(phoneNumber?.toString() ?? 'N/A'),
+            TextCellValue(session['village_name'] ?? 'N/A'),
+            TextCellValue(session['panchayat'] ?? ''),
+            TextCellValue(session['block'] ?? ''),
+            TextCellValue(session['district'] ?? ''),
+            TextCellValue(session['surveyor_name'] ?? ''),
+            TextCellValue(session['survey_date'] ?? ''),
+            TextCellValue(session['status'] ?? ''),
+            IntCellValue(members.length),
+            DoubleCellValue(totalIncome),
+            TextCellValue(exportStatus),
+          ]);
+
+        } catch (e) {
+          exportStatus = 'Error: $e';
+          print('✗ Error processing survey $identifier: $e');
+          
+          overviewSheet.appendRow([
+            TextCellValue(phoneNumber?.toString() ?? 'N/A'),
+            TextCellValue('ERROR'),
+            TextCellValue(''),
+            TextCellValue(''),
+            TextCellValue(''),
+            TextCellValue(''),
+            TextCellValue(''),
+            TextCellValue('error'),
+            IntCellValue(0),
+            DoubleCellValue(0),
+            TextCellValue(exportStatus),
+          ]);
+        }
+      }
+
+      print('\n📊 Export Summary:');
+      print('  📄 Total in overview: ${sessions.length} surveys\n');
+
+      await _saveExcelFile(excel, _safeFileName('all_surveys_${DateTime.now().millisecondsSinceEpoch}.xlsx'));
+
+    } catch (e) {
+      throw Exception('Failed to export all surveys: $e');
+    } finally {
+      _isExporting = false;
+    }
+  }
+
+  /// Export complete survey data with all details to Excel
+  Future<void> exportCompleteSurveyData(String phoneNumber) async {
+    await exportCompleteSurveyToExcel(phoneNumber);
+  }
+
+  /// Export complete village survey data to Excel (single sheet)
+  Future<void> exportCompleteVillageSurveyToExcel(String sessionId) async {
+    try {
+      if (_isExporting) {
+        throw Exception('Another export is already in progress. Please wait.');
+      }
+      _isExporting = true;
+
+      final surveyData = await fetchCompleteVillageSurveyData(sessionId);
+      if (surveyData.isEmpty) {
+        throw Exception('No village survey data found for session: $sessionId');
+      }
+
+      var excel = Excel.createExcel();
+      String sheetName = 'Village Survey Report';
+      if (excel.sheets.containsKey('Sheet1')) {
+        excel.rename('Sheet1', sheetName);
+      }
+
+      Sheet sheet = excel[sheetName];
+      _rowIndex = 0;
+
+      await createVillageSurveyReport(sheet, surveyData);
+
+      await _saveExcelFile(
+        excel,
+        _safeFileName('village_survey_${sessionId}_${DateTime.now().millisecondsSinceEpoch}.xlsx'),
+      );
+    } catch (e) {
+      throw Exception('Failed to export village survey: $e');
+    } finally {
+      _isExporting = false;
+    }
+  }
+
+  String _safeSheetName(String name) {
+    final sanitized = name.replaceAll(RegExp(r'[^A-Za-z0-9_\-]'), '_');
+    return sanitized.length > 31 ? sanitized.substring(0, 31) : sanitized;
+  }
+
   Future<Map<String, dynamic>> fetchCompleteSurveyData(String phoneNumber) async {
     final data = <String, dynamic>{};
     final missingTables = <String>[];
@@ -106,6 +252,8 @@ class ExcelService {
       // 2. Get all related data tables
       final dataMappings = {
         'family_members': 'family_members',
+        'social_consciousness': 'social_consciousness',
+        'tribal_questions': 'tribal_questions',
         'land_holding': 'land_holding',
         'irrigation_facilities': 'irrigation_facilities',
         'crop_productivity': 'crop_productivity',
@@ -120,20 +268,16 @@ class ExcelService {
         'house_conditions': 'house_conditions',
         'house_facilities': 'house_facilities',
         'diseases': 'diseases',
-        'social_consciousness': 'social_consciousness',
-        'children_data': 'children_data',
-        'malnourished_children_data': 'malnourished_children_data',
-        'child_diseases': 'child_diseases',
-        'folklore_medicine': 'folklore_medicine',
         'health_programmes': 'health_programmes',
-        'migration_data': 'migration_data',
-        'training_data': 'training_data',
+        'folklore_medicine': 'folklore_medicine',
         'shg_members': 'shg_members',
         'fpo_members': 'fpo_members',
         'bank_accounts': 'bank_accounts',
-        'tulsi_plants': 'tulsi_plants',
-        'nutritional_garden': 'nutritional_garden',
-        'malnutrition_data': 'malnutrition_data',
+        'children_data': 'children_data',
+        'malnourished_children_data': 'malnourished_children_data',
+        'child_diseases': 'child_diseases',
+        'migration_data': 'migration_data',
+        'training_data': 'training_data',
       };
 
       for (final entry in dataMappings.entries) {
@@ -180,6 +324,87 @@ class ExcelService {
     }
 
     return data;
+  }
+
+  /// Fetch complete village survey data from local database
+  Future<Map<String, dynamic>> fetchCompleteVillageSurveyData(String sessionId) async {
+    final db = await _databaseService.database;
+
+    final sessions = await db.query(
+      'village_survey_sessions',
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+    );
+
+    if (sessions.isEmpty) {
+      throw Exception('Village survey session not found: $sessionId');
+    }
+
+    final surveyData = Map<String, dynamic>.from(sessions.first);
+
+    final tables = [
+      'village_population',
+      'village_farm_families',
+      'village_housing',
+      'village_agricultural_implements',
+      'village_crop_productivity',
+      'village_animals',
+      'village_irrigation_facilities',
+      'village_drinking_water',
+      'village_transport',
+      'village_entertainment',
+      'village_medical_treatment',
+      'village_disputes',
+      'village_educational_facilities',
+      'village_social_consciousness',
+      'village_children_data',
+      'village_malnutrition_data',
+      'village_bpl_families',
+      'village_kitchen_gardens',
+      'village_seed_clubs',
+      'village_biodiversity_register',
+      'village_traditional_occupations',
+      'village_drainage_waste',
+      'village_signboards',
+      'village_infrastructure',
+      'village_infrastructure_details',
+      'village_survey_details',
+      'village_map_points',
+      'village_forest_maps',
+      'village_cadastral_maps',
+      'village_unemployment',
+      'village_social_maps',
+      'village_transport_facilities',
+    ];
+
+    for (final table in tables) {
+      try {
+        final data = await db.query(
+          table,
+          where: 'session_id = ?',
+          whereArgs: [sessionId],
+        );
+        if (data.isNotEmpty) {
+          if (_isOneToManyVillageTable(table)) {
+            surveyData[table] = data;
+          } else {
+            surveyData[table] = data.first;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return surveyData;
+  }
+
+  bool _isOneToManyVillageTable(String tableName) {
+    const oneToManyTables = {
+      'village_crop_productivity',
+      'village_animals',
+      'village_malnutrition_data',
+      'village_traditional_occupations',
+    };
+    return oneToManyTables.contains(tableName);
   }
 
   /// Fetch all government schemes data
@@ -250,6 +475,122 @@ class ExcelService {
     _addOtherInformationSection(sheet, data);
   }
 
+  /// Create a single-sheet village survey report with clear headings
+  Future<void> createVillageSurveyReport(Sheet sheet, Map<String, dynamic> data) async {
+    for (int i = 0; i < 15; i++) {
+      double width = 22;
+      if (i == 0) width = 32;
+      sheet.setColumnWidth(i, width);
+    }
+
+    _writeSectionHeader(sheet, 'VILLAGE SURVEY REPORT');
+
+    _writeKeyValuePair(sheet, 'Village Name:', data['village_name']);
+    _writeKeyValuePair(sheet, 'Panchayat:', data['panchayat']);
+    _writeKeyValuePair(sheet, 'Block:', data['block']);
+    _writeKeyValuePair(sheet, 'District:', data['district']);
+    _writeKeyValuePair(sheet, 'Survey Date:', data['survey_date']);
+    _writeKeyValuePair(sheet, 'Surveyor Name:', data['surveyor_name']);
+    _rowIndex++;
+
+    final sectionOrder = <String, String>{
+      'village_population': 'Population',
+      'village_farm_families': 'Farm Families',
+      'village_housing': 'Housing',
+      'village_agricultural_implements': 'Agricultural Implements',
+      'village_crop_productivity': 'Crop Productivity',
+      'village_animals': 'Animals',
+      'village_irrigation_facilities': 'Irrigation Facilities',
+      'village_drinking_water': 'Drinking Water',
+      'village_transport': 'Transport',
+      'village_transport_facilities': 'Transport Facilities',
+      'village_entertainment': 'Entertainment',
+      'village_medical_treatment': 'Medical Treatment',
+      'village_disputes': 'Disputes',
+      'village_educational_facilities': 'Educational Facilities',
+      'village_social_consciousness': 'Social Consciousness',
+      'village_children_data': 'Children Data',
+      'village_malnutrition_data': 'Malnutrition Data',
+      'village_bpl_families': 'BPL Families',
+      'village_kitchen_gardens': 'Kitchen Gardens',
+      'village_seed_clubs': 'Seed Clubs',
+      'village_biodiversity_register': 'Biodiversity Register',
+      'village_traditional_occupations': 'Traditional Occupations',
+      'village_drainage_waste': 'Drainage & Waste',
+      'village_signboards': 'Signboards',
+      'village_infrastructure': 'Infrastructure',
+      'village_infrastructure_details': 'Infrastructure Details',
+      'village_survey_details': 'Survey Details',
+      'village_map_points': 'Map Points',
+      'village_forest_maps': 'Forest Maps',
+      'village_cadastral_maps': 'Cadastral Maps',
+      'village_unemployment': 'Unemployment',
+      'village_social_maps': 'Social Maps',
+    };
+
+    for (final entry in sectionOrder.entries) {
+      final sectionData = data[entry.key];
+      if (sectionData == null) continue;
+
+      _writeSectionHeader(sheet, entry.value.toUpperCase());
+
+      if (sectionData is Map<String, dynamic>) {
+        _writeMapSection(sheet, sectionData);
+      } else if (sectionData is List) {
+        _writeListSection(sheet, sectionData);
+      }
+
+      _rowIndex++;
+    }
+  }
+
+  void _writeMapSection(Sheet sheet, Map<String, dynamic> data) {
+    for (final entry in data.entries) {
+      if (_shouldSkipVillageField(entry.key)) continue;
+      _writeKeyValuePair(sheet, '${_prettyLabel(entry.key)}:', entry.value);
+    }
+  }
+
+  void _writeListSection(Sheet sheet, List<dynamic> rows) {
+    if (rows.isEmpty || rows.first is! Map) {
+      _writeKeyValuePair(sheet, 'No data', '-');
+      return;
+    }
+
+    final first = Map<String, dynamic>.from(rows.first as Map);
+    final headers = first.keys.where((k) => !_shouldSkipVillageField(k)).toList();
+    if (headers.isEmpty) {
+      _writeKeyValuePair(sheet, 'No data', '-');
+      return;
+    }
+
+    _writeTableHeader(sheet, headers.map(_prettyLabel).toList());
+
+    for (final row in rows) {
+      final mapRow = Map<String, dynamic>.from(row as Map);
+      final cells = headers.map((key) => TextCellValue(mapRow[key]?.toString() ?? '')).toList();
+      _writeTableRow(sheet, cells);
+    }
+  }
+
+  String _prettyLabel(String key) {
+    final words = key.replaceAll('_', ' ').split(' ');
+    return words.map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
+  }
+
+  bool _shouldSkipVillageField(String key) {
+    const skip = {
+      'id',
+      'session_id',
+      'created_at',
+      'updated_at',
+      'sync_status',
+      'sync_pending',
+      'last_synced_at',
+    };
+    return skip.contains(key);
+  }
+
   /// Legacy method for backward compatibility
   Future<void> exportSurveyToExcel(Map<String, dynamic> surveyData) async {
     // If phone number is available, use the new comprehensive method
@@ -276,7 +617,10 @@ class ExcelService {
     _addSchemesSection(sheet, surveyData);
     _addOtherSection(sheet, surveyData);
 
-    await _saveExcelFile(excel, 'survey_${surveyData['village_name'] ?? 'export'}_${surveyData['head_of_family'] ?? 'family'}.xlsx');
+    await _saveExcelFile(
+      excel,
+      _safeFileName('survey_${surveyData['village_name'] ?? 'export'}_${surveyData['head_of_family'] ?? 'family'}.xlsx'),
+    );
   }
 
   // --- Helper Methods ---
@@ -328,10 +672,10 @@ class ExcelService {
       for (var member in data['family_members']) {
         List<CellValue> row = [
           TextCellValue(member['name']?.toString() ?? ''),
-          TextCellValue(member['relationship']?.toString() ?? ''),
+          TextCellValue((member['relationship_with_head'] ?? member['relationship'])?.toString() ?? ''),
           IntCellValue(int.tryParse(member['age']?.toString() ?? '0') ?? 0),
           TextCellValue(member['sex']?.toString() ?? ''),
-          TextCellValue(member['education']?.toString() ?? ''),
+          TextCellValue((member['educational_qualification'] ?? member['education'])?.toString() ?? ''),
           TextCellValue(member['occupation']?.toString() ?? ''),
           DoubleCellValue(double.tryParse(member['income']?.toString() ?? '0') ?? 0.0),
         ];
@@ -346,9 +690,10 @@ class ExcelService {
     
     // Land
      _writeSubSectionHeader(sheet, "Land Holdings (Acres for Year)");
-     _writeKeyValuePair(sheet, "Irrigated Land:", data['irrigated_land']);
-     _writeKeyValuePair(sheet, "Unirrigated Land:", data['unirrigated_land']);
-     _writeKeyValuePair(sheet, "Barren Land:", data['barren_land']);
+     final land = (data['land_holding'] is Map<String, dynamic>) ? data['land_holding'] as Map<String, dynamic> : data;
+     _writeKeyValuePair(sheet, "Irrigated Land:", land['irrigated_area'] ?? land['irrigated_land']);
+     _writeKeyValuePair(sheet, "Unirrigated Land:", land['unirrigated_area'] ?? land['unirrigated_land']);
+     _writeKeyValuePair(sheet, "Barren Land:", land['barren_land']);
      _rowIndex++;
 
     // Crops
@@ -356,14 +701,15 @@ class ExcelService {
     List<String> cropHeaders = ['Crop Name', 'Area (Acres)', 'Production (Q)', 'Sold (Q)', 'Rate (Rs)'];
     _writeTableHeader(sheet, cropHeaders);
     
-    if (data['crops'] != null && data['crops'] is List) {
-      for (var crop in data['crops']) {
+    final crops = data['crop_productivity'] ?? data['crops'];
+    if (crops != null && crops is List) {
+      for (var crop in crops) {
         _writeTableRow(sheet, [
           TextCellValue(crop['crop_name']?.toString() ?? ''),
-          DoubleCellValue(double.tryParse(crop['area']?.toString() ?? '0') ?? 0),
-          DoubleCellValue(double.tryParse(crop['production']?.toString() ?? '0') ?? 0),
-          DoubleCellValue(double.tryParse(crop['quantity_sold']?.toString() ?? '0') ?? 0),
-          DoubleCellValue(double.tryParse(crop['rate']?.toString() ?? '0') ?? 0),
+          DoubleCellValue(double.tryParse((crop['area_hectares'] ?? crop['area'])?.toString() ?? '0') ?? 0),
+          DoubleCellValue(double.tryParse((crop['total_production_quintal'] ?? crop['production'])?.toString() ?? '0') ?? 0),
+          DoubleCellValue(double.tryParse((crop['quantity_sold_quintal'] ?? crop['quantity_sold'])?.toString() ?? '0') ?? 0),
+          DoubleCellValue(double.tryParse((crop['rate'] ?? crop['price_per_quintal'])?.toString() ?? '0') ?? 0),
         ]);
       }
     }
@@ -381,9 +727,9 @@ class ExcelService {
       for (var x in data['animals']) {
         _writeTableRow(sheet, [
           TextCellValue(x['animal_type']?.toString() ?? ''),
-          IntCellValue(int.tryParse(x['count']?.toString() ?? '0') ?? 0),
+          IntCellValue(int.tryParse((x['number_of_animals'] ?? x['count'])?.toString() ?? '0') ?? 0),
           TextCellValue(x['breed']?.toString() ?? ''),
-          DoubleCellValue(double.tryParse(x['milk_production']?.toString() ?? '0') ?? 0),
+          DoubleCellValue(double.tryParse((x['production_per_animal'] ?? x['milk_production'])?.toString() ?? '0') ?? 0),
         ]);
       }
     }
@@ -392,10 +738,15 @@ class ExcelService {
     _rowIndex++;
     _writeSubSectionHeader(sheet, "Farm Equipment");
     List<String> equipments = [];
-    if (data['tractor'] != null && data['tractor'].toString().isNotEmpty) equipments.add("Tractor: ${data['tractor']}");
-    if (data['pump_set'] != null && data['pump_set'].toString().isNotEmpty) equipments.add("Pump Set: ${data['pump_set']}");
-    if (data['thresher'] != null && data['thresher'].toString().isNotEmpty) equipments.add("Thresher: ${data['thresher']}");
-    if (data['sprayer'] != null && data['sprayer'].toString().isNotEmpty) equipments.add("Sprayer: ${data['sprayer']}");
+    final equipmentData = (data['agricultural_equipment'] is Map<String, dynamic>)
+      ? data['agricultural_equipment'] as Map<String, dynamic>
+      : data;
+    if (equipmentData['tractor'] != null && equipmentData['tractor'].toString().isNotEmpty) equipments.add("Tractor: ${equipmentData['tractor']}");
+    if (equipmentData['diesel_engine'] != null && equipmentData['diesel_engine'].toString().isNotEmpty) equipments.add("Diesel Engine: ${equipmentData['diesel_engine']}");
+    if (equipmentData['thresher'] != null && equipmentData['thresher'].toString().isNotEmpty) equipments.add("Thresher: ${equipmentData['thresher']}");
+    if (equipmentData['sprayer'] != null && equipmentData['sprayer'].toString().isNotEmpty) equipments.add("Sprayer: ${equipmentData['sprayer']}");
+    if (equipmentData['seed_drill'] != null && equipmentData['seed_drill'].toString().isNotEmpty) equipments.add("Seed Drill: ${equipmentData['seed_drill']}");
+    if (equipmentData['other_equipment'] != null && equipmentData['other_equipment'].toString().isNotEmpty) equipments.add("Other: ${equipmentData['other_equipment']}");
     
     sheet.cell(CellIndex.indexByString("A${_rowIndex + 1}")).value = TextCellValue(equipments.join(", "));
     _rowIndex++;
@@ -443,11 +794,12 @@ class ExcelService {
     // 1. General Programs (Flat list)
     _writeSubSectionHeader(sheet, "General Programs (Yes/No)");
     List<List<String>> generalSchemes = [
+      ['PM Kisan Nidhi', _getBeneficiaryStatus(data, 'pm_kisan_nidhi')],
       ['PM Kisan Samman Nidhi', _getBeneficiaryStatus(data, 'pm_kisan_samman_nidhi')],
       ['Kisan Credit Card', _getBeneficiaryStatus(data, 'kisan_credit_card')],
-      ['Swachh Bharat Mission', _getBeneficiaryStatus(data, 'swachh_bharat_mission')],
+      ['Swachh Bharat Mission', _getBeneficiaryStatus(data, 'swachh_bharat')],
       ['Fasal Bima Yojana', _getBeneficiaryStatus(data, 'fasal_bima')],
-      ['VB Gram G', _getBeneficiaryStatus(data, 'vb_gram_g')],
+      ['VB Gram G', _getBeneficiaryStatus(data, 'vb_gram')],
       ['Ujjwala Yojana', _getBeneficiaryStatus(data, 'ujjwala_yojana')],
       ['PM Awas Yojana', _getBeneficiaryStatus(data, 'pm_awas')],
       ['Ladli Behna', _getBeneficiaryStatus(data, 'ladli_behna')],
@@ -479,18 +831,34 @@ class ExcelService {
   }
   
   String _getBeneficiaryStatus(Map<String, dynamic> data, String key) {
-    // Check if key exists in general fields or in beneficiary_programs list
+    // Check if key exists in general fields
     if (data.containsKey(key)) {
-       var val = data[key];
-       if (val is Map) return val['is_beneficiary'] == true ? "Yes" : "No";
-       if (val is String) return val;
+      var val = data[key];
+      if (val is List && val.isNotEmpty) {
+        val = val.first;
+      }
+      if (val is Map) return val['is_beneficiary'] == true ? "Yes" : "No";
+      if (val is String) return val;
     }
-    // Also check the generic 'beneficiary_programs' list for program_type == key
-    if (data['beneficiary_programs'] != null && data['beneficiary_programs'] is List) {
-      for (var p in data['beneficiary_programs']) {
-        if (p['program_type'] == key) {
-           return (p['beneficiary'] == 1 || p['beneficiary'] == true) ? "Yes" : "No";
-        }
+
+    // Check merged schemes (scheme_data JSON)
+    final merged = data['merged_govt_schemes'];
+    if (merged is List && merged.isNotEmpty) {
+      final row = merged.first;
+      final raw = row['scheme_data'];
+      if (raw is String && raw.trim().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map && decoded.containsKey(key)) {
+            final val = decoded[key];
+            if (val is Map) return val['is_beneficiary'] == true ? "Yes" : "No";
+            if (val is String) return val;
+          }
+        } catch (_) {}
+      } else if (raw is Map && raw.containsKey(key)) {
+        final val = raw[key];
+        if (val is Map) return val['is_beneficiary'] == true ? "Yes" : "No";
+        if (val is String) return val;
       }
     }
     return "-";
@@ -634,7 +1002,7 @@ class ExcelService {
     // Handicapped Allowance
     _writeSchemeTable(sheet, "Handicapped Allowance", data['handicapped_scheme_members']);
 
-    // VB Gram - Fixed: use vb_gram main table (no vb_gram_members)
+    // VB Gram
     if (data['vb_gram'] != null && data['vb_gram'] is Map) {
       _writeSubSectionHeader(sheet, "VB Gram Membership");
       final vbGram = data['vb_gram'];
@@ -642,13 +1010,27 @@ class ExcelService {
       _writeKeyValuePair(sheet, "Total Members:", vbGram['total_members'] ?? '-');
     }
 
-    // PM Kisan Nidhi - Fixed: use pm_kisan_nidhi main table (no pm_kisan_members)
+    _writeSchemeTable(sheet, "VB Gram Members", data['vb_gram_members']);
+
+    // PM Kisan Nidhi
     if (data['pm_kisan_nidhi'] != null && data['pm_kisan_nidhi'] is Map) {
       _writeSubSectionHeader(sheet, "PM Kisan Nidhi");
       final pmKisan = data['pm_kisan_nidhi'];
       _writeKeyValuePair(sheet, "Is Beneficiary:", pmKisan['is_beneficiary'] ?? '-');
       _writeKeyValuePair(sheet, "Total Members:", pmKisan['total_members'] ?? '-');
     }
+
+    _writeSchemeTable(sheet, "PM Kisan Members", data['pm_kisan_members']);
+
+    // PM Kisan Samman Nidhi
+    if (data['pm_kisan_samman_nidhi'] != null && data['pm_kisan_samman_nidhi'] is Map) {
+      _writeSubSectionHeader(sheet, "PM Kisan Samman Nidhi");
+      final pmSamman = data['pm_kisan_samman_nidhi'];
+      _writeKeyValuePair(sheet, "Is Beneficiary:", pmSamman['is_beneficiary'] ?? '-');
+      _writeKeyValuePair(sheet, "Total Members:", pmSamman['total_members'] ?? '-');
+    }
+
+    _writeSchemeTable(sheet, "PM Kisan Samman Members", data['pm_kisan_samman_members']);
   }
 
   void _addSocialConsciousnessSection(Sheet sheet, Map<String, dynamic> data) {
@@ -798,7 +1180,7 @@ class ExcelService {
   }
 
   void _addOtherInformationSection(Sheet sheet, Map<String, dynamic> data) {
-    _writeSectionHeader(sheet, "ADDITIONAL INFORMATION");
+    _writeSectionHeader(sheet, "CHILDREN, MIGRATION & DISPUTES");
 
     // Children Data
     _writeSubSectionHeader(sheet, "Children Statistics");
@@ -868,31 +1250,56 @@ class ExcelService {
     return types.isEmpty ? 'Not specified' : types.join(', ');
   }
 
-  Future<void> _saveExcelFile(Excel excel, String fileName) async {
-    var fileBytes = excel.save();
-    if (fileBytes == null) return;
-    Uint8List data = Uint8List.fromList(fileBytes);
-
-    if (Platform.isAndroid || Platform.isIOS) {
-      await FilePicker.platform.saveFile(
-        dialogTitle: 'Save Complete Survey Report',
-        fileName: fileName,
-        bytes: data,
-      );
-    } else {
-      String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save Complete Survey Report',
-        fileName: fileName,
-      );
-
-      if (outputFile != null) {
-        if (!outputFile.endsWith('.xlsx')) {
-          outputFile += '.xlsx';
-        }
-        File(outputFile)
-          ..createSync(recursive: true)
-          ..writeAsBytesSync(data);
+  int _estimateRowCount(Map<String, dynamic> data) {
+    int count = 50; // base rows for headers/sections
+    for (final entry in data.entries) {
+      final value = entry.value;
+      if (value is List) {
+        count += value.length + 2;
+      } else if (value is Map) {
+        count += value.length > 10 ? 5 : 2;
       }
+    }
+    return count;
+  }
+
+  String _safeFileName(String fileName) {
+    final sanitized = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    return sanitized.replaceAll(RegExp(r'\s+'), '_');
+  }
+
+  Future<void> _saveExcelFile(Excel excel, String fileName) async {
+    try {
+      final safeName = _safeFileName(fileName);
+      final fileBytes = excel.save();
+      if (fileBytes == null) {
+        throw Exception('Excel encoding failed (empty bytes)');
+      }
+      final data = Uint8List.fromList(fileBytes);
+
+      if (Platform.isAndroid || Platform.isIOS) {
+        await FilePicker.platform.saveFile(
+          dialogTitle: 'Save Complete Survey Report',
+          fileName: safeName,
+          bytes: data,
+        );
+      } else {
+        String? outputFile = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save Complete Survey Report',
+          fileName: safeName,
+        );
+
+        if (outputFile != null) {
+          if (!outputFile.endsWith('.xlsx')) {
+            outputFile += '.xlsx';
+          }
+          File(outputFile)
+            ..createSync(recursive: true)
+            ..writeAsBytesSync(data);
+        }
+      }
+    } catch (e) {
+      throw Exception('Failed to save Excel file: $e');
     }
   }
 }

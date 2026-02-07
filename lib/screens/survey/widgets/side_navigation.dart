@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -610,7 +611,7 @@ class SideNavigation extends ConsumerWidget {
         content: SizedBox(
           width: double.maxFinite,
           child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: DatabaseService().getAllSurveySessions(),
+            future: kIsWeb ? Future.value([]) : DatabaseService().getAllSurveySessions(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());

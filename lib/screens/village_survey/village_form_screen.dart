@@ -5,7 +5,7 @@ import 'package:location/location.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../data/india_states_districts.dart';
 import '../../data/shine_villages.dart';
@@ -202,7 +202,7 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
     );
 
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final syncService = SyncService.instance;
     
     // Create a new session ID
     final sessionId = const Uuid().v4();
@@ -231,13 +231,9 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
       // 1. Save to SQLite and set current session
       await databaseService.createNewVillageSurveySession(sessionData); // This sets _currentSessionId
       
-      // 2. Save to Supabase (with timeout to prevent hanging)
-      try {
-        await supabaseService.saveVillageData('village_survey_sessions', sessionData).timeout(const Duration(seconds: 5));
-      } catch (e) {
-        print('Supabase sync warning: $e');
-        // Continue navigation even if sync fails
-      }
+      // 2. Mark page completion and sync immediately (queue fallback)
+      await databaseService.markVillagePageCompleted(sessionId, 0);
+      await syncService.syncVillagePageData(sessionId, 0, sessionData);
 
       if (mounted) {
         // Close loading dialog

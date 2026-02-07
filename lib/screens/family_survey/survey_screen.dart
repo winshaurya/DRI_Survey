@@ -38,7 +38,8 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
         if (args.containsKey('previewSessionId')) {
           _handlePreviewMode(args['previewSessionId']);
         } else if (args.containsKey('continueSessionId')) {
-          _handleContinueMode(args['continueSessionId']);
+          final startPage = args['startPage'] is int ? args['startPage'] as int : 0;
+          _handleContinueMode(args['continueSessionId'], startPage: startPage);
         }
       }
     }
@@ -71,9 +72,12 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     });
   }
 
-  Future<void> _handleContinueMode(String continueSessionId) async {
+  Future<void> _handleContinueMode(String continueSessionId, {int startPage = 0}) async {
     final surveyNotifier = ref.read(surveyProvider.notifier);
-    await surveyNotifier.loadSurveySessionForContinuation(continueSessionId);
+    await surveyNotifier.loadSurveySessionForContinuation(continueSessionId, startPage: startPage);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pageController.jumpToPage(startPage);
+    });
   }
 
   @override
@@ -115,7 +119,8 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
       'Migration',
       'Training',
       'VB-G RAM-G',
-      'PM Kisan',
+      'PM Kisan Nidhi',
+      'PM Kisan Samman',
       'Kisan CC',
       'Swachh',
       'Fasal Bima',
@@ -166,6 +171,15 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                             if (index < surveyState.totalPages - 1) {
                               // Constraints disabled: always allow next page
                               if (index == 0) {
+                                final phoneNumber =
+                                    (surveyState.surveyData['phone_number'] ?? '').toString().trim();
+                                if (phoneNumber.isEmpty) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Phone number is required to start the survey.')),
+                                  );
+                                  return;
+                                }
                                 await surveyNotifier.initializeSurvey(
                                   villageName: surveyState.surveyData['village_name'] ?? '',
                                   villageNumber: surveyState.surveyData['village_number'],
@@ -176,7 +190,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                                   postalAddress: surveyState.surveyData['postal_address'],
                                   pinCode: surveyState.surveyData['pin_code'],
                                   surveyorName: surveyState.surveyData['surveyor_name'],
-                                  phoneNumber: surveyState.surveyData['phone_number'],
+                                  phoneNumber: phoneNumber,
                                 );
                               }
                               // CRITICAL FIX: Save current page data before navigation

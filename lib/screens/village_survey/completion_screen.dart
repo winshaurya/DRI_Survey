@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
-import 'village_form_screen.dart';
+import '../../services/sync_service.dart';
+import 'village_survey_preview_page.dart';
 
 class CompletionScreen extends StatelessWidget {
   const CompletionScreen({super.key});
@@ -92,47 +92,41 @@ class CompletionScreen extends StatelessWidget {
                     onPressed: () async {
                       try {
                         final databaseService = Provider.of<DatabaseService>(context, listen: false);
-                        final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+                        final syncService = SyncService.instance;
                         final sessionId = databaseService.currentSessionId;
 
                         if (sessionId != null) {
-                          final updateData = {
-                            'status': 'completed',
-                            'updated_at': DateTime.now().toIso8601String()
-                          };
+                          // Get the shine_code from the session
+                          final session = await databaseService.getVillageSurveySession(sessionId);
+                          final shineCode = session?['shine_code'] as String?;
 
-                          await DatabaseHelper().update(
-                            'village_survey_sessions',
-                            updateData,
-                            where: 'session_id = ?',
-                            whereArgs: [sessionId],
-                          );
-
-                          // Sync to Supabase
-                          try {
-                            await supabaseService.saveVillageData('village_survey_sessions', {
-                              'session_id': sessionId,
-                              ...updateData,
-                            });
-                          } catch (e) {
-                            print('Error syncing completion status: $e');
+                          if (shineCode != null) {
+                            // Navigate to preview page instead of home
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (context) => VillageSurveyPreviewPage(
+                                  shineCode: shineCode,
+                                  fromHistory: false,
+                                  showSubmitButton: true, // Show submit button from survey flow
+                                ),
+                              ),
+                            );
+                            return;
                           }
                         }
                       } catch (e) {
-                        print('Error completing session: $e');
+                        print('Error loading preview: $e');
                       }
 
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (context) => const VillageFormScreen()),
-                        (route) => false, // Remove all previous routes
-                      );
+                      // Fallback to home if anything fails
+                      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color(0xFF800080),
                       padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                     ),
-                    icon: Icon(Icons.home),
-                    label: Text('Back to Home'),
+                    icon: Icon(Icons.preview),
+                    label: Text('View Survey'),
                   ),
                 ],
               ),

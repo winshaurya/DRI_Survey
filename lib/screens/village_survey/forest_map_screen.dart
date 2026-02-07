@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 import 'cadastral_map_screen.dart'; // Import the previous screen
 import 'biodiversity_register_screen.dart';
 
@@ -25,7 +25,7 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
 
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final syncService = SyncService.instance;
     final sessionId = databaseService.currentSessionId;
 
     if (sessionId == null) {
@@ -48,12 +48,9 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
 
     try {
       await DatabaseHelper().insert('village_forest_maps', data);
-      
-      try {
-        await supabaseService.saveVillageData('village_forest_maps', data);
-      } catch (e) {
-         print('Supabase sync warning: $e');
-      }
+
+      await databaseService.markVillagePageCompleted(sessionId, 11);
+      await syncService.syncVillagePageData(sessionId, 11, data);
 
       if (mounted) {
         Navigator.push(

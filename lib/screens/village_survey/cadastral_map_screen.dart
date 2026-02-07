@@ -5,7 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 import 'detailed_map_screen.dart'; // Import the previous screen
 import 'forest_map_screen.dart';
 
@@ -54,7 +54,7 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
 
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final syncService = SyncService.instance;
     
     // Get session ID (ensure DatabaseService is updated to return String ID)
     final sessionId = databaseService.currentSessionId;
@@ -84,12 +84,9 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
       // Assuming it doesn't exist yet based on previous file reads of DatabaseHelper.
       // I will add the table creation to DatabaseHelper shortly.
       await DatabaseHelper().insert('village_cadastral_maps', data);
-      
-      try {
-        await supabaseService.saveVillageData('village_cadastral_maps', data);
-      } catch (e) {
-        print('Supabase sync warning: $e');
-      }
+
+      await databaseService.markVillagePageCompleted(sessionId, 13);
+      await syncService.syncVillagePageData(sessionId, 13, data);
 
       if (mounted) {
         Navigator.push(

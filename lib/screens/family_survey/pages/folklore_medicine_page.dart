@@ -108,15 +108,14 @@ class _FolkloreMedicinePageState extends ConsumerState<FolkloreMedicinePage> {
           'plant_botanical_name': _plantBotanicalNameController.text.trim(),
           'uses': _usesController.text.trim(),
         });
+
+        // Clear form for next entry
+        _selectedFamilyMember = null;
+        _plantLocalNameController.clear();
+        _plantBotanicalNameController.clear();
+        _usesController.clear();
       });
 
-      // Clear controllers
-      _selectedFamilyMember = null;
-      _plantLocalNameController.clear();
-      _plantBotanicalNameController.clear();
-      _usesController.clear();
-
-      // Update data
       _updateData();
     }
   }
@@ -321,16 +320,7 @@ class _FolkloreMedicinePageState extends ConsumerState<FolkloreMedicinePage> {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _folkloreMedicines.add({
-                            'person_name': '',
-                            'plant_local_name': '',
-                            'plant_botanical_name': '',
-                            'uses': '',
-                          });
-                        });
-                      },
+                      onPressed: _addFolkloreMedicine,
                       icon: const Icon(Icons.add_circle),
                       label: const Text('Add More Folklore Medicines'),
                       style: ElevatedButton.styleFrom(

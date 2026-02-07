@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 import 'irrigation_facilities_screen.dart'; // Import the previous screen
 import 'signboards_screen.dart';
 
@@ -20,7 +20,6 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
 
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;
 
     if (sessionId == null) {
@@ -43,13 +42,9 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
     try {
       // 1. Save to SQLite
       await DatabaseHelper().insert('village_seed_clubs', data);
-      
-      // 2. Save to Supabase (Non-blocking)
-      try {
-        await supabaseService.saveVillageData('village_seed_clubs', data);
-      } catch (e) {
-        print('Supabase sync warning: $e');
-      }
+
+      await databaseService.markVillagePageCompleted(sessionId, 6);
+      await SyncService.instance.syncVillagePageData(sessionId, 6, data);
 
       if (mounted) {
         Navigator.push(

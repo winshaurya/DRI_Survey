@@ -8,7 +8,7 @@ import 'completion_screen.dart'; // Add this import
 import '../../services/file_upload_service.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 
 class BiodiversityRegisterScreen extends StatefulWidget {
   const BiodiversityRegisterScreen({super.key});
@@ -183,7 +183,8 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
   }
 
   Future<void> _submitForm() async {
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final syncService = SyncService.instance;
 
     if (_currentSessionId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,12 +205,9 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
 
     try {
       await DatabaseHelper().insert('village_biodiversity_register', data);
-      
-      try {
-        await supabaseService.saveVillageData('village_biodiversity_register', data);
-      } catch (e) {
-        print('Supabase sync warning: $e');
-      }
+
+      await databaseService.markVillagePageCompleted(_currentSessionId!, 12);
+      await syncService.syncVillagePageData(_currentSessionId!, 12, data);
 
       if (mounted) {
         Navigator.push(

@@ -4,6 +4,8 @@ import 'screens/landing/landing_screen.dart';
 import 'screens/family_survey/survey_screen.dart';
 import 'screens/history/history_screen.dart';
 import 'screens/village_survey_screen.dart';
+import 'screens/family_survey/pages/pm_kisan_nidhi_page.dart';
+import 'screens/family_survey/pages/pm_kisan_samman_nidhi_page.dart';
 import 'screens/village_survey/village_form_screen.dart';
 import 'screens/village_survey/infrastructure_screen.dart';
 import 'screens/village_survey/infrastructure_availability_screen.dart';
@@ -18,13 +20,14 @@ import 'screens/village_survey/detailed_map_screen.dart';
 import 'screens/village_survey/forest_map_screen.dart';
 import 'screens/village_survey/biodiversity_register_screen.dart';
 import 'screens/village_survey/completion_screen.dart';
-
 class AppRouter {
   static const String landing = '/';
   static const String auth = '/auth';
   static const String survey = '/survey';
   static const String history = '/history';
   static const String villageSurvey = '/village-survey';
+  static const String pmKisanNidhi = '/pm-kisan-nidhi';
+  static const String pmKisanSammanNidhi = '/pm-kisan-samman-nidhi';
   static const String villageForm = '/village-form';
   static const String infrastructure = '/infrastructure';
   static const String infrastructureAvailability = '/infrastructure-availability';
@@ -46,6 +49,8 @@ class AppRouter {
     survey: (context) => const SurveyScreen(),
     history: (context) => const HistoryScreen(),
     villageSurvey: (context) => const VillageSurveyScreen(),
+    pmKisanNidhi: (context) => const PMKisanNidhiRouteScreen(),
+    pmKisanSammanNidhi: (context) => const PMKisanSammanNidhiRouteScreen(),
     villageForm: (context) => const VillageFormScreen(),
     infrastructure: (context) => InfrastructureScreen(),
     infrastructureAvailability: (context) => InfrastructureAvailabilityScreen(),

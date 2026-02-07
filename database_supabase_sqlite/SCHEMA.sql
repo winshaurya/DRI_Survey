@@ -644,6 +644,11 @@ CREATE TABLE IF NOT EXISTS vb_gram_members (
     phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     member_name TEXT,
+    name_included INTEGER,
+    details_correct INTEGER,
+    incorrect_details TEXT,
+    received INTEGER,
+    days TEXT,
     membership_details TEXT,
     created_at TEXT DEFAULT NOW()::TEXT
 );
@@ -664,6 +669,35 @@ CREATE TABLE IF NOT EXISTS pm_kisan_members (
     member_name TEXT,
     account_number TEXT,
     benefits_received TEXT,
+    name_included INTEGER,
+    details_correct INTEGER,
+    incorrect_details TEXT,
+    received INTEGER,
+    days TEXT,
+    created_at TEXT DEFAULT NOW()::TEXT
+);
+
+CREATE TABLE IF NOT EXISTS pm_kisan_samman_nidhi (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    is_beneficiary TEXT,
+    total_members INTEGER,
+    created_at TEXT DEFAULT NOW()::TEXT,
+    UNIQUE(phone_number)
+);
+
+CREATE TABLE IF NOT EXISTS pm_kisan_samman_members (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    sr_no INTEGER,
+    member_name TEXT,
+    account_number TEXT,
+    benefits_received TEXT,
+    name_included INTEGER,
+    details_correct INTEGER,
+    incorrect_details TEXT,
+    received INTEGER,
+    days TEXT,
     created_at TEXT DEFAULT NOW()::TEXT
 );
 
@@ -741,7 +775,7 @@ CREATE TABLE IF NOT EXISTS training_data (
     created_at TEXT DEFAULT NOW()::TEXT
 );
 
-CREATE TABLE IF NOT EXISTS self_help_groups (
+CREATE TABLE IF NOT EXISTS shg_members (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
     phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     member_name TEXT,
@@ -1530,6 +1564,15 @@ CREATE POLICY "Bank accounts - Users access own data" ON bank_accounts
                  AND surveyor_email = auth.jwt() ->> 'email')
     );
 
+ALTER TABLE shg_members ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "SHG members - Users access own data" ON shg_members;
+CREATE POLICY "SHG members - Users access own data" ON shg_members
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM family_survey_sessions
+                 WHERE phone_number = shg_members.phone_number
+                 AND surveyor_email = auth.jwt() ->> 'email')
+    );
+
 ALTER TABLE children_data ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Children - Users access own data" ON children_data;
 CREATE POLICY "Children - Users access own data" ON children_data
@@ -1744,6 +1787,24 @@ CREATE POLICY "PM Kisan members - Users access own data" ON pm_kisan_members
     FOR ALL USING (
         EXISTS (SELECT 1 FROM family_survey_sessions 
                  WHERE phone_number = pm_kisan_members.phone_number 
+                 AND surveyor_email = auth.jwt() ->> 'email')
+    );
+
+ALTER TABLE pm_kisan_samman_nidhi ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "PM Kisan Samman - Users access own data" ON pm_kisan_samman_nidhi;
+CREATE POLICY "PM Kisan Samman - Users access own data" ON pm_kisan_samman_nidhi
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM family_survey_sessions 
+                 WHERE phone_number = pm_kisan_samman_nidhi.phone_number 
+                 AND surveyor_email = auth.jwt() ->> 'email')
+    );
+
+ALTER TABLE pm_kisan_samman_members ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "PM Kisan Samman members - Users access own data" ON pm_kisan_samman_members;
+CREATE POLICY "PM Kisan Samman members - Users access own data" ON pm_kisan_samman_members
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM family_survey_sessions 
+                 WHERE phone_number = pm_kisan_samman_members.phone_number 
                  AND surveyor_email = auth.jwt() ->> 'email')
     );
 

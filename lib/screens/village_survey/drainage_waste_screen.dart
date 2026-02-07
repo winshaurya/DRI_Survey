@@ -5,7 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 import 'educational_facilities_screen.dart';
 import 'irrigation_facilities_screen.dart';
 
@@ -50,7 +50,6 @@ class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
 
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;
 
     if (sessionId == null) {
@@ -86,14 +85,9 @@ class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
 
       // 1. Save to SQLite
       await DatabaseHelper().insert('village_drainage_waste', drainageData);
-      
-      // 2. Save to Supabase (Non-blocking)
-      try {
-        await supabaseService.saveVillageData('village_drainage_waste', drainageData);
-      } catch (e) {
-        print('Supabase sync warning: $e');
-        // Continue flow even if sync fails (e.g. offline or table missing)
-      }
+
+      await databaseService.markVillagePageCompleted(sessionId, 4);
+      await SyncService.instance.syncVillagePageData(sessionId, 4, drainageData);
 
       // Show success message
       if (mounted) {

@@ -5,7 +5,6 @@ import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import 'educational_facilities_screen.dart';
 
@@ -54,7 +53,6 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
 
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;
 
     if (sessionId == null) {
@@ -103,9 +101,9 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
 
     try {
       await DatabaseHelper().insert('village_infrastructure_details', data);
-      
-      // Trigger background sync immediately
-      SyncService.instance.syncVillageSurveyImmediately(sessionId);
+
+      await databaseService.markVillagePageCompleted(sessionId, 2);
+      await SyncService.instance.syncVillagePageData(sessionId, 2, data);
 
       if (mounted) {
         Navigator.push(

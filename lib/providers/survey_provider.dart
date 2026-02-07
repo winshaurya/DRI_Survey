@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dri_survey/services/database_service.dart';
 import 'package:dri_survey/services/supabase_service.dart';
@@ -54,7 +55,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   SurveyState build() {
     return const SurveyState(
       currentPage: 0,
-      totalPages: 31, // Pages indexed 0-30 in survey_page.dart
+      totalPages: 32, // Pages indexed 0-31 in survey_page.dart
       surveyData: {},
       isLoading: false,
     );
@@ -76,6 +77,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
     try {
       setLoading(true);
 
+      if (phoneNumber == null || phoneNumber.isEmpty) {
+        throw Exception('Phone number is required to create a survey');
+      }
+
+        final resolvedEmail =
+          surveyorEmail ?? _supabaseService.currentUser?.email ?? 'unknown';
+
       // Create local survey record first
       final surveyId = await _databaseService.createNewSurveyRecord({
         'village_name': villageName,
@@ -88,7 +96,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         'pin_code': pinCode,
         'surveyor_name': surveyorName,
         'phone_number': phoneNumber,
-        'surveyor_email': surveyorEmail,
+        'surveyor_email': resolvedEmail,
         'survey_date': DateTime.now().toIso8601String(), // Ensure survey_date is set
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
@@ -102,7 +110,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
               .from('family_survey_sessions')
               .insert({
                 'phone_number': phoneNumber,
-                'surveyor_email': surveyorEmail ?? _supabaseService.currentUser?.email ?? 'unknown',
+                'surveyor_email': resolvedEmail,
                 'village_name': villageName,
                 'village_number': villageNumber,
                 'panchayat': panchayat,
@@ -206,9 +214,14 @@ class SurveyNotifier extends Notifier<SurveyState> {
         case 2: // Social Consciousness 1
         case 3: // Social Consciousness 2
         case 4: // Social Consciousness 3
+        case 25: // Social consciousness (later page)
           final socialData = await _databaseService.getData('social_consciousness', state.phoneNumber!);
           if (socialData.isNotEmpty) {
             data.addAll(socialData.first);
+          }
+          final tribalQuestions = await _databaseService.getData('tribal_questions', state.phoneNumber!);
+          if (tribalQuestions.isNotEmpty) {
+            data['tribal_questions'] = tribalQuestions.first;
           }
           break;
         case 5: // Land Holding
@@ -311,6 +324,17 @@ class SurveyNotifier extends Notifier<SurveyState> {
               'tulsi_plants': facilities['tulsi_plants_available'],
             });
           }
+
+          final tulsiData = await _databaseService.getData('tulsi_plants', state.phoneNumber!);
+          if (tulsiData.isNotEmpty) {
+            data['tulsi_plant_count'] = tulsiData.first['plant_count'];
+          }
+
+          final nutritionData = await _databaseService.getData('nutritional_garden', state.phoneNumber!);
+          if (nutritionData.isNotEmpty) {
+            data['nutritional_garden_size'] = nutritionData.first['garden_size'];
+            data['nutritional_garden_vegetables'] = nutritionData.first['vegetables_grown'];
+          }
           break;
         case 17: // Diseases
           final diseaseData = await _databaseService.getData('diseases', state.phoneNumber!);
@@ -318,22 +342,65 @@ class SurveyNotifier extends Notifier<SurveyState> {
             data['diseases'] = diseaseData;
           }
           break;
-        case 18: // Folklore Medicine
-          final folkloreData = await _databaseService.getData('folklore_medicine', state.phoneNumber!);
-          if (folkloreData.isNotEmpty) {
-            data['folklore_medicines'] = folkloreData;
+        case 18: // Government schemes
+          final aadhaarInfo = await _databaseService.getData('aadhaar_info', state.phoneNumber!);
+          if (aadhaarInfo.isNotEmpty) {
+            data['aadhaar_info'] = aadhaarInfo.first;
           }
-          break;
-        case 19: // Health Programme Implemented
-          final healthProgrammeData = await _databaseService.getData('health_programmes', state.phoneNumber!);
-          if (healthProgrammeData.isNotEmpty) {
-            data.addAll(healthProgrammeData.first);
+
+          final ayushmanCard = await _databaseService.getData('ayushman_card', state.phoneNumber!);
+          if (ayushmanCard.isNotEmpty) {
+            data['ayushman_card'] = ayushmanCard.first;
           }
-          break;
-        case 20: // Beneficiary Programs
-          final beneficiaryData = await _databaseService.getData('beneficiary_programs', state.phoneNumber!);
-          if (beneficiaryData.isNotEmpty) {
-            data['beneficiary_programs'] = beneficiaryData;
+
+          final familyId = await _databaseService.getData('family_id', state.phoneNumber!);
+          if (familyId.isNotEmpty) {
+            data['family_id'] = familyId.first;
+          }
+
+          final rationCard = await _databaseService.getData('ration_card', state.phoneNumber!);
+          if (rationCard.isNotEmpty) {
+            data['ration_card'] = rationCard.first;
+          }
+
+          final samagraId = await _databaseService.getData('samagra_id', state.phoneNumber!);
+          if (samagraId.isNotEmpty) {
+            data['samagra_id'] = samagraId.first;
+          }
+
+          final tribalCard = await _databaseService.getData('tribal_card', state.phoneNumber!);
+          if (tribalCard.isNotEmpty) {
+            data['tribal_card'] = tribalCard.first;
+          }
+
+          final handicappedAllowance = await _databaseService.getData('handicapped_allowance', state.phoneNumber!);
+          if (handicappedAllowance.isNotEmpty) {
+            data['handicapped_allowance'] = handicappedAllowance.first;
+          }
+
+          final pensionAllowance = await _databaseService.getData('pension_allowance', state.phoneNumber!);
+          if (pensionAllowance.isNotEmpty) {
+            data['pension_allowance'] = pensionAllowance.first;
+          }
+
+          final widowAllowance = await _databaseService.getData('widow_allowance', state.phoneNumber!);
+          if (widowAllowance.isNotEmpty) {
+            data['widow_allowance'] = widowAllowance.first;
+          }
+
+          final vbGram = await _databaseService.getData('vb_gram', state.phoneNumber!);
+          if (vbGram.isNotEmpty) {
+            data['vb_gram'] = vbGram.first;
+          }
+
+          final pmKisan = await _databaseService.getData('pm_kisan_nidhi', state.phoneNumber!);
+          if (pmKisan.isNotEmpty) {
+            data['pm_kisan_nidhi'] = pmKisan.first;
+          }
+
+          final mergedSchemes = await _databaseService.getData('merged_govt_schemes', state.phoneNumber!);
+          if (mergedSchemes.isNotEmpty) {
+            data['merged_govt_schemes'] = mergedSchemes.first;
           }
 
           // Load government scheme member data
@@ -381,6 +448,28 @@ class SurveyNotifier extends Notifier<SurveyState> {
           if (widowMembers.isNotEmpty) {
             data['widow_scheme_members'] = widowMembers;
           }
+
+          final vbGramMembers = await _databaseService.getData('vb_gram_members', state.phoneNumber!);
+          if (vbGramMembers.isNotEmpty) {
+            data['vb_gram_members'] = vbGramMembers;
+          }
+
+          final pmKisanMembers = await _databaseService.getData('pm_kisan_members', state.phoneNumber!);
+          if (pmKisanMembers.isNotEmpty) {
+            data['pm_kisan_members'] = pmKisanMembers;
+          }
+          break;
+        case 19: // Folklore Medicine
+          final folkloreData = await _databaseService.getData('folklore_medicine', state.phoneNumber!);
+          if (folkloreData.isNotEmpty) {
+            data['folklore_medicines'] = folkloreData;
+          }
+          break;
+        case 20: // Health Programme Implemented
+          final healthProgrammeData = await _databaseService.getData('health_programmes', state.phoneNumber!);
+          if (healthProgrammeData.isNotEmpty) {
+            data.addAll(healthProgrammeData.first);
+          }
           break;
         case 21: // Children data
           final childrenData = await _databaseService.getData('children_data', state.phoneNumber!);
@@ -406,27 +495,99 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
             data['malnourished_children_data'] = childrenWithDiseases;
           }
+
+          final malnutritionData = await _databaseService.getData('malnutrition_data', state.phoneNumber!);
+          if (malnutritionData.isNotEmpty) {
+            data['malnutrition_data'] = malnutritionData;
+          }
           break;
-        case 26: // Training
+        case 22: // Migration
+          final migration = await _databaseService.getData('migration_data', state.phoneNumber!);
+          if (migration.isNotEmpty) {
+            data.addAll(migration.first);
+          }
+          break;
+        case 23: // Training
           // Load training data
           final trainingData = await _databaseService.getData('training_data', state.phoneNumber!);
           if (trainingData.isNotEmpty) {
-            data['training_entries'] = trainingData;
+            data['training_members'] = trainingData;
           }
 
           // Load SHG data
           final shgData = await _databaseService.getData('shg_members', state.phoneNumber!);
           if (shgData.isNotEmpty) {
-            data['shg_entries'] = shgData;
+            data['shg_members'] = shgData;
           }
 
           // Load FPO data
           final fpoData = await _databaseService.getData('fpo_members', state.phoneNumber!);
           if (fpoData.isNotEmpty) {
-            data['fpo_entries'] = fpoData;
+            data['fpo_members'] = fpoData;
           }
           break;
-        case 29: // Bank accounts
+        case 24: // VB Gram beneficiaries
+          final vbGramData = await _databaseService.getData('vb_gram', state.phoneNumber!);
+          final vbGramMembers = await _databaseService.getData('vb_gram_members', state.phoneNumber!);
+          data['vb_gram'] = {
+            'is_beneficiary': vbGramData.isNotEmpty ? (vbGramData.first['is_member'] ?? false) : false,
+            'members': vbGramMembers
+                .map((m) => {
+                      'sr_no': m['sr_no'],
+                      'name': m['member_name'],
+                      'name_included': m['name_included'],
+                      'details_correct': m['details_correct'],
+                      'incorrect_details': m['incorrect_details'],
+                      'received': m['received'],
+                      'days': m['days'],
+                    })
+                .toList(),
+          };
+          break;
+        case 25: // PM Kisan beneficiaries
+          final pmKisanData = await _databaseService.getData('pm_kisan_nidhi', state.phoneNumber!);
+          final pmKisanMembers = await _databaseService.getData('pm_kisan_members', state.phoneNumber!);
+          data['pm_kisan_nidhi'] = {
+            'is_beneficiary': pmKisanData.isNotEmpty ? (pmKisanData.first['is_beneficiary'] ?? false) : false,
+            'members': pmKisanMembers
+                .map((m) => {
+                      'sr_no': m['sr_no'],
+                      'name': m['member_name'],
+                      'details_correct': m['details_correct'],
+                      'incorrect_details': m['incorrect_details'],
+                      'received': m['received'],
+                      'days': m['days'],
+                    })
+                .toList(),
+          };
+          break;
+        case 26: // PM Kisan Samman Nidhi
+          final pmSammanData = await _databaseService.getData('pm_kisan_samman_nidhi', state.phoneNumber!);
+          final pmSammanMembers = await _databaseService.getData('pm_kisan_samman_members', state.phoneNumber!);
+          data['pm_kisan_samman_nidhi'] = {
+            'is_beneficiary': pmSammanData.isNotEmpty ? (pmSammanData.first['is_beneficiary'] ?? false) : false,
+            'members': pmSammanMembers
+                .map((m) => {
+                      'sr_no': m['sr_no'],
+                      'name': m['member_name'],
+                      'details_correct': m['details_correct'],
+                      'incorrect_details': m['incorrect_details'],
+                      'received': m['received'],
+                      'days': m['days'],
+                    })
+                .toList(),
+          };
+          break;
+        case 27: // Kisan Credit Card
+          data['kisan_credit_card'] = await _getMergedSchemeByKey(state.phoneNumber!, 'kisan_credit_card');
+          break;
+        case 28: // Swachh Bharat
+          data['swachh_bharat'] = await _getMergedSchemeByKey(state.phoneNumber!, 'swachh_bharat');
+          break;
+        case 29: // Fasal Bima
+          data['fasal_bima'] = await _getMergedSchemeByKey(state.phoneNumber!, 'fasal_bima');
+          break;
+        case 30: // Bank accounts
           final bankAccountData = await _databaseService.getData('bank_accounts', state.phoneNumber!);
           if (bankAccountData.isNotEmpty) {
             data['bank_accounts'] = bankAccountData;
@@ -446,8 +607,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
     // Map page numbers to database tables and save accordingly
     switch (page) {
       case 0: // Location page
+        final existing = await _databaseService.getSurveySession(state.phoneNumber!);
+        final resolvedEmail =
+          existing?['surveyor_email'] ?? _supabaseService.currentUser?.email ?? 'unknown';
+
         await _databaseService.saveData('family_survey_sessions', {
           'phone_number': state.phoneNumber,
+          'surveyor_email': resolvedEmail,
           'village_name': data['village_name'],
           'village_number': data['village_number'],
           'panchayat': data['panchayat'],
@@ -457,6 +623,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'postal_address': data['postal_address'],
           'pin_code': data['pin_code'],
           'surveyor_name': data['surveyor_name'],
+          'updated_at': DateTime.now().toIso8601String(),
         });
         await _syncPageDataToSupabase(page, data);
         break;
@@ -478,6 +645,20 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'phone_number': state.phoneNumber,
           ...data,
         });
+        if (data['tribal_questions'] != null) {
+          await _databaseService.saveData('tribal_questions', {
+            'phone_number': state.phoneNumber,
+            ...data['tribal_questions'],
+          });
+        } else if (data.containsKey('deity_name') || data.containsKey('festival_name')) {
+          await _databaseService.saveData('tribal_questions', {
+            'phone_number': state.phoneNumber,
+            'deity_name': data['deity_name'],
+            'festival_name': data['festival_name'],
+            'dance_name': data['dance_name'],
+            'language': data['language'],
+          });
+        }
         await _syncPageDataToSupabase(page, data);
         break;
       case 5: // Land Holding
@@ -596,6 +777,23 @@ class SurveyNotifier extends Notifier<SurveyState> {
         };
         await _databaseService.saveData('house_facilities', houseFacilitiesData);
 
+        if (data['tulsi_plants'] != null) {
+          await _databaseService.saveData('tulsi_plants', {
+            'phone_number': state.phoneNumber,
+            'has_plants': data['tulsi_plants'],
+            'plant_count': data['tulsi_plant_count'],
+          });
+        }
+
+        if (data['nutritional_garden'] != null) {
+          await _databaseService.saveData('nutritional_garden', {
+            'phone_number': state.phoneNumber,
+            'has_garden': data['nutritional_garden'],
+            'garden_size': data['nutritional_garden_size'],
+            'vegetables_grown': data['nutritional_garden_vegetables'],
+          });
+        }
+
         await _syncPageDataToSupabase(page, data);
         break;
       case 17: // Diseases
@@ -609,36 +807,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         }
         await _syncPageDataToSupabase(page, data);
         break;
-      case 18: // Folklore Medicine
-        if (data['folklore_medicines'] != null) {
-          for (final medicine in data['folklore_medicines']) {
-            await _databaseService.saveData('folklore_medicine', {
-              'phone_number': state.phoneNumber,
-              ...medicine,
-            });
-          }
-        }
-        await _syncPageDataToSupabase(page, data);
-        break;
-      case 19: // Health Programme Implemented
-        await _databaseService.saveData('health_programmes', {
-          'phone_number': state.phoneNumber,
-          ...data,
-        });
-        await _syncPageDataToSupabase(page, data);
-        break;
-      case 20: // Beneficiary Programs
-        // Save beneficiary program data
-        if (data['beneficiary_programs'] != null) {
-          for (final program in data['beneficiary_programs']) {
-            await _databaseService.saveData('beneficiary_programs', {
-              'phone_number': state.phoneNumber,
-              ...program,
-            });
-          }
-        }
-
-        // Save government scheme member data
+      case 18: // Government schemes
         if (data['aadhaar_scheme_members'] != null) {
           for (final member in data['aadhaar_scheme_members']) {
             await _databaseService.saveData('aadhaar_scheme_members', {
@@ -646,6 +815,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
               ...member,
             });
           }
+        }
+
+        if (data['aadhaar_info'] != null) {
+          await _databaseService.saveData('aadhaar_info', {
+            'phone_number': state.phoneNumber,
+            ...data['aadhaar_info'],
+          });
         }
 
         if (data['ayushman_scheme_members'] != null) {
@@ -657,6 +833,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
           }
         }
 
+        if (data['ayushman_card'] != null) {
+          await _databaseService.saveData('ayushman_card', {
+            'phone_number': state.phoneNumber,
+            ...data['ayushman_card'],
+          });
+        }
+
         if (data['ration_scheme_members'] != null) {
           for (final member in data['ration_scheme_members']) {
             await _databaseService.saveData('ration_scheme_members', {
@@ -664,6 +847,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
               ...member,
             });
           }
+        }
+
+        if (data['ration_card'] != null) {
+          await _databaseService.saveData('ration_card', {
+            'phone_number': state.phoneNumber,
+            ...data['ration_card'],
+          });
         }
 
         if (data['family_id_scheme_members'] != null) {
@@ -675,6 +865,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
           }
         }
 
+        if (data['family_id'] != null) {
+          await _databaseService.saveData('family_id', {
+            'phone_number': state.phoneNumber,
+            ...data['family_id'],
+          });
+        }
+
         if (data['samagra_scheme_members'] != null) {
           for (final member in data['samagra_scheme_members']) {
             await _databaseService.saveData('samagra_scheme_members', {
@@ -682,6 +879,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
               ...member,
             });
           }
+        }
+
+        if (data['samagra_id'] != null) {
+          await _databaseService.saveData('samagra_id', {
+            'phone_number': state.phoneNumber,
+            ...data['samagra_id'],
+          });
         }
 
         if (data['handicapped_scheme_members'] != null) {
@@ -693,6 +897,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
           }
         }
 
+        if (data['handicapped_allowance'] != null) {
+          await _databaseService.saveData('handicapped_allowance', {
+            'phone_number': state.phoneNumber,
+            ...data['handicapped_allowance'],
+          });
+        }
+
         if (data['tribal_scheme_members'] != null) {
           for (final member in data['tribal_scheme_members']) {
             await _databaseService.saveData('tribal_scheme_members', {
@@ -700,6 +911,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
               ...member,
             });
           }
+        }
+
+        if (data['tribal_card'] != null) {
+          await _databaseService.saveData('tribal_card', {
+            'phone_number': state.phoneNumber,
+            ...data['tribal_card'],
+          });
         }
 
         if (data['pension_scheme_members'] != null) {
@@ -711,6 +929,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
           }
         }
 
+        if (data['pension_allowance'] != null) {
+          await _databaseService.saveData('pension_allowance', {
+            'phone_number': state.phoneNumber,
+            ...data['pension_allowance'],
+          });
+        }
+
         if (data['widow_scheme_members'] != null) {
           for (final member in data['widow_scheme_members']) {
             await _databaseService.saveData('widow_scheme_members', {
@@ -720,16 +945,76 @@ class SurveyNotifier extends Notifier<SurveyState> {
           }
         }
 
+        if (data['widow_allowance'] != null) {
+          await _databaseService.saveData('widow_allowance', {
+            'phone_number': state.phoneNumber,
+            ...data['widow_allowance'],
+          });
+        }
+
+        if (data['vb_gram'] != null) {
+          await _databaseService.saveData('vb_gram', {
+            'phone_number': state.phoneNumber,
+            ...data['vb_gram'],
+          });
+        }
+
+        if (data['vb_gram_members'] != null) {
+          for (final member in data['vb_gram_members']) {
+            await _databaseService.saveData('vb_gram_members', {
+              'phone_number': state.phoneNumber,
+              ...member,
+            });
+          }
+        }
+
+        if (data['pm_kisan_nidhi'] != null) {
+          await _databaseService.saveData('pm_kisan_nidhi', {
+            'phone_number': state.phoneNumber,
+            ...data['pm_kisan_nidhi'],
+          });
+        }
+
+        if (data['pm_kisan_members'] != null) {
+          for (final member in data['pm_kisan_members']) {
+            await _databaseService.saveData('pm_kisan_members', {
+              'phone_number': state.phoneNumber,
+              ...member,
+            });
+          }
+        }
+
+        if (data['merged_govt_schemes'] != null) {
+          final merged = data['merged_govt_schemes'];
+          if (merged is Map<String, dynamic>) {
+            await _databaseService.saveData('merged_govt_schemes', {
+              'phone_number': state.phoneNumber,
+              'scheme_data': jsonEncode(merged),
+            });
+          }
+        }
+
         await _syncPageDataToSupabase(page, data);
         break;
-      case 21: // Beneficiary programs
-        await _databaseService.saveData('beneficiary_programs', {
+      case 19: // Folklore Medicine
+        if (data['folklore_medicines'] != null) {
+          for (final medicine in data['folklore_medicines']) {
+            await _databaseService.saveData('folklore_medicine', {
+              'phone_number': state.phoneNumber,
+              ...medicine,
+            });
+          }
+        }
+        await _syncPageDataToSupabase(page, data);
+        break;
+      case 20: // Health Programme Implemented
+        await _databaseService.saveData('health_programmes', {
           'phone_number': state.phoneNumber,
           ...data,
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 22: // Children data
+      case 21: // Children data
         // Save basic children data
         await _databaseService.saveData('children_data', {
           'phone_number': state.phoneNumber,
@@ -751,6 +1036,14 @@ class SurveyNotifier extends Notifier<SurveyState> {
               'weight': childData['weight'],
             });
 
+            await _databaseService.saveData('malnutrition_data', {
+              'phone_number': state.phoneNumber,
+              'child_name': childData['child_name'],
+              'age': childData['age'],
+              'weight': childData['weight'],
+              'height': childData['height'],
+            });
+
             // Save diseases for this child
             if (childData['diseases'] != null) {
               int diseaseIndex = 0;
@@ -767,46 +1060,32 @@ class SurveyNotifier extends Notifier<SurveyState> {
         }
         await _syncPageDataToSupabase(page, data);
         break;
-      case 23: // Malnutrition data (handled in case 22 - children data)
-        // This case is a duplicate - malnourished children already saved in case 22
-        await _syncPageDataToSupabase(page, data);
-        break;
-      case 24: // Migration
+      case 22: // Migration
         await _databaseService.saveData('migration_data', {
           'phone_number': state.phoneNumber,
           ...data,
         });
         await _syncPageDataToSupabase(page, data);
         break;
-      case 25: // Social consciousness
-        await _databaseService.saveData('social_consciousness', {
-          'phone_number': state.phoneNumber,
-          ...data,
-        });
-        await _syncPageDataToSupabase(page, data);
-        break;
-      case 26: // Training
-        // Save training data with new fields
-        if (data['training_entries'] != null) {
-          for (final training in data['training_entries']) {
+      case 23: // Training
+        if (data['training_members'] != null) {
+          for (final training in data['training_members']) {
             await _databaseService.saveData('training_data', {
               'phone_number': state.phoneNumber,
               ...training,
             });
           }
         }
-        // Save SHG data
-        if (data['shg_entries'] != null) {
-          for (final shg in data['shg_entries']) {
+        if (data['shg_members'] != null) {
+          for (final shg in data['shg_members']) {
             await _databaseService.saveData('shg_members', {
               'phone_number': state.phoneNumber,
               ...shg,
             });
           }
         }
-        // Save FPO data
-        if (data['fpo_entries'] != null) {
-          for (final fpo in data['fpo_entries']) {
+        if (data['fpo_members'] != null) {
+          for (final fpo in data['fpo_members']) {
             await _databaseService.saveData('fpo_members', {
               'phone_number': state.phoneNumber,
               ...fpo,
@@ -815,21 +1094,117 @@ class SurveyNotifier extends Notifier<SurveyState> {
         }
         await _syncPageDataToSupabase(page, data);
         break;
-      case 27: // Self help groups
-        await _databaseService.saveData('shg_members', {
-          'phone_number': state.phoneNumber,
-          ...data,
+      case 24: // VB Gram beneficiaries
+        if (data['vb_gram'] != null) {
+          final vb = Map<String, dynamic>.from(data['vb_gram']);
+          final members = List<Map<String, dynamic>>.from(vb['members'] ?? []);
+          await _databaseService.saveData('vb_gram', {
+            'phone_number': state.phoneNumber,
+            'is_member': vb['is_beneficiary'],
+            'total_members': members.length,
+          });
+          for (final member in members) {
+            await _databaseService.saveData('vb_gram_members', {
+              'phone_number': state.phoneNumber,
+              'sr_no': member['sr_no'],
+              'member_name': member['name'],
+              'name_included': member['name_included'],
+              'details_correct': member['details_correct'],
+              'incorrect_details': member['incorrect_details'],
+              'received': member['received'],
+              'days': member['days'],
+            });
+          }
+        }
+        await _syncPageDataToSupabase(page, {
+          'vb_gram': data['vb_gram'],
+          'vb_gram_members': (data['vb_gram']?['members']) ?? [],
         });
-        await _syncPageDataToSupabase(page, data);
         break;
-      case 28: // FPO membership
-        await _databaseService.saveData('fpo_members', {
-          'phone_number': state.phoneNumber,
-          ...data,
+      case 25: // PM Kisan beneficiaries
+        if (data['pm_kisan_nidhi'] != null) {
+          final pm = Map<String, dynamic>.from(data['pm_kisan_nidhi']);
+          final members = List<Map<String, dynamic>>.from(pm['members'] ?? []);
+          await _databaseService.saveData('pm_kisan_nidhi', {
+            'phone_number': state.phoneNumber,
+            'is_beneficiary': pm['is_beneficiary'],
+            'total_members': members.length,
+          });
+          for (final member in members) {
+            await _databaseService.saveData('pm_kisan_members', {
+              'phone_number': state.phoneNumber,
+              'sr_no': member['sr_no'],
+              'member_name': member['name'],
+              'account_number': member['account_number'],
+              'benefits_received': member['received'],
+              'details_correct': member['details_correct'],
+              'incorrect_details': member['incorrect_details'],
+              'received': member['received'],
+              'days': member['days'],
+            });
+          }
+        }
+        await _syncPageDataToSupabase(page, {
+          'pm_kisan_nidhi': data['pm_kisan_nidhi'],
+          'pm_kisan_members': (data['pm_kisan_nidhi']?['members']) ?? [],
         });
-        await _syncPageDataToSupabase(page, data);
         break;
-        case 29: // Bank accounts
+      case 26: // PM Kisan Samman Nidhi
+        if (data['pm_kisan_samman_nidhi'] != null) {
+          final pmSamman = Map<String, dynamic>.from(data['pm_kisan_samman_nidhi']);
+          final members = List<Map<String, dynamic>>.from(pmSamman['members'] ?? []);
+          await _databaseService.saveData('pm_kisan_samman_nidhi', {
+            'phone_number': state.phoneNumber,
+            'is_beneficiary': pmSamman['is_beneficiary'],
+            'total_members': members.length,
+          });
+          for (final member in members) {
+            await _databaseService.saveData('pm_kisan_samman_members', {
+              'phone_number': state.phoneNumber,
+              'sr_no': member['sr_no'],
+              'member_name': member['name'],
+              'account_number': member['account_number'],
+              'benefits_received': member['received'],
+              'details_correct': member['details_correct'],
+              'incorrect_details': member['incorrect_details'],
+              'received': member['received'],
+              'days': member['days'],
+            });
+          }
+        }
+        await _syncPageDataToSupabase(page, {
+          'pm_kisan_samman_nidhi': data['pm_kisan_samman_nidhi'],
+          'pm_kisan_samman_members': (data['pm_kisan_samman_nidhi']?['members']) ?? [],
+        });
+        break;
+      case 27: // Kisan Credit Card
+        if (data['kisan_credit_card'] != null) {
+          await _upsertMergedScheme(state.phoneNumber!, 'kisan_credit_card', Map<String, dynamic>.from(data['kisan_credit_card']));
+        }
+        final mergedKisan = await _databaseService.getData('merged_govt_schemes', state.phoneNumber!);
+        await _syncPageDataToSupabase(page, {
+          'merged_govt_schemes': mergedKisan.isNotEmpty ? mergedKisan.first : null,
+        });
+        break;
+      case 28: // Swachh Bharat
+        if (data['swachh_bharat'] != null) {
+          await _upsertMergedScheme(state.phoneNumber!, 'swachh_bharat', Map<String, dynamic>.from(data['swachh_bharat']));
+        }
+        final mergedSwachh = await _databaseService.getData('merged_govt_schemes', state.phoneNumber!);
+        await _syncPageDataToSupabase(page, {
+          'merged_govt_schemes': mergedSwachh.isNotEmpty ? mergedSwachh.first : null,
+        });
+        break;
+      case 29: // Fasal Bima
+        if (data['fasal_bima'] != null) {
+          await _upsertMergedScheme(state.phoneNumber!, 'fasal_bima', Map<String, dynamic>.from(data['fasal_bima']));
+        }
+        final mergedFasal = await _databaseService.getData('merged_govt_schemes', state.phoneNumber!);
+        await _syncPageDataToSupabase(page, {
+          'merged_govt_schemes': mergedFasal.isNotEmpty ? mergedFasal.first : null,
+        });
+        break;
+      case 30: // Bank accounts
         // Save bank account data with new structure
         if (data['bank_accounts'] != null) {
           for (final account in data['bank_accounts']) {
@@ -841,25 +1216,49 @@ class SurveyNotifier extends Notifier<SurveyState> {
         }
         await _syncPageDataToSupabase(page, data);
         break;
-      case 30: // Health programs
-        await _databaseService.saveData('health_programmes', {
-          'phone_number': state.phoneNumber,
-          ...data,
-        });
-        await _syncPageDataToSupabase(page, data);
-        break;
-      case 31: // Folklore medicine
-        await _databaseService.saveData('folklore_medicine', {
-          'phone_number': state.phoneNumber,
-          ...data,
-        });
-        await _syncPageDataToSupabase(page, data);
-        break;
-      case 32: // Tulsi plants (Note: stored in house_facilities.tulsi_plants_available from page 16)
-        // Tulsi plants are part of house_facilities, already saved in page 16
-        await _syncPageDataToSupabase(page, data);
-        break;
     }
+  }
+
+  Map<String, dynamic> _decodeMergedSchemeData(Map<String, dynamic> row) {
+    final raw = row['scheme_data'];
+    if (raw is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(raw);
+    }
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          return decoded.map((k, v) => MapEntry(k.toString(), v));
+        }
+      } catch (_) {
+        return {};
+      }
+    }
+    return {};
+  }
+
+  Future<Map<String, dynamic>> _getMergedSchemeByKey(String phoneNumber, String schemeKey) async {
+    final merged = await _databaseService.getData('merged_govt_schemes', phoneNumber);
+    if (merged.isEmpty) return {};
+    final decoded = _decodeMergedSchemeData(merged.first);
+    final value = decoded[schemeKey];
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return {};
+  }
+
+  Future<void> _upsertMergedScheme(String phoneNumber, String schemeKey, Map<String, dynamic> schemeData) async {
+    final merged = await _databaseService.getData('merged_govt_schemes', phoneNumber);
+    final decoded = merged.isNotEmpty ? _decodeMergedSchemeData(merged.first) : <String, dynamic>{};
+    decoded[schemeKey] = schemeData;
+    await _databaseService.saveData('merged_govt_schemes', {
+      'phone_number': phoneNumber,
+      'scheme_data': jsonEncode(decoded),
+    });
   }
 
   Future<void> nextPage() async {
@@ -968,7 +1367,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
     }
   }
 
-  Future<void> loadSurveySessionForContinuation(String sessionId) async {
+  Future<void> loadSurveySessionForContinuation(String sessionId, {int startPage = 0}) async {
     try {
       setLoading(true);
 
@@ -980,9 +1379,8 @@ class SurveyNotifier extends Notifier<SurveyState> {
         // Load all survey data for this session
         await _loadAllSurveyData();
 
-        // For continuation, start from page 0 but with existing data loaded
-        // The user can navigate through pages and continue filling
-        state = state.copyWith(currentPage: 0);
+        // For continuation, start from requested page with existing data loaded
+        state = state.copyWith(currentPage: startPage);
       }
     } catch (e) {
       print('Error loading survey session for continuation: $e');
@@ -994,18 +1392,20 @@ class SurveyNotifier extends Notifier<SurveyState> {
   Future<void> _syncPageDataToSupabase(int page, Map<String, dynamic> data) async {
     if (state.phoneNumber == null) return;
 
-    // Queue the sync operation - sync service will handle it when online
-    await _syncService.queueSyncOperation('update_survey_data', {
-      'phone_number': state.phoneNumber,
-      'page': page,
-      'data': data,
-    });
+    await _databaseService.markFamilyPageCompleted(state.phoneNumber!, page);
+
+    // Sync immediately if possible, otherwise queue fallback
+    await _syncService.syncFamilyPageData(
+      state.phoneNumber!,
+      page,
+      data,
+    );
   }
 
   void reset() {
     state = const SurveyState(
       currentPage: 0,
-      totalPages: 23, // Pages indexed 0-22 in survey_page.dart
+      totalPages: 31, // Pages indexed 0-30 in survey_page.dart
       surveyData: {},
       isLoading: false,
     );

@@ -49,7 +49,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 35,
+      version: 40,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -61,7 +61,108 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Legacy migrations commented out. Current schema is defined in _createTables/_createVillageTables.
+    // Ensure newer columns exist for upgrades.
+    await _ensurePageTrackingColumns(db);
+    await _ensureSchemeMemberTables(db);
+    if (oldVersion < 38) {
+      await _migrateFamilySurveySessionsPrimaryKey(db);
+    }
+  }
+
+  Future<void> _ensureSchemeMemberTables(Database db) async {
+    await db.execute('CREATE TABLE IF NOT EXISTS vb_gram_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, membership_details TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, member_name TEXT, account_number TEXT, benefits_received TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_samman_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, member_name TEXT, account_number TEXT, benefits_received TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_samman_nidhi (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, is_beneficiary TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+  }
+
+  Future<void> _migrateFamilySurveySessionsPrimaryKey(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(family_survey_sessions)');
+    final hasIdColumn = columns.any((row) => row['name'] == 'id');
+    if (!hasIdColumn) {
+      return;
+    }
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS family_survey_sessions_new (
+        phone_number TEXT PRIMARY KEY,
+        surveyor_email TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        village_name TEXT,
+        village_number TEXT,
+        panchayat TEXT,
+        block TEXT,
+        tehsil TEXT,
+        district TEXT,
+        postal_address TEXT,
+        pin_code TEXT,
+        shine_code TEXT,
+        latitude DECIMAL(10,8),
+        longitude DECIMAL(11,8),
+        location_accuracy DECIMAL(5,2),
+        location_timestamp TEXT,
+        survey_date TEXT DEFAULT CURRENT_DATE,
+        surveyor_name TEXT,
+        status TEXT DEFAULT 'in_progress' CHECK (status IN ('in_progress', 'completed', 'exported')),
+        sync_status TEXT DEFAULT 'pending',
+        device_info TEXT,
+        app_version TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        is_deleted INTEGER DEFAULT 0,
+        last_synced_at TEXT,
+        current_version INTEGER DEFAULT 1,
+        last_edited_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        page_completion_status TEXT DEFAULT '{}',
+        sync_pending INTEGER DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      INSERT OR REPLACE INTO family_survey_sessions_new (
+        phone_number, surveyor_email, created_at, updated_at, village_name, village_number,
+        panchayat, block, tehsil, district, postal_address, pin_code, shine_code,
+        latitude, longitude, location_accuracy, location_timestamp, survey_date, surveyor_name,
+        status, sync_status, device_info, app_version, created_by, updated_by, is_deleted,
+        last_synced_at, current_version, last_edited_at, page_completion_status, sync_pending
+      )
+      SELECT
+        phone_number,
+        COALESCE(surveyor_email, 'unknown'),
+        created_at, updated_at, village_name, village_number,
+        panchayat, block, tehsil, district, postal_address, pin_code, shine_code,
+        latitude, longitude, location_accuracy, location_timestamp, survey_date, surveyor_name,
+        status, sync_status, device_info, app_version, created_by, updated_by, is_deleted,
+        last_synced_at, current_version, last_edited_at, page_completion_status, sync_pending
+      FROM family_survey_sessions
+    ''');
+
+    await db.execute('DROP TABLE family_survey_sessions');
+    await db.execute('ALTER TABLE family_survey_sessions_new RENAME TO family_survey_sessions');
+  }
+
+  Future<void> _ensurePageTrackingColumns(Database db) async {
+    await _addColumnIfMissing(db, 'family_survey_sessions', 'page_completion_status', "TEXT DEFAULT '{}'");
+    await _addColumnIfMissing(db, 'family_survey_sessions', 'sync_pending', 'INTEGER DEFAULT 0');
+    await _addColumnIfMissing(db, 'family_survey_sessions', 'sync_status', "TEXT DEFAULT 'pending'");
+
+    await _addColumnIfMissing(db, 'village_survey_sessions', 'page_completion_status', "TEXT DEFAULT '{}'");
+    await _addColumnIfMissing(db, 'village_survey_sessions', 'sync_pending', 'INTEGER DEFAULT 0');
+    await _addColumnIfMissing(db, 'village_survey_sessions', 'sync_status', "TEXT DEFAULT 'pending'");
+  }
+
+  Future<void> _addColumnIfMissing(
+    Database db,
+    String tableName,
+    String columnName,
+    String columnDef,
+  ) async {
+    final columns = await db.rawQuery('PRAGMA table_info($tableName)');
+    final exists = columns.any((row) => row['name'] == columnName);
+    if (!exists) {
+      await db.execute('ALTER TABLE $tableName ADD COLUMN $columnName $columnDef');
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -110,6 +211,7 @@ class DatabaseHelper {
         location_accuracy REAL,
         location_timestamp TEXT,
         status TEXT,
+        sync_status TEXT DEFAULT 'pending',
         device_info TEXT,
         app_version TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -117,7 +219,9 @@ class DatabaseHelper {
         is_deleted INTEGER DEFAULT 0,
         last_synced_at TEXT,
         current_version INTEGER DEFAULT 1,
-        last_edited_at TEXT
+        last_edited_at TEXT,
+        page_completion_status TEXT DEFAULT '{}',
+        sync_pending INTEGER DEFAULT 0
       )
     ''');
     
@@ -143,8 +247,7 @@ class DatabaseHelper {
 
     await db.execute('''
       CREATE TABLE IF NOT EXISTS family_survey_sessions (
-        id TEXT PRIMARY KEY,
-        phone_number TEXT UNIQUE NOT NULL,
+        phone_number TEXT PRIMARY KEY,
         surveyor_email TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -172,7 +275,28 @@ class DatabaseHelper {
         is_deleted INTEGER DEFAULT 0,
         last_synced_at TEXT,
         current_version INTEGER DEFAULT 1,
-        last_edited_at TEXT DEFAULT CURRENT_TIMESTAMP
+        last_edited_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        page_completion_status TEXT DEFAULT '{}',
+        sync_pending INTEGER DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sync_failures (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone_number TEXT,
+        failed_at TEXT,
+        failed_tables TEXT,
+        error_count INTEGER
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sync_metadata (
+        phone_number TEXT PRIMARY KEY,
+        last_sync_attempt TEXT,
+        data_hash TEXT,
+        sync_version INTEGER
       )
     ''');
 
@@ -311,9 +435,6 @@ class DatabaseHelper {
     // Health Programmes
     await db.execute('CREATE TABLE IF NOT EXISTS health_programmes (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, vaccination_pregnancy TEXT, child_vaccination TEXT, vaccination_schedule TEXT, balance_doses_schedule TEXT, family_planning_awareness TEXT, contraceptive_applied TEXT, created_at TEXT)');
     
-    // Beneficiary Programs
-    await db.execute('CREATE TABLE IF NOT EXISTS beneficiary_programs (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, program_type TEXT, beneficiary INTEGER, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, days_worked INTEGER, received INTEGER, created_at TEXT)');
-
     // Scheme Members Tables (updated to use phone_number)
     await db.execute('CREATE TABLE IF NOT EXISTS aadhaar_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
     await db.execute('CREATE TABLE IF NOT EXISTS tribal_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
@@ -324,6 +445,9 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS family_id_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
     await db.execute('CREATE TABLE IF NOT EXISTS samagra_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
     await db.execute('CREATE TABLE IF NOT EXISTS handicapped_scheme_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, family_member_name TEXT, have_card TEXT, card_number TEXT, details_correct TEXT, what_incorrect TEXT, benefits_received TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS vb_gram_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, membership_details TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, member_name TEXT, account_number TEXT, benefits_received TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_samman_members (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, member_name TEXT, account_number TEXT, benefits_received TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT)');
 
     // Social Consciousness
     await db.execute('''
@@ -413,6 +537,7 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS widow_allowance (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_allowance TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
     await db.execute('CREATE TABLE IF NOT EXISTS vb_gram (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, is_member TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
     await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_nidhi (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, is_beneficiary TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
+    await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_samman_nidhi (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, is_beneficiary TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');
 
     // Merged Government Schemes (for small schemes)
     await db.execute('CREATE TABLE IF NOT EXISTS merged_govt_schemes (id TEXT PRIMARY KEY, phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, scheme_data TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(phone_number))');

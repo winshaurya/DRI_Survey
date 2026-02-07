@@ -21,7 +21,7 @@ class SwachhBharatMissionPage extends ConsumerStatefulWidget {
 class _SwachhBharatMissionPageState extends ConsumerState<SwachhBharatMissionPage> {
   Map<String, dynamic> _schemeData = {};
   List<String> _familyMemberNames = [];
-  final String _schemeKey = 'swachh_bharat_mission';
+  final String _schemeKey = 'swachh_bharat';
 
   @override
   void initState() {

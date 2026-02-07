@@ -30,13 +30,13 @@ import '../pages/health_programme_page.dart';
 import '../pages/migration_page.dart';
 import '../pages/training_page.dart';
 import '../pages/vb_g_ram_g_beneficiary_page.dart';
+import '../pages/pm_kisan_nidhi_page.dart';
 import '../pages/pm_kisan_samman_nidhi_page.dart';
 import '../pages/kisan_credit_card_page.dart';
 import '../pages/swachh_bharat_mission_page.dart';
 import '../pages/fasal_bima_page.dart';
 import '../pages/bank_account_page.dart';
-import '../pages/final_page.dart';
-import '../pages/survey_preview_page.dart';
+import '../pages/family_survey_preview_page.dart';
 
 class SurveyPage extends ConsumerStatefulWidget {
   final int pageIndex;
@@ -143,7 +143,7 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
                           ),
                         ),
                         child: Text(
-                          widget.pageIndex == 30 ? l10n.submit : l10n.next,
+                          widget.pageIndex == 31 ? l10n.submit : l10n.next,
                           style: const TextStyle(fontSize: 16),
                         ),
                       ),
@@ -211,17 +211,29 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
       case 24:
         return VBGBeneficiaryPage(pageData: _pageData, onDataChanged: _updateData);
       case 25:
-        return PMKisanSammanNidhiPage(pageData: _pageData, onDataChanged: _updateData);
+        return PMKisanNidhiPage(pageData: _pageData, onDataChanged: _updateData);
       case 26:
-        return KisanCreditCardPage(pageData: _pageData, onDataChanged: _updateData);
+        return PMKisanSammanNidhiPage(pageData: _pageData, onDataChanged: _updateData);
       case 27:
-        return SwachhBharatMissionPage(pageData: _pageData, onDataChanged: _updateData);
+        return KisanCreditCardPage(pageData: _pageData, onDataChanged: _updateData);
       case 28:
-        return FasalBimaPage(pageData: _pageData, onDataChanged: _updateData);
+        return SwachhBharatMissionPage(pageData: _pageData, onDataChanged: _updateData);
       case 29:
-        return BankAccountPage(pageData: _pageData, onDataChanged: _updateData);
+        return FasalBimaPage(pageData: _pageData, onDataChanged: _updateData);
       case 30:
-        return SurveyPreviewPage(pageData: _pageData, onDataChanged: _updateData);
+        return BankAccountPage(pageData: _pageData, onDataChanged: _updateData);
+      case 31:
+        // Preview page with submit button (end of survey flow)
+        final surveyState = ref.watch(surveyProvider);
+        final phoneNumber = surveyState.phoneNumber ?? '';
+        print('SurveyPage: Passing survey data to preview: ${surveyState.surveyData.keys}');
+        return FamilySurveyPreviewPage(
+          phoneNumber: phoneNumber,
+          fromHistory: false,
+          showSubmitButton: true, // Show submit button when in survey flow
+          embedInSurveyFlow: true,
+          surveyData: surveyState.surveyData, // Pass survey data directly
+        );
       default:
         return const Center(child: Text('Page not found'));
     }

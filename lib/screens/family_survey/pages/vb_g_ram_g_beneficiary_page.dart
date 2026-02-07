@@ -21,7 +21,7 @@ class VBGBeneficiaryPage extends ConsumerStatefulWidget {
 class _VBGBeneficiaryPageState extends ConsumerState<VBGBeneficiaryPage> {
   Map<String, dynamic> _schemeData = {};
   List<String> _familyMemberNames = [];
-  final String _schemeKey = 'vb_gram_g';
+  final String _schemeKey = 'vb_gram';
 
   @override
   void initState() {

@@ -6,7 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 import 'survey_details_screen.dart';
 import 'forest_map_screen.dart';
 
@@ -148,7 +148,7 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
 
   Future<void> _saveAndContinue() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final syncService = SyncService.instance;
     final sessionId = databaseService.currentSessionId;
 
     if (sessionId == null) {
@@ -164,6 +164,7 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
       await db.delete('village_map_points', where: 'session_id = ?', whereArgs: [sessionId]);
 
       // 1. Save all points
+      final List<Map<String, dynamic>> pointsPayload = [];
       for (var point in _mapPoints) {
         final data = {
           'id': const Uuid().v4(),
@@ -177,13 +178,11 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
         };
 
         await DatabaseHelper().insert('village_map_points', data);
-        
-        try {
-            await supabaseService.saveVillageData('village_map_points', data);
-        } catch (e) {
-             print('Supabase sync warning: $e');
-        }
+        pointsPayload.add(data);
       }
+
+      await databaseService.markVillagePageCompleted(sessionId, 10);
+      await syncService.syncVillagePageData(sessionId, 10, {'map_points': pointsPayload});
 
       if (mounted) {
         Navigator.push(

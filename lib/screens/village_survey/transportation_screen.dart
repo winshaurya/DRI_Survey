@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 import '../../form_template.dart';
 import 'irrigation_facilities_screen.dart'; // Import the previous screen
 
@@ -26,7 +26,6 @@ class _TransportationScreenState extends State<TransportationScreen> {
 
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;
 
     if (sessionId == null) {
@@ -50,12 +49,9 @@ class _TransportationScreenState extends State<TransportationScreen> {
 
     try {
       await DatabaseHelper().insert('village_transport_facilities', data);
-      
-      try {
-        await supabaseService.saveVillageData('village_transport_facilities', data);
-      } catch (e) {
-        print('Supabase sync failed (non-fatal): $e');
-      }
+
+      await databaseService.markVillagePageCompleted(sessionId, 14);
+      await SyncService.instance.syncVillagePageData(sessionId, 14, data);
 
       if (mounted) {
         Navigator.pop(context);

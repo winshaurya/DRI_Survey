@@ -5,7 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
-import '../../services/supabase_service.dart';
+import '../../services/sync_service.dart';
 import 'drainage_waste_screen.dart';
 
 class EducationalFacilitiesScreen extends StatefulWidget {
@@ -24,7 +24,6 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
 
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;
 
     if (sessionId == null) {
@@ -56,12 +55,9 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
       // Let's proceed assuming the table exists.
       
       await DatabaseHelper().insert('village_educational_facilities', data);
-      
-      try {
-        await supabaseService.saveVillageData('village_educational_facilities', data);
-      } catch (e) {
-        print('Supabase sync warning: $e');
-      }
+
+      await databaseService.markVillagePageCompleted(sessionId, 3);
+      await SyncService.instance.syncVillagePageData(sessionId, 3, data);
 
       if (mounted) {
         Navigator.push(

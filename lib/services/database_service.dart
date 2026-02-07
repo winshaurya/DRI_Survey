@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
 
@@ -90,12 +91,92 @@ static Database? _database;
     await db.update(
       'family_survey_sessions',
       {
-        'status': syncStatus,
+        'sync_status': syncStatus,
         'last_synced_at': syncStatus == 'synced' ? DateTime.now().toIso8601String() : null,
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'phone_number = ?',
       whereArgs: [phoneNumber],
+    );
+  }
+
+  Future<void> markFamilyPageCompleted(String phoneNumber, int page) async {
+    await _updatePageStatus(
+      tableName: 'family_survey_sessions',
+      keyColumn: 'phone_number',
+      keyValue: phoneNumber,
+      page: page,
+      completed: true,
+      synced: null,
+    );
+  }
+
+  Future<void> markFamilyPageSynced(String phoneNumber, int page) async {
+    await _updatePageStatus(
+      tableName: 'family_survey_sessions',
+      keyColumn: 'phone_number',
+      keyValue: phoneNumber,
+      page: page,
+      completed: true,
+      synced: true,
+    );
+  }
+
+  Future<void> markVillagePageCompleted(String sessionId, int page) async {
+    await _updatePageStatus(
+      tableName: 'village_survey_sessions',
+      keyColumn: 'session_id',
+      keyValue: sessionId,
+      page: page,
+      completed: true,
+      synced: null,
+    );
+  }
+
+  Future<void> markVillagePageSynced(String sessionId, int page) async {
+    await _updatePageStatus(
+      tableName: 'village_survey_sessions',
+      keyColumn: 'session_id',
+      keyValue: sessionId,
+      page: page,
+      completed: true,
+      synced: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> getFamilyPageStatus(String phoneNumber) async {
+    return _getPageStatus(
+      tableName: 'family_survey_sessions',
+      keyColumn: 'phone_number',
+      keyValue: phoneNumber,
+    );
+  }
+
+  Future<Map<String, dynamic>> getVillagePageStatus(String sessionId) async {
+    return _getPageStatus(
+      tableName: 'village_survey_sessions',
+      keyColumn: 'session_id',
+      keyValue: sessionId,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getIncompleteFamilySurveys() async {
+    final db = await database;
+    return await db.query(
+      'family_survey_sessions',
+      where: 'status = ? OR sync_pending = 1',
+      whereArgs: ['in_progress'],
+      orderBy: 'updated_at DESC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getIncompleteVillageSurveys() async {
+    final db = await database;
+    return await db.query(
+      'village_survey_sessions',
+      where: 'status = ? OR sync_pending = 1',
+      whereArgs: ['in_progress'],
+      orderBy: 'updated_at DESC',
     );
   }
 
@@ -105,7 +186,7 @@ static Database? _database;
     await db.update(
       'village_survey_sessions',
       {
-        'status': syncStatus,
+        'sync_status': syncStatus,
         'last_synced_at': syncStatus == 'synced' ? DateTime.now().toIso8601String() : null,
         'updated_at': DateTime.now().toIso8601String(),
       },
@@ -133,7 +214,7 @@ static Database? _database;
     final db = await database;
     return await db.query(
       'family_survey_sessions',
-      where: 'last_synced_at IS NULL OR status != "synced"',
+      where: 'last_synced_at IS NULL OR sync_status != "synced"',
     );
   }
 
@@ -142,7 +223,7 @@ static Database? _database;
     final db = await database;
     return await db.query(
       'village_survey_sessions',
-      where: 'last_synced_at IS NULL OR status != "synced"',
+      where: 'last_synced_at IS NULL OR sync_status != "synced"',
     );
   }
 
@@ -174,6 +255,103 @@ static Database? _database;
     return results.isNotEmpty ? results.first : null;
   }
 
+  Future<void> _updatePageStatus({
+    required String tableName,
+    required String keyColumn,
+    required String keyValue,
+    required int page,
+    bool? completed,
+    bool? synced,
+  }) async {
+    final db = await database;
+    final results = await db.query(
+      tableName,
+      columns: ['page_completion_status'],
+      where: '$keyColumn = ?',
+      whereArgs: [keyValue],
+    );
+
+    final existingRaw = results.isNotEmpty ? results.first['page_completion_status'] as String? : null;
+    final statusMap = _decodePageStatus(existingRaw);
+
+    final pageKey = page.toString();
+    final entry = Map<String, dynamic>.from(statusMap[pageKey] ?? {});
+    if (completed != null) {
+      entry['completed'] = completed;
+    }
+    if (synced != null) {
+      entry['synced'] = synced;
+    }
+    statusMap[pageKey] = entry;
+
+    final syncPending = _hasPendingSync(statusMap) ? 1 : 0;
+
+    await db.update(
+      tableName,
+      {
+        'page_completion_status': jsonEncode(statusMap),
+        'sync_pending': syncPending,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: '$keyColumn = ?',
+      whereArgs: [keyValue],
+    );
+  }
+
+  Future<Map<String, dynamic>> _getPageStatus({
+    required String tableName,
+    required String keyColumn,
+    required String keyValue,
+  }) async {
+    final db = await database;
+    final results = await db.query(
+      tableName,
+      columns: ['page_completion_status', 'sync_pending'],
+      where: '$keyColumn = ?',
+      whereArgs: [keyValue],
+    );
+    if (results.isEmpty) return {};
+    final row = results.first;
+    return {
+      'page_completion_status': _decodePageStatus(row['page_completion_status'] as String?),
+      'sync_pending': row['sync_pending'] ?? 0,
+    };
+  }
+
+  Map<String, dynamic> _decodePageStatus(String? raw) {
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return decoded.map((key, value) => MapEntry(key.toString(), value));
+      }
+    } catch (_) {
+      // ignore and fallback
+    }
+    return {};
+  }
+
+  bool _hasPendingSync(Map<String, dynamic> statusMap) {
+    for (final entry in statusMap.entries) {
+      final value = entry.value;
+      if (value is Map) {
+        final completed = value['completed'] == true;
+        final synced = value['synced'] == true;
+        if (completed && !synced) {
+          return true;
+        }
+      } else if (value == true) {
+        // Legacy format: completed but no sync flag means pending
+        return true;
+      }
+    }
+    return false;
+  }
+
+
 
   Future<List<Map<String, dynamic>>> getVillageData(String tableName, String sessionId) async {
     final db = await database;
@@ -182,5 +360,105 @@ static Database? _database;
       where: 'session_id = ?',
       whereArgs: [sessionId],
     );
+  }
+
+  // Get village survey by shine_code (PRIMARY KEY)
+  Future<Map<String, dynamic>?> getVillageSurveyByShineCode(String shineCode) async {
+    final db = await database;
+    final results = await db.query(
+      'village_survey_sessions',
+      where: 'shine_code = ?',
+      whereArgs: [shineCode],
+    );
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  // Get village screen data by shine_code or session_id
+  Future<List<Map<String, dynamic>>> getVillageScreenData(String identifier, String tableName) async {
+    final db = await database;
+    
+    // Try shine_code first, fallback to session_id
+    var results = await db.query(
+      tableName,
+      where: 'shine_code = ?',
+      whereArgs: [identifier],
+    );
+    
+    if (results.isEmpty) {
+      results = await db.query(
+        tableName,
+        where: 'session_id = ?',
+        whereArgs: [identifier],
+      );
+    }
+    
+    return results;
+  }
+
+  // Create village survey session
+  Future<void> createVillageSurveySession(Map<String, dynamic> sessionData) async {
+    final db = await database;
+    await db.insert(
+      'village_survey_sessions',
+      {
+        ...sessionData,
+        'created_at': sessionData['created_at'] ?? DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    
+    // Set current session ID
+    if (sessionData.containsKey('session_id')) {
+      _currentSessionId = sessionData['session_id'];
+    }
+  }
+
+  // Update village survey status
+  Future<void> updateVillageSurveyStatus(String sessionId, String status) async {
+    final db = await database;
+    await db.update(
+      'village_survey_sessions',
+      {
+        'status': status,
+        'updated_at': DateTime.now().toIso8601String(),
+        'last_synced_at': status == 'completed' ? DateTime.now().toIso8601String() : null,
+      },
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+    );
+  }
+
+  // Insert or update village survey data
+  Future<void> insertOrUpdate(String tableName, Map<String, dynamic> data, String sessionId) async {
+    final db = await database;
+    
+    // Check if record exists
+    final existing = await db.query(
+      tableName,
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+      limit: 1,
+    );
+    
+    final dataWithTimestamp = {
+      ...data,
+      'session_id': sessionId,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    
+    if (existing.isEmpty) {
+      // Insert new
+      dataWithTimestamp['created_at'] = DateTime.now().toIso8601String();
+      await db.insert(tableName, dataWithTimestamp);
+    } else {
+      // Update existing
+      await db.update(
+        tableName,
+        dataWithTimestamp,
+        where: 'session_id = ?',
+        whereArgs: [sessionId],
+      );
+    }
   }
 }

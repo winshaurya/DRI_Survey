@@ -4,6 +4,8 @@ import '../../services/database_service.dart';
 import '../../services/sync_service.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
+import '../family_survey/pages/family_survey_preview_page.dart';
+import '../village_survey/village_survey_preview_page.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -325,14 +327,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           if (type == 'family') {
-            if (isCompleted) {
-              _navigateToSurveyPreview(phoneNumber);
-            } else {
-              _navigateToContinueSurvey(phoneNumber);
-            }
+            // ALWAYS navigate to preview page first (read-only)
+            _navigateToFamilyPreview(phoneNumber);
           } else {
-             // Village survey navigation
-             _navigateToContinueVillageSurvey(sessionId);
+            // Village survey - navigate to preview page
+            final shineCode = session['shine_code'] ?? sessionId;
+            _navigateToVillagePreview(shineCode);
           }
         },
         onLongPress: () => _showDataPreview(context, session),
@@ -435,31 +435,30 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
     );
   }
 
-  void _navigateToSurveyPreview(String sessionId) {
-    Navigator.pushNamed(
+  void _navigateToFamilyPreview(String phoneNumber) {
+    Navigator.push(
       context,
-      '/survey',
-      arguments: {'previewSessionId': sessionId},
-    ).then((_) => _loadSessions()); // Reload on return
+      MaterialPageRoute(
+        builder: (context) => FamilySurveyPreviewPage(
+          phoneNumber: phoneNumber,
+          fromHistory: true, // Show edit button
+          showSubmitButton: false,
+        ),
+      ),
+    ).then((_) => _loadSessions());
   }
 
-  void _navigateToContinueSurvey(String sessionId) {
-    Navigator.pushNamed(
+  void _navigateToVillagePreview(String shineCode) {
+    Navigator.push(
       context,
-      '/survey',
-      arguments: {'continueSessionId': sessionId},
-    ).then((_) => _loadSessions()); // Reload on return
-  }
-
-  void _navigateToContinueVillageSurvey(String sessionId) {
-     // Set current session ID in DatabaseService
-     DatabaseService().currentSessionId = sessionId;
-     
-     // Navigate to Village Form (start of flow)
-     Navigator.pushNamed(
-       context,
-       '/village-form',
-     ).then((_) => _loadSessions());
+      MaterialPageRoute(
+        builder: (context) => VillageSurveyPreviewPage(
+          shineCode: shineCode,
+          fromHistory: true, // Show edit button
+          showSubmitButton: false,
+        ),
+      ),
+    ).then((_) => _loadSessions());
   }
 
   void _showSyncStatusDialog(BuildContext context) {

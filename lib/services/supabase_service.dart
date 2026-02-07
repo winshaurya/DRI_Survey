@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
@@ -9,10 +10,160 @@ class SupabaseService {
 
   SupabaseClient get client => Supabase.instance.client;
 
+  // Retry configuration
+  static const int _maxRetryAttempts = 4;
+  static const int _initialBackoffMs = 500;
+  static const int _maxBackoffMs = 8000;
+
+  // Field normalization helpers
+  static const Set<String> _boolFields = {
+    'is_deleted',
+    'has_account',
+    'details_correct',
+    'name_included',
+    'received',
+    'is_auto_save',
+  };
+
   Future<void> initialize() async {
     // Supabase is already initialized in main.dart
     // This method is kept for compatibility
     return;
+  }
+
+  Future<T> _withRetry<T>(Future<T> Function() action, {String? operation}) async {
+    int attempt = 0;
+    int delayMs = _initialBackoffMs;
+    final rng = Random();
+
+    while (true) {
+      try {
+        return await action();
+      } catch (e) {
+        attempt++;
+        if (attempt >= _maxRetryAttempts) {
+          rethrow;
+        }
+        final jitter = rng.nextInt(250);
+        await Future.delayed(Duration(milliseconds: delayMs + jitter));
+        delayMs = (delayMs * 2).clamp(_initialBackoffMs, _maxBackoffMs);
+        if (operation != null) {
+          print('⚠ Retry $attempt for $operation after error: $e');
+        }
+      }
+    }
+  }
+
+  dynamic _normalizeValue(String key, dynamic value) {
+    if (value == null) return null;
+
+    if (value is bool) {
+      return _boolFields.contains(key) ? (value ? 1 : 0) : value;
+    }
+
+    if (value is num) return value;
+
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+      final lower = trimmed.toLowerCase();
+
+      if (_boolFields.contains(key)) {
+        if (lower == 'true' || lower == 'yes' || lower == '1') return 1;
+        if (lower == 'false' || lower == 'no' || lower == '0') return 0;
+      }
+
+      if (_shouldParseNumber(key) && _isNumericString(trimmed)) {
+        return _parseNumber(trimmed);
+      }
+
+      return trimmed;
+    }
+
+    return value;
+  }
+
+  bool _isNumericString(String value) {
+    return double.tryParse(value) != null;
+  }
+
+  bool _shouldParseNumber(String key) {
+    final lower = key.toLowerCase();
+    return lower.contains('count') ||
+        lower.contains('number') ||
+        lower.contains('total') ||
+        lower.contains('age') ||
+        lower.contains('area') ||
+        lower.contains('income') ||
+        lower.contains('lat') ||
+        lower.contains('long') ||
+        lower.contains('distance') ||
+        lower.contains('sr_no') ||
+        lower.contains('population') ||
+        lower.contains('members') ||
+        lower.contains('years') ||
+        lower.contains('height') ||
+        lower.contains('weight') ||
+        lower.contains('percentage') ||
+        lower.contains('amount') ||
+        lower.contains('quantity') ||
+        lower.contains('duration') ||
+        lower.contains('rate') ||
+        lower.contains('size');
+  }
+
+  num _parseNumber(String value) {
+    if (value.contains('.')) {
+      return double.tryParse(value) ?? 0.0;
+    }
+    return int.tryParse(value) ?? 0;
+  }
+
+  Map<String, dynamic> _normalizeMap(Map<String, dynamic> data) {
+    final normalized = <String, dynamic>{};
+    for (final entry in data.entries) {
+      normalized[entry.key] = _normalizeValue(entry.key, entry.value);
+    }
+    return normalized;
+  }
+
+  List<Map<String, dynamic>> _normalizeList(List<dynamic> data) {
+    final normalized = <Map<String, dynamic>>[];
+    for (final item in data) {
+      if (item is Map<String, dynamic>) {
+        normalized.add(_normalizeMap(item));
+      } else if (item is Map) {
+        final casted = <String, dynamic>{};
+        for (final entry in item.entries) {
+          casted[entry.key.toString()] = entry.value;
+        }
+        normalized.add(_normalizeMap(casted));
+      }
+    }
+    return normalized;
+  }
+
+  Future<void> _upsertWithRetry(String table, dynamic data) async {
+    if (data == null) return;
+    if (data is List && data.isEmpty) return;
+    await _withRetry(() => client.from(table).upsert(data), operation: 'upsert $table');
+  }
+
+  Future<Map<String, String>> validateSchema(List<String> tableNames) async {
+    final errors = <String, String>{};
+
+    for (final table in tableNames) {
+      try {
+        await _withRetry(
+          () => client.from(table).select('id').limit(1),
+          operation: 'schema check $table',
+        );
+      } catch (e) {
+        errors[table] = e.toString();
+      }
+    }
+
+    return errors;
   }
 
   // Authentication methods
@@ -72,30 +223,28 @@ class SupabaseService {
 
       // Insert main survey session data
       try {
-        await client
-            .from('family_survey_sessions')
-            .upsert({
-              'phone_number': phoneNumber,
-              'surveyor_email': userEmail,
-              'village_name': surveyData['village_name'],
-              'village_number': surveyData['village_number'],
-              'panchayat': surveyData['panchayat'],
-              'block': surveyData['block'],
-              'tehsil': surveyData['tehsil'],
-              'district': surveyData['district'],
-              'postal_address': surveyData['postal_address'],
-              'pin_code': surveyData['pin_code'],
-              'shine_code': surveyData['shine_code'],
-              'latitude': surveyData['latitude'],
-              'longitude': surveyData['longitude'],
-              'location_accuracy': surveyData['location_accuracy'],
-              'location_timestamp': surveyData['location_timestamp'],
-              'surveyor_name': surveyData['surveyor_name'],
-              'status': surveyData['status'] ?? 'in_progress',
-              'created_by': userEmail,
-              'updated_by': userEmail,
-              'user_id': currentUser?.id,
-            });
+        final payload = _normalizeMap({
+          'phone_number': phoneNumber,
+          'surveyor_email': userEmail,
+          'village_name': surveyData['village_name'],
+          'village_number': surveyData['village_number'],
+          'panchayat': surveyData['panchayat'],
+          'block': surveyData['block'],
+          'tehsil': surveyData['tehsil'],
+          'district': surveyData['district'],
+          'postal_address': surveyData['postal_address'],
+          'pin_code': surveyData['pin_code'],
+          'shine_code': surveyData['shine_code'],
+          'latitude': surveyData['latitude'],
+          'longitude': surveyData['longitude'],
+          'location_accuracy': surveyData['location_accuracy'],
+          'location_timestamp': surveyData['location_timestamp'],
+          'surveyor_name': surveyData['surveyor_name'],
+          'status': surveyData['status'] ?? 'in_progress',
+          'created_by': userEmail,
+          'updated_by': userEmail,
+        });
+        await _upsertWithRetry('family_survey_sessions', payload);
         tableSyncStatus['family_survey_sessions'] = true;
       } catch (e) {
         tableSyncStatus['family_survey_sessions'] = false;
@@ -164,12 +313,208 @@ class SupabaseService {
     }
   }
 
+  Future<void> syncFamilyPageToSupabase(String phoneNumber, int page, Map<String, dynamic> data) async {
+    if (phoneNumber.isEmpty) return;
+
+    final userEmail = currentUser?.email ?? data['surveyor_email'];
+
+    if (page == 0) {
+      final payload = _normalizeMap({
+        'phone_number': phoneNumber,
+        'surveyor_email': userEmail,
+        'village_name': data['village_name'],
+        'village_number': data['village_number'],
+        'panchayat': data['panchayat'],
+        'block': data['block'],
+        'tehsil': data['tehsil'],
+        'district': data['district'],
+        'postal_address': data['postal_address'],
+        'pin_code': data['pin_code'],
+        'shine_code': data['shine_code'],
+        'latitude': data['latitude'],
+        'longitude': data['longitude'],
+        'location_accuracy': data['location_accuracy'],
+        'location_timestamp': data['location_timestamp'],
+        'surveyor_name': data['surveyor_name'],
+        'status': data['status'] ?? 'in_progress',
+        'created_by': userEmail,
+        'updated_by': userEmail,
+      });
+      await _upsertWithRetry('family_survey_sessions', payload);
+      return;
+    }
+
+    switch (page) {
+      case 1:
+        await _syncFamilyMembers(phoneNumber, data['family_members'] ?? data['familyMembers'] ?? data['members']);
+        break;
+      case 2:
+      case 3:
+      case 4:
+      case 25:
+        await _syncSocialConsciousness(phoneNumber, data['social_consciousness'] ?? data);
+        break;
+      case 5:
+        await _syncLandHolding(phoneNumber, data['land_holding'] ?? data);
+        break;
+      case 6:
+        await _syncIrrigationFacilities(phoneNumber, data['irrigation_facilities'] ?? data);
+        break;
+      case 7:
+        await _syncCropProductivity(phoneNumber, data['crops'] ?? data['crop_productivity']);
+        break;
+      case 8:
+        await _syncFertilizerUsage(phoneNumber, data['fertilizer_usage'] ?? data);
+        break;
+      case 9:
+        await _syncAnimals(phoneNumber, data['animals']);
+        break;
+      case 10:
+        await _syncAgriculturalEquipment(phoneNumber, data['agricultural_equipment'] ?? data);
+        break;
+      case 11:
+        await _syncEntertainmentFacilities(phoneNumber, data['entertainment_facilities'] ?? data);
+        break;
+      case 12:
+        await _syncTransportFacilities(phoneNumber, data['transport_facilities'] ?? data);
+        break;
+      case 13:
+        await _syncDrinkingWaterSources(phoneNumber, data['drinking_water_sources'] ?? data);
+        break;
+      case 14:
+        await _syncMedicalTreatment(phoneNumber, data['medical_treatment'] ?? data);
+        break;
+      case 15:
+        await _syncDisputes(phoneNumber, data['disputes'] ?? data);
+        break;
+      case 16:
+        await _syncHouseConditions(phoneNumber, data['house_conditions'] ?? data);
+        await _syncHouseFacilities(phoneNumber, data['house_facilities'] ?? data);
+        await _syncTulsiPlants(phoneNumber, data['house_facilities'] ?? data);
+        await _syncNutritionalGarden(phoneNumber, data['house_facilities'] ?? data);
+        break;
+      case 17:
+        await _syncDiseases(phoneNumber, data['diseases']);
+        break;
+      case 19:
+        await _syncFolkloreMedicine(phoneNumber, data['folklore_medicine'] ?? data['folklore_medicines']);
+        break;
+      case 20:
+        await _syncHealthProgrammes(phoneNumber, data['health_programmes'] ?? data);
+        break;
+      case 18:
+        await _syncGovernmentSchemesParallel(phoneNumber, data, {});
+        break;
+      case 21:
+        await _syncChildrenData(phoneNumber, data['children_data'] ?? data);
+        await _syncMalnourishedChildrenData(phoneNumber, data['malnourished_children_data']);
+        await _syncChildDiseases(phoneNumber, data['child_diseases']);
+        break;
+      case 22:
+        await _syncMigration(phoneNumber, data['migration_data'] ?? data);
+        break;
+      case 23:
+        await _syncTraining(phoneNumber, data['training_data']);
+        await _syncSelfHelpGroups(phoneNumber, data['shg_members']);
+        await _syncFpoMembership(phoneNumber, data['fpo_members']);
+        break;
+      case 24:
+        await _syncVbGram(phoneNumber, data['vb_gram'] ?? data);
+        await _syncVbGramMembers(phoneNumber, data['vb_gram_members']);
+        break;
+      case 25:
+        await _syncPmKisanNidhi(phoneNumber, data['pm_kisan_nidhi'] ?? data);
+        await _syncPmKisanMembers(phoneNumber, data['pm_kisan_members']);
+        break;
+      case 26:
+        await _syncPmKisanSammanNidhi(phoneNumber, data['pm_kisan_samman_nidhi'] ?? data);
+        await _syncPmKisanSammanMembers(phoneNumber, data['pm_kisan_samman_members']);
+        break;
+      case 27:
+      case 28:
+      case 29:
+        await _syncMergedGovtSchemes(phoneNumber, data['merged_govt_schemes'] ?? data);
+        break;
+      case 30:
+        await _syncBankAccounts(phoneNumber, data['bank_accounts']);
+        break;
+      default:
+        break;
+    }
+  }
+
+  Future<void> syncVillagePageToSupabase(String sessionId, int page, Map<String, dynamic> data) async {
+    if (sessionId.isEmpty) return;
+
+    switch (page) {
+      case 0:
+        await saveVillageData('village_survey_sessions', data);
+        break;
+      case 1:
+        await saveVillageData('village_infrastructure', data);
+        break;
+      case 2:
+        await saveVillageData('village_infrastructure_details', data);
+        break;
+      case 3:
+        await saveVillageData('village_educational_facilities', data);
+        break;
+      case 4:
+        await saveVillageData('village_drainage_waste', data);
+        break;
+      case 5:
+        await saveVillageData('village_irrigation_facilities', data);
+        break;
+      case 6:
+        await saveVillageData('village_seed_clubs', data);
+        break;
+      case 7:
+        await saveVillageData('village_signboards', data);
+        break;
+      case 8:
+        await saveVillageData('village_social_maps', data);
+        break;
+      case 9:
+        await saveVillageData('village_survey_details', data);
+        break;
+      case 10:
+        final points = data['map_points'];
+        if (points is List) {
+          for (final point in points) {
+            if (point is Map<String, dynamic>) {
+              await saveVillageData('village_map_points', point);
+            } else if (point is Map) {
+              await saveVillageData('village_map_points', point.map((k, v) => MapEntry(k.toString(), v)));
+            }
+          }
+        } else {
+          await saveVillageData('village_map_points', data);
+        }
+        break;
+      case 11:
+        await saveVillageData('village_forest_maps', data);
+        break;
+      case 12:
+        await saveVillageData('village_biodiversity_register', data);
+        break;
+      case 13:
+        await saveVillageData('village_cadastral_maps', data);
+        break;
+      case 14:
+        await saveVillageData('village_transport_facilities', data);
+        break;
+      default:
+        break;
+    }
+  }
+
 // Helper methods for syncing family survey tables
   Future<void> _syncFamilyMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('family_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('family_members', rows);
   }
 
   Future<void> _syncLandHolding(String phoneNumber, Map<String, dynamic>? data) async {
@@ -192,94 +537,103 @@ class SupabaseService {
       for (final entry in data.entries)
         if (allowedKeys.contains(entry.key)) entry.key: entry.value,
     };
-    await client.from('land_holding').upsert({...filtered, 'phone_number': phoneNumber});
+    await _upsertWithRetry('land_holding', _normalizeMap({...filtered, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncIrrigationFacilities(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('irrigation_facilities').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('irrigation_facilities', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncCropProductivity(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('crop_productivity').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('crop_productivity', rows);
   }
 
   Future<void> _syncFertilizerUsage(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('fertilizer_usage').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('fertilizer_usage', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncAnimals(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('animals').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('animals', rows);
   }
 
   Future<void> _syncAgriculturalEquipment(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('agricultural_equipment').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('agricultural_equipment', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncEntertainmentFacilities(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('entertainment_facilities').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('entertainment_facilities', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncTransportFacilities(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('transport_facilities').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('transport_facilities', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncDrinkingWaterSources(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-await client.from('drinking_water_sources').upsert({
-  ...data,
-  'phone_number': phoneNumber,
-  'hand_pumps_quality': data['hand_pumps_quality'],
-  'well_quality': data['well_quality'],
-  'tubewell_quality': data['tubewell_quality'],
-  'nal_jaal_quality': data['nal_jaal_quality'],
-  'other_sources_quality': data['other_sources_quality'],
-});
+    await _upsertWithRetry(
+      'drinking_water_sources',
+      _normalizeMap({
+        ...data,
+        'phone_number': phoneNumber,
+        'hand_pumps_quality': data['hand_pumps_quality'],
+        'well_quality': data['well_quality'],
+        'tubewell_quality': data['tubewell_quality'],
+        'nal_jaal_quality': data['nal_jaal_quality'],
+        'other_sources_quality': data['other_sources_quality'],
+      }),
+    );
   }
 
   Future<void> _syncMedicalTreatment(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('medical_treatment').upsert({
-      'allopathic': data['allopathic'] ?? '0',
-      'ayurvedic': data['ayurvedic'] ?? '0',
-      'homeopathy': data['homeopathy'] ?? '0',
-      'traditional': data['traditional'] ?? '0',
-      'other_treatment': data['other_treatment'] ?? '0',
-      'preferred_treatment': data['preferred_treatment'],
-      'phone_number': phoneNumber
-    });
+    await _upsertWithRetry(
+      'medical_treatment',
+      _normalizeMap({
+        'allopathic': data['allopathic'] ?? '0',
+        'ayurvedic': data['ayurvedic'] ?? '0',
+        'homeopathy': data['homeopathy'] ?? '0',
+        'traditional': data['traditional'] ?? '0',
+        'other_treatment': data['other_treatment'] ?? '0',
+        'preferred_treatment': data['preferred_treatment'],
+        'phone_number': phoneNumber,
+      }),
+    );
   }
 
   Future<void> _syncDisputes(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('disputes').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('disputes', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncHouseConditions(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('house_conditions').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('house_conditions', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncHouseFacilities(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('house_facilities').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('house_facilities', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncDiseases(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('diseases').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('diseases', rows);
   }
 
   Future<void> _syncGovernmentSchemes(String phoneNumber, Map<String, dynamic> surveyData) async {
@@ -329,6 +683,8 @@ await client.from('drinking_water_sources').upsert({
     syncTasks.add(syncWithTracking('vb_gram_members', () => _syncVbGramMembers(phoneNumber, surveyData['vb_gram_members'])));
     syncTasks.add(syncWithTracking('pm_kisan_nidhi', () => _syncPmKisanNidhi(phoneNumber, surveyData['pm_kisan_nidhi'])));
     syncTasks.add(syncWithTracking('pm_kisan_members', () => _syncPmKisanMembers(phoneNumber, surveyData['pm_kisan_members'])));
+    syncTasks.add(syncWithTracking('pm_kisan_samman_nidhi', () => _syncPmKisanSammanNidhi(phoneNumber, surveyData['pm_kisan_samman_nidhi'])));
+    syncTasks.add(syncWithTracking('pm_kisan_samman_members', () => _syncPmKisanSammanMembers(phoneNumber, surveyData['pm_kisan_samman_members'])));
     syncTasks.add(syncWithTracking('merged_govt_schemes', () => _syncMergedGovtSchemes(phoneNumber, surveyData['merged_govt_schemes'])));
 
     // Execute all in parallel
@@ -337,242 +693,317 @@ await client.from('drinking_water_sources').upsert({
 
   Future<void> _syncChildrenData(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('children_data').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('children_data', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncMalnourishedChildrenData(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('malnourished_children_data').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('malnourished_children_data', rows);
   }
 
   Future<void> _syncChildDiseases(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('child_diseases').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('child_diseases', rows);
   }
 
   Future<void> _syncMalnutritionData(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('malnutrition_data').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('malnutrition_data', rows);
   }
 
   Future<void> _syncMigration(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('migration_data').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('migration_data', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncTraining(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('training_data').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('training_data', rows);
   }
 
   Future<void> _syncSelfHelpGroups(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('self_help_groups').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('shg_members', rows);
   }
 
   Future<void> _syncFpoMembership(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('fpo_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('fpo_members', rows);
   }
 
   Future<void> _syncBankAccounts(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('bank_accounts').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('bank_accounts', rows);
   }
 
   Future<void> _syncSocialConsciousness(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('social_consciousness').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('social_consciousness', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncTribalQuestions(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('tribal_questions').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('tribal_questions', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncFolkloreMedicine(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('folklore_medicine').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('folklore_medicine', rows);
   }
 
   Future<void> _syncHealthProgrammes(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('health_programmes').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('health_programmes', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
 
   // Government scheme helper methods
   Future<void> _syncAadhaarInfo(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('aadhaar_info').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('aadhaar_info', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncAadhaarSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('aadhaar_scheme_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('aadhaar_scheme_members', rows);
   }
 
   Future<void> _syncAyushmanCard(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('ayushman_card').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('ayushman_card', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncAyushmanSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('ayushman_scheme_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('ayushman_scheme_members', rows);
   }
 
   Future<void> _syncFamilyId(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('family_id').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('family_id', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncFamilyIdSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('family_id_scheme_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('family_id_scheme_members', rows);
   }
 
   Future<void> _syncRationCard(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('ration_card').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('ration_card', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncRationSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('ration_scheme_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('ration_scheme_members', rows);
   }
 
   Future<void> _syncSamagraId(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('samagra_id').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('samagra_id', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncSamagraSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('samagra_scheme_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('samagra_scheme_members', rows);
   }
 
   Future<void> _syncTribalCard(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('tribal_card').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('tribal_card', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncTribalSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('tribal_scheme_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('tribal_scheme_members', rows);
   }
 
   Future<void> _syncHandicappedAllowance(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('handicapped_allowance').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('handicapped_allowance', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncHandicappedSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('handicapped_scheme_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('handicapped_scheme_members', rows);
   }
 
   Future<void> _syncPensionAllowance(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('pension_allowance').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('pension_allowance', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncPensionSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('pension_scheme_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('pension_scheme_members', rows);
   }
 
   Future<void> _syncWidowAllowance(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('widow_allowance').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('widow_allowance', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncWidowSchemeMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('widow_scheme_members').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
+    await _upsertWithRetry('widow_scheme_members', rows);
   }
 
   Future<void> _syncVbGram(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('vb_gram').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('vb_gram', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncVbGramMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('vb_gram_members').upsert(
-      data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
+    final rows = _normalizeList(
+      data.map((item) {
+        final memberName = item['member_name'] ?? item['name'] ?? item['family_member_name'];
+        return {
+          'phone_number': phoneNumber,
+          'sr_no': item['sr_no'],
+          'member_name': memberName,
+          'name_included': item['name_included'],
+          'details_correct': item['details_correct'],
+          'incorrect_details': item['incorrect_details'],
+          'received': item['received'],
+          'days': item['days'],
+          'membership_details': item['membership_details'],
+        };
+      }).toList(),
     );
+    await _upsertWithRetry('vb_gram_members', rows);
   }
 
   Future<void> _syncPmKisanNidhi(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('pm_kisan_nidhi').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('pm_kisan_nidhi', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncPmKisanMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('pm_kisan_members').upsert(
-      data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
+    final rows = _normalizeList(
+      data.map((item) {
+        final memberName = item['member_name'] ?? item['name'] ?? item['family_member_name'];
+        return {
+          'phone_number': phoneNumber,
+          'sr_no': item['sr_no'],
+          'member_name': memberName,
+          'account_number': item['account_number'],
+          'benefits_received': item['benefits_received'] ?? item['received'],
+          'name_included': item['name_included'],
+          'details_correct': item['details_correct'],
+          'incorrect_details': item['incorrect_details'],
+          'received': item['received'],
+          'days': item['days'],
+        };
+      }).toList(),
     );
+    await _upsertWithRetry('pm_kisan_members', rows);
   }
 
-  Future<void> _syncPmKisanSamman(String phoneNumber, Map<String, dynamic>? data) async {
+  Future<void> _syncPmKisanSammanNidhi(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('pm_kisan_samman').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('pm_kisan_samman_nidhi', _normalizeMap({...data, 'phone_number': phoneNumber}));
+  }
+
+  Future<void> _syncPmKisanSammanMembers(String phoneNumber, List<dynamic>? data) async {
+    if (data == null || data.isEmpty) return;
+    final rows = _normalizeList(
+      data.map((item) {
+        final memberName = item['member_name'] ?? item['name'] ?? item['family_member_name'];
+        return {
+          'phone_number': phoneNumber,
+          'sr_no': item['sr_no'],
+          'member_name': memberName,
+          'account_number': item['account_number'],
+          'benefits_received': item['benefits_received'] ?? item['received'],
+          'name_included': item['name_included'],
+          'details_correct': item['details_correct'],
+          'incorrect_details': item['incorrect_details'],
+          'received': item['received'],
+          'days': item['days'],
+        };
+      }).toList(),
+    );
+    await _upsertWithRetry('pm_kisan_samman_members', rows);
   }
 
   Future<void> _syncKisanCreditCard(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('kisan_credit_card').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('kisan_credit_card', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncSwachhBharat(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('swachh_bharat').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('swachh_bharat', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncFasalBima(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('fasal_bima').upsert({...data, 'phone_number': phoneNumber});
+    await _upsertWithRetry('fasal_bima', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
   Future<void> _syncMergedGovtSchemes(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('merged_govt_schemes').upsert({...data, 'phone_number': phoneNumber});
+    final schemeData = data['scheme_data'] ?? (data is Map<String, dynamic> ? data : null);
+    await _upsertWithRetry(
+      'merged_govt_schemes',
+      _normalizeMap({
+        'phone_number': phoneNumber,
+        'scheme_data': schemeData,
+      }),
+    );
   }
 
   // Extract and sync tulsi_plants from house_facilities
@@ -585,7 +1016,7 @@ await client.from('drinking_water_sources').upsert({
       'plant_count': houseFacilitiesData['tulsi_plants_count'] ?? 0,
     };
 
-    await client.from('tulsi_plants').upsert(tulsiData);
+    await _upsertWithRetry('tulsi_plants', _normalizeMap(tulsiData));
   }
 
   // Extract and sync nutritional_garden from house_facilities
@@ -599,142 +1030,151 @@ await client.from('drinking_water_sources').upsert({
       'vegetables_grown': houseFacilitiesData['vegetables_grown'] ?? '',
     };
 
-    await client.from('nutritional_garden').upsert(gardenData);
+    await _upsertWithRetry('nutritional_garden', _normalizeMap(gardenData));
   }
 
   // Village survey helper methods
   Future<void> _syncVillagePopulation(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_population').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_population', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageFarmFamilies(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_farm_families').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_farm_families', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageDrainageWaste(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_drainage_waste').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_drainage_waste', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageHousing(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_housing').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_housing', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageAgriculturalImplements(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_agricultural_implements').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_agricultural_implements', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageCropProductivity(String sessionId, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_crop_productivity').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'session_id': sessionId}).toList(),
     );
+    await _upsertWithRetry('village_crop_productivity', rows);
   }
 
   Future<void> _syncVillageAnimals(String sessionId, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_animals').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'session_id': sessionId}).toList(),
     );
+    await _upsertWithRetry('village_animals', rows);
   }
 
   Future<void> _syncVillageIrrigationFacilities(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_irrigation_facilities').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_irrigation_facilities', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageDrinkingWater(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_drinking_water').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_drinking_water', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageTransport(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_transport').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_transport', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageEntertainment(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_entertainment').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_entertainment', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageMedicalTreatment(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_medical_treatment').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_medical_treatment', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageDisputes(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_disputes').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_disputes', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageEducationalFacilities(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_educational_facilities').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_educational_facilities', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageSocialConsciousness(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_social_consciousness').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_social_consciousness', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageChildrenData(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_children_data').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_children_data', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageMalnutritionData(String sessionId, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_malnutrition_data').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'session_id': sessionId}).toList(),
     );
+    await _upsertWithRetry('village_malnutrition_data', rows);
   }
 
   Future<void> _syncVillageBplFamilies(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_bpl_families').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_bpl_families', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageKitchenGardens(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_kitchen_gardens').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_kitchen_gardens', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageSeedClubs(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_seed_clubs').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_seed_clubs', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageBiodiversityRegister(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_biodiversity_register').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_biodiversity_register', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   Future<void> _syncVillageTraditionalOccupations(String sessionId, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_traditional_occupations').upsert(
+    final rows = _normalizeList(
       data.map((item) => {...item, 'session_id': sessionId}).toList(),
     );
+    await _upsertWithRetry('village_traditional_occupations', rows);
   }
 
   Future<void> _syncVillageUnemployment(String sessionId, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    await client.from('village_unemployment').upsert({...data, 'session_id': sessionId});
+    await _upsertWithRetry('village_unemployment', _normalizeMap({...data, 'session_id': sessionId}));
   }
 
   // Get survey statistics for dashboard
   Future<Map<String, dynamic>> getSurveyStatistics() async {
     try {
-      final surveyCount = await client.from('family_survey_sessions').select('id').then((data) => data.length);
-      final todaySurveys = await client
-          .from('family_survey_sessions')
-          .select('id')
-          .gte('created_at', DateTime.now().toIso8601String().split('T')[0])
-          .then((data) => data.length);
+      final surveyCount = await _withRetry(
+        () => client.from('family_survey_sessions').select('id'),
+        operation: 'stats total surveys',
+      ).then((data) => data.length);
+      final todaySurveys = await _withRetry(
+        () => client
+            .from('family_survey_sessions')
+            .select('id')
+            .gte('created_at', DateTime.now().toIso8601String().split('T')[0]),
+        operation: 'stats today surveys',
+      ).then((data) => data.length);
 
       return {
         'total_surveys': surveyCount,
@@ -763,7 +1203,13 @@ await client.from('drinking_water_sources').upsert({
   // Save village data to Supabase (generic method used by screens)
   Future<void> saveVillageData(String tableName, Map<String, dynamic> data) async {
     try {
-      await client.from(tableName).upsert(data);
+      final payload = Map<String, dynamic>.from(data);
+      if (tableName == 'village_survey_sessions') {
+        payload.remove('page_completion_status');
+        payload.remove('sync_pending');
+        payload.remove('sync_status');
+      }
+      await _upsertWithRetry(tableName, _normalizeMap(payload));
     } catch (e) {
       throw Exception('Failed to save village data to $tableName: $e');
     }
@@ -782,7 +1228,10 @@ await client.from('drinking_water_sources').upsert({
       'village_educational_facilities', 'village_social_consciousness',
       'village_children_data', 'village_malnutrition_data', 'village_bpl_families',
       'village_kitchen_gardens', 'village_seed_clubs', 'village_biodiversity_register',
-      'village_traditional_occupations', 'village_drainage_waste', 'village_signboards'
+      'village_traditional_occupations', 'village_drainage_waste', 'village_signboards',
+      'village_infrastructure', 'village_infrastructure_details', 'village_survey_details',
+      'village_map_points', 'village_forest_maps', 'village_cadastral_maps',
+      'village_unemployment', 'village_social_maps', 'village_transport_facilities'
     ];
     
     // Remove child data from main session payload
