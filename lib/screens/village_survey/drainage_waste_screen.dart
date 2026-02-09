@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import 'educational_facilities_screen.dart';
 import 'irrigation_facilities_screen.dart';
@@ -84,10 +84,10 @@ class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
       };
 
       // 1. Save to SQLite
-      await DatabaseHelper().insert('village_drainage_waste', drainageData);
+      await databaseService.insertOrUpdate('village_drainage_waste', drainageData, sessionId);
 
       await databaseService.markVillagePageCompleted(sessionId, 4);
-      await SyncService.instance.syncVillagePageData(sessionId, 4, drainageData);
+      unawaited(SyncService.instance.syncVillagePageData(sessionId, 4, drainageData));
 
       // Show success message
       if (mounted) {

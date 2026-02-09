@@ -351,7 +351,6 @@ class ExcelService {
       'village_animals',
       'village_irrigation_facilities',
       'village_drinking_water',
-      'village_transport',
       'village_entertainment',
       'village_medical_treatment',
       'village_disputes',
@@ -421,6 +420,7 @@ class ExcelService {
       'widow_allowance', 'widow_scheme_members',
       'vb_gram', 'vb_gram_members',
       'pm_kisan_nidhi', 'pm_kisan_members',
+      'pm_kisan_samman_nidhi', 'pm_kisan_samman_members',
       'merged_govt_schemes',
     ];
 
@@ -477,7 +477,7 @@ class ExcelService {
 
   /// Create a single-sheet village survey report with clear headings
   Future<void> createVillageSurveyReport(Sheet sheet, Map<String, dynamic> data) async {
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < 18; i++) {
       double width = 22;
       if (i == 0) width = 32;
       sheet.setColumnWidth(i, width);
@@ -486,11 +486,20 @@ class ExcelService {
     _writeSectionHeader(sheet, 'VILLAGE SURVEY REPORT');
 
     _writeKeyValuePair(sheet, 'Village Name:', data['village_name']);
+    _writeKeyValuePair(sheet, 'Village Smile:', data['village_smile']);
+    _writeKeyValuePair(sheet, 'Shine Code:', data['shine_code']);
     _writeKeyValuePair(sheet, 'Panchayat:', data['panchayat']);
     _writeKeyValuePair(sheet, 'Block:', data['block']);
     _writeKeyValuePair(sheet, 'District:', data['district']);
     _writeKeyValuePair(sheet, 'Survey Date:', data['survey_date']);
     _writeKeyValuePair(sheet, 'Surveyor Name:', data['surveyor_name']);
+    _writeKeyValuePair(sheet, 'Latitude:', data['latitude']);
+    _writeKeyValuePair(sheet, 'Longitude:', data['longitude']);
+    _writeKeyValuePair(sheet, 'Location Accuracy:', data['location_accuracy']);
+    _writeKeyValuePair(sheet, 'Location Timestamp:', data['location_timestamp']);
+    _writeKeyValuePair(sheet, 'Status:', data['status']);
+    _writeKeyValuePair(sheet, 'Device Info:', data['device_info']);
+    _writeKeyValuePair(sheet, 'App Version:', data['app_version']);
     _rowIndex++;
 
     final sectionOrder = <String, String>{
@@ -545,8 +554,13 @@ class ExcelService {
   }
 
   void _writeMapSection(Sheet sheet, Map<String, dynamic> data) {
+    // Only skip technical fields, not user-input fields or map links
+    const skip = {
+      'id', 'session_id', 'created_at', 'updated_at', 'sync_status', 'sync_pending', 'last_synced_at',
+      'device_info', 'app_version', 'location_accuracy', 'location_timestamp', 'shine_code', 'village_smile', 'latitude', 'longitude'
+    };
     for (final entry in data.entries) {
-      if (_shouldSkipVillageField(entry.key)) continue;
+      if (skip.contains(entry.key)) continue;
       _writeKeyValuePair(sheet, '${_prettyLabel(entry.key)}:', entry.value);
     }
   }
@@ -712,6 +726,16 @@ class ExcelService {
           DoubleCellValue(double.tryParse((crop['rate'] ?? crop['price_per_quintal'])?.toString() ?? '0') ?? 0),
         ]);
       }
+    }
+    _rowIndex++;
+
+    // Fertilizer
+    _writeSubSectionHeader(sheet, "Fertilizer Usage");
+    if (data['fertilizer_usage'] != null && data['fertilizer_usage'] is Map) {
+      final fert = data['fertilizer_usage'];
+      _writeKeyValuePair(sheet, "Urea Fertilizer:", fert['urea_fertilizer']);
+      _writeKeyValuePair(sheet, "Organic Fertilizer:", fert['organic_fertilizer']);
+      _writeKeyValuePair(sheet, "Fertilizer Types:", fert['fertilizer_types']);
     }
     _rowIndex++;
   }
@@ -947,6 +971,17 @@ class ExcelService {
     _rowIndex++;
   }
 
+  List<dynamic> _decodeJsonList(dynamic raw) {
+    if (raw == null) return [];
+    try {
+      if (raw is String && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) return decoded;
+      }
+    } catch (_) {}
+    return [];
+  }
+
   // --- New Comprehensive Section Methods ---
 
   void _addFamilyMembersSection(Sheet sheet, Map<String, dynamic> data) {
@@ -1165,14 +1200,22 @@ class ExcelService {
     if (data['entertainment_facilities'] != null && data['entertainment_facilities'] is Map) {
       final entertainment = data['entertainment_facilities'];
       _writeKeyValuePair(sheet, "Smart Mobile Phones:", entertainment['smart_mobile']);
+      _writeKeyValuePair(sheet, "Smart Mobile Count:", entertainment['smart_mobile_count']);
+      _writeKeyValuePair(sheet, "Analog Mobile Phones:", entertainment['analog_mobile']);
+      _writeKeyValuePair(sheet, "Analog Mobile Count:", entertainment['analog_mobile_count']);
       _writeKeyValuePair(sheet, "Television:", entertainment['television']);
       _writeKeyValuePair(sheet, "Radio:", entertainment['radio']);
+      _writeKeyValuePair(sheet, "Games:", entertainment['games']);
+      _writeKeyValuePair(sheet, "Other Entertainment:", entertainment['other_entertainment']);
     }
 
     if (data['transport_facilities'] != null && data['transport_facilities'] is Map) {
       final transport = data['transport_facilities'];
       _writeKeyValuePair(sheet, "Car/Jeep:", transport['car_jeep']);
       _writeKeyValuePair(sheet, "Motorcycle/Scooter:", transport['motorcycle_scooter']);
+      _writeKeyValuePair(sheet, "E-rickshaw:", transport['e_rickshaw']);
+      _writeKeyValuePair(sheet, "Cycle:", transport['cycle']);
+      _writeKeyValuePair(sheet, "Pick-up/Truck:", transport['pickup_truck']);
       _writeKeyValuePair(sheet, "Bullock Cart:", transport['bullock_cart']);
     }
 
@@ -1199,6 +1242,24 @@ class ExcelService {
       _writeKeyValuePair(sheet, "Migration Reason:", migration['reason']);
       _writeKeyValuePair(sheet, "Migration Duration:", migration['duration']);
       _writeKeyValuePair(sheet, "Destination:", migration['destination']);
+
+      final members = _decodeJsonList(migration['migrated_members_json']);
+      if (members.isNotEmpty) {
+        _writeTableHeader(sheet, ['Member Name', 'Permanent Distance', 'Permanent Job', 'Seasonal Distance', 'Seasonal Job', 'Need-based Distance', 'Need-based Job']);
+        for (final m in members) {
+          if (m is Map) {
+            _writeTableRow(sheet, [
+              TextCellValue(m['member_name']?.toString() ?? ''),
+              TextCellValue(m['permanent_distance']?.toString() ?? ''),
+              TextCellValue(m['permanent_job']?.toString() ?? ''),
+              TextCellValue(m['seasonal_distance']?.toString() ?? ''),
+              TextCellValue(m['seasonal_job']?.toString() ?? ''),
+              TextCellValue(m['need_based_distance']?.toString() ?? ''),
+              TextCellValue(m['need_based_job']?.toString() ?? ''),
+            ]);
+          }
+        }
+      }
     }
 
     // Disputes
@@ -1208,6 +1269,16 @@ class ExcelService {
       _writeKeyValuePair(sheet, "Family Disputes:", disputes['family_disputes']);
       _writeKeyValuePair(sheet, "Revenue Disputes:", disputes['revenue_disputes']);
       _writeKeyValuePair(sheet, "Criminal Disputes:", disputes['criminal_disputes']);
+      _writeKeyValuePair(sheet, "Family Registered:", disputes['family_registered']);
+      _writeKeyValuePair(sheet, "Family Period:", disputes['family_period']);
+      _writeKeyValuePair(sheet, "Revenue Registered:", disputes['revenue_registered']);
+      _writeKeyValuePair(sheet, "Revenue Period:", disputes['revenue_period']);
+      _writeKeyValuePair(sheet, "Criminal Registered:", disputes['criminal_registered']);
+      _writeKeyValuePair(sheet, "Criminal Period:", disputes['criminal_period']);
+      _writeKeyValuePair(sheet, "Other Disputes:", disputes['other_disputes']);
+      _writeKeyValuePair(sheet, "Other Description:", disputes['other_description']);
+      _writeKeyValuePair(sheet, "Other Registered:", disputes['other_registered']);
+      _writeKeyValuePair(sheet, "Other Period:", disputes['other_period']);
     }
 
     // Folklore Medicine

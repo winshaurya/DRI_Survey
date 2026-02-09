@@ -96,6 +96,9 @@ class CompletionScreen extends StatelessWidget {
                         final sessionId = databaseService.currentSessionId;
 
                         if (sessionId != null) {
+                          await databaseService.updateVillageSurveyStatus(sessionId, 'completed');
+                          await syncService.syncVillageSurveyToSupabase(sessionId);
+
                           // Get the shine_code from the session
                           final session = await databaseService.getVillageSurveySession(sessionId);
                           final shineCode = session?['shine_code'] as String?;

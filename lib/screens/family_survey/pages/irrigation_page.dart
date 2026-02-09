@@ -1,11 +1,8 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../../l10n/app_localizations.dart';
-import '../../../providers/survey_provider.dart';
 
-class IrrigationPage extends ConsumerStatefulWidget {
+class IrrigationPage extends StatefulWidget {
   final Map<String, dynamic> pageData;
   final Function(Map<String, dynamic>) onDataChanged;
 
@@ -16,10 +13,10 @@ class IrrigationPage extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<IrrigationPage> createState() => _IrrigationPageState();
+  State<IrrigationPage> createState() => _IrrigationPageState();
 }
 
-class _IrrigationPageState extends ConsumerState<IrrigationPage> {
+class _IrrigationPageState extends State<IrrigationPage> {
   late bool _canal;
   late bool _tubeWell;
   late bool _ponds;
@@ -32,10 +29,9 @@ class _IrrigationPageState extends ConsumerState<IrrigationPage> {
     super.initState();
     _canal = _parseBool(widget.pageData['canal']);
     _tubeWell = _parseBool(widget.pageData['tube_well']);
-    _ponds = _parseBool(widget.pageData['ponds']);
-    _otherFacilities = _parseBool(widget.pageData['other_facilities']);
-    
-    _otherIrrigationSpecify = widget.pageData['other_irrigation_specify'];
+    _ponds = _parseBool(widget.pageData['pond']);
+    _otherIrrigationSpecify = widget.pageData['other_sources'];
+    _otherFacilities = _otherIrrigationSpecify != null && _otherIrrigationSpecify!.toString().trim().isNotEmpty;
   }
 
   @override
@@ -45,9 +41,9 @@ class _IrrigationPageState extends ConsumerState<IrrigationPage> {
       setState(() {
         _canal = _parseBool(widget.pageData['canal']);
         _tubeWell = _parseBool(widget.pageData['tube_well']);
-        _ponds = _parseBool(widget.pageData['ponds']);
-        _otherFacilities = _parseBool(widget.pageData['other_facilities']);
-        _otherIrrigationSpecify = widget.pageData['other_irrigation_specify'];
+        _ponds = _parseBool(widget.pageData['pond']);
+        _otherIrrigationSpecify = widget.pageData['other_sources'];
+        _otherFacilities = _otherIrrigationSpecify != null && _otherIrrigationSpecify!.toString().trim().isNotEmpty;
       });
     }
   }
@@ -63,12 +59,15 @@ class _IrrigationPageState extends ConsumerState<IrrigationPage> {
     final data = {
       'canal': _canal ? 'Yes' : 'No',
       'tube_well': _tubeWell ? 'Yes' : 'No',
-      'ponds': _ponds ? 'Yes' : 'No',
-      'other_facilities': _otherFacilities ? 'Yes' : 'No',
-      'other_irrigation_specify': _otherIrrigationSpecify,
+        'pond': _ponds ? 'Yes' : 'No',
+        'other_sources': _otherFacilities
+          ? ((_otherIrrigationSpecify != null && _otherIrrigationSpecify!.trim().isNotEmpty)
+            ? _otherIrrigationSpecify
+            : 'Yes')
+          : null,
     };
     widget.onDataChanged(data);
-    ref.read(surveyProvider.notifier).savePageData(6, data);
+    // ref.read(surveyProvider.notifier).savePageData(6, data); // Removed direct savePageData call
   }
 
   @override

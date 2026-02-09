@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import '../../form_template.dart';
 import 'irrigation_facilities_screen.dart'; // Import the previous screen
@@ -48,10 +48,10 @@ class _TransportationScreenState extends State<TransportationScreen> {
     };
 
     try {
-      await DatabaseHelper().insert('village_transport_facilities', data);
+      await databaseService.insertOrUpdate('village_transport_facilities', data, sessionId);
 
       await databaseService.markVillagePageCompleted(sessionId, 14);
-      await SyncService.instance.syncVillagePageData(sessionId, 14, data);
+      unawaited(SyncService.instance.syncVillagePageData(sessionId, 14, data));
 
       if (mounted) {
         Navigator.pop(context);
@@ -186,8 +186,8 @@ class _TransportationScreenState extends State<TransportationScreen> {
     return FormTemplateScreen(
       title: 'Transportation Facilities',
       stepNumber: 'Step 17',
-      nextScreenRoute: '/completion',
-      nextScreenName: 'Completion',
+      nextScreenRoute: '/village-form',
+      nextScreenName: 'Village Information',
       icon: Icons.directions_car,
       instructions: 'Enter number of vehicles available in the village',
       contentWidget: _buildTransportationContent(),

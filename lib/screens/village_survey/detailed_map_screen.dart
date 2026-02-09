@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -182,7 +183,7 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
       }
 
       await databaseService.markVillagePageCompleted(sessionId, 10);
-      await syncService.syncVillagePageData(sessionId, 10, {'map_points': pointsPayload});
+      unawaited(syncService.syncVillagePageData(sessionId, 10, {'map_points': pointsPayload}));
 
       if (mounted) {
         Navigator.push(

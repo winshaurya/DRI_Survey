@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../providers/survey_provider.dart';
 import '../../../services/database_service.dart';
-import '../../../services/data_export_service.dart';
 import '../../../services/excel_service.dart';
 
 class FamilySurveyPreviewPage extends ConsumerStatefulWidget {
@@ -41,17 +40,7 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
     setState(() => _isLoading = true);
 
     try {
-      // If survey data is provided directly, use it instead of loading from database
-      if (widget.surveyData != null && widget.surveyData!.isNotEmpty) {
-        print('Using provided survey data: ${widget.surveyData!.keys}');
-        setState(() {
-          _surveyData = Map<String, dynamic>.from(widget.surveyData!);
-          _isLoading = false;
-        });
-        return;
-      }
-
-      print('No survey data provided, loading from database');
+      print('Loading survey data from database');
 
       // Otherwise, load from database as before
       final db = DatabaseService();
@@ -305,6 +294,389 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
     }
   }
 
+  Map<String, dynamic> _normalizeSurveyDataForPreview(Map<String, dynamic> raw) {
+    final data = Map<String, dynamic>.from(raw);
+
+    Map<String, dynamic> mapify(dynamic value) {
+      if (value is Map<String, dynamic>) return Map<String, dynamic>.from(value);
+      if (value is Map) {
+        return value.map((key, val) => MapEntry(key.toString(), val));
+      }
+      return {};
+    }
+
+    List<dynamic> listify(dynamic value) {
+      if (value is List) return List<dynamic>.from(value);
+      return [];
+    }
+
+    void ensureMap(String targetKey, List<String> sourceKeys, List<String> fields) {
+      if (data[targetKey] is Map) return;
+      for (final key in sourceKeys) {
+        final val = data[key];
+        if (val is Map) {
+          data[targetKey] = mapify(val);
+          return;
+        }
+      }
+      final built = <String, dynamic>{};
+      for (final field in fields) {
+        if (data.containsKey(field)) {
+          built[field] = data[field];
+        }
+      }
+      if (built.isNotEmpty) {
+        data[targetKey] = built;
+      }
+    }
+
+    void ensureList(String targetKey, List<String> sourceKeys) {
+      if (data[targetKey] is List) return;
+      for (final key in sourceKeys) {
+        final val = data[key];
+        if (val is List) {
+          data[targetKey] = listify(val);
+          return;
+        }
+      }
+    }
+
+    ensureMap('irrigation', ['irrigation', 'irrigation_facilities'], [
+      'primary_source',
+      'canal',
+      'tube_well',
+      'river',
+      'pond',
+      'well',
+      'hand_pump',
+      'submersible',
+      'rainwater_harvesting',
+      'check_dam',
+      'other_sources',
+    ]);
+
+    ensureList('crops', ['crops', 'crop_productivity']);
+
+    ensureMap('fertilizer', ['fertilizer', 'fertilizer_usage'], [
+      'urea_fertilizer',
+      'organic_fertilizer',
+      'fertilizer_types',
+      'fertilizer_expenditure',
+    ]);
+
+    ensureList('animals', ['animals']);
+
+    if (data['equipment'] is! List) {
+      final equipmentList = listify(data['agricultural_equipment']);
+      if (equipmentList.isNotEmpty) {
+        data['equipment'] = equipmentList;
+      } else {
+        Map<String, dynamic> equipmentMap = {};
+        if (data['agricultural_equipment'] is Map) {
+          equipmentMap = mapify(data['agricultural_equipment']);
+        } else if (data['equipment'] is Map) {
+          equipmentMap = mapify(data['equipment']);
+        } else {
+          equipmentMap = mapify({
+            'tractor': data['tractor'],
+            'tractor_condition': data['tractor_condition'],
+            'thresher': data['thresher'],
+            'thresher_condition': data['thresher_condition'],
+            'seed_drill': data['seed_drill'],
+            'seed_drill_condition': data['seed_drill_condition'],
+            'sprayer': data['sprayer'],
+            'sprayer_condition': data['sprayer_condition'],
+            'duster': data['duster'],
+            'duster_condition': data['duster_condition'],
+            'diesel_engine': data['diesel_engine'],
+            'diesel_engine_condition': data['diesel_engine_condition'],
+            'other_equipment': data['other_equipment'],
+          });
+        }
+        if (equipmentMap.isNotEmpty) {
+          data['equipment'] = [equipmentMap];
+        }
+      }
+    }
+
+    ensureMap('entertainment', ['entertainment', 'entertainment_facilities'], [
+      'smart_mobile',
+      'smart_mobile_count',
+      'analog_mobile',
+      'analog_mobile_count',
+      'television',
+      'radio',
+      'games',
+      'other_entertainment',
+      'other_specify',
+    ]);
+
+    ensureMap('transport', ['transport', 'transport_facilities'], [
+      'car_jeep',
+      'motorcycle_scooter',
+      'e_rickshaw',
+      'cycle',
+      'pickup_truck',
+      'bullock_cart',
+    ]);
+
+    ensureMap('water_sources', ['water_sources', 'drinking_water_sources'], [
+      'hand_pumps',
+      'hand_pumps_distance',
+      'hand_pumps_quality',
+      'well',
+      'well_distance',
+      'well_quality',
+      'tubewell',
+      'tubewell_distance',
+      'tubewell_quality',
+      'nal_jaal',
+      'nal_jaal_quality',
+      'other_source',
+      'other_distance',
+      'other_sources_quality',
+    ]);
+
+    ensureMap('medical', ['medical', 'medical_treatment'], [
+      'allopathic',
+      'ayurvedic',
+      'homeopathy',
+      'traditional',
+      'other_treatment',
+      'preferred_treatment',
+    ]);
+
+    ensureMap('house', ['house', 'house_conditions'], [
+      'house_type',
+      'house_ownership',
+      'num_of_rooms',
+      'toilet_in_use',
+      'toilet_details',
+      'cooking_fuel',
+      'light_source',
+      'kitchen_type',
+      'kitchen_type_other',
+      'drainage_system',
+      'electricity_connection',
+    ]);
+
+    ensureMap('facilities', ['facilities', 'house_facilities'], [
+      'sewage',
+      'compost_pit',
+      'nadep',
+      'lpg_gas',
+      'biogas',
+      'solar_cooking',
+      'electric_connection',
+      'nutritional_garden_available',
+      'tulsi_plants_available',
+    ]);
+
+    if (data['folklore_medicine'] is! List) {
+      final folklore = listify(data['folklore_medicines']);
+      if (folklore.isNotEmpty) {
+        data['folklore_medicine'] = folklore;
+      }
+    }
+
+    if (data['health_programmes'] is! Map) {
+      ensureMap('health_programmes', ['health_programmes'], [
+        'vaccination_pregnancy',
+        'child_vaccination',
+        'vaccination_schedule',
+        'health_checkup',
+        'nutrition_programme',
+        'health_programme_details',
+      ]);
+    }
+
+    if (data['children'] is! List) {
+      final childrenFields = <String, dynamic>{
+        'births_last_3_years': data['births_last_3_years'],
+        'infant_deaths_last_3_years': data['infant_deaths_last_3_years'],
+        'malnourished_children': data['malnourished_children'],
+      }..removeWhere((key, value) => value == null);
+      if (childrenFields.isNotEmpty) {
+        data['children'] = [childrenFields];
+      }
+    }
+
+    if (data['malnourished_children'] is! List) {
+      final malnourished = listify(data['malnourished_children_data']);
+      if (malnourished.isNotEmpty) {
+        data['malnourished_children'] = malnourished
+            .map((child) {
+              final c = mapify(child);
+              return {
+                'child_id': c['child_id'],
+                'child_name': c['child_name'],
+                'height': c['height'],
+                'weight': c['weight'],
+              };
+            })
+            .toList();
+
+        if (data['child_diseases'] is! List) {
+          final childDiseases = <Map<String, dynamic>>[];
+          for (final child in malnourished) {
+            final c = mapify(child);
+            final childId = c['child_id'];
+            final diseases = listify(c['diseases']);
+            for (final d in diseases) {
+              final disease = mapify(d);
+              childDiseases.add({
+                'child_id': childId,
+                'disease_name': disease['name'] ?? disease['disease_name'],
+              });
+            }
+          }
+          if (childDiseases.isNotEmpty) {
+            data['child_diseases'] = childDiseases;
+          }
+        }
+      }
+    }
+
+    if (data['migration'] is! Map) {
+      final migrationMap = <String, dynamic>{
+        'family_members_migrated': data['family_members_migrated'],
+        'reason': data['reason'],
+        'duration': data['duration'],
+        'destination': data['destination'],
+        'no_migration': data['no_migration'],
+        'migrated_members_json': data['migrated_members_json'],
+      }..removeWhere((key, value) => value == null);
+
+      if (data['migrated_members'] is List && !migrationMap.containsKey('migrated_members_json')) {
+        migrationMap['migrated_members_json'] = jsonEncode(data['migrated_members']);
+      }
+
+      if (migrationMap.isNotEmpty) {
+        data['migration'] = migrationMap;
+      }
+    }
+
+    if (data['training'] is! List) {
+      final trainingMembers = listify(data['training_members']);
+      if (trainingMembers.isNotEmpty) {
+        data['training'] = trainingMembers;
+      }
+    }
+
+    if (data['diseases'] is! List) {
+      final diseasesValue = data['diseases'];
+      if (diseasesValue is Map && diseasesValue['members'] is List) {
+        data['diseases'] = (diseasesValue['members'] as List)
+            .map((member) => _mapDiseaseMember(mapify(member)))
+            .toList();
+      } else {
+        final members = listify(data['members']);
+        final looksLikeDisease = members.any((m) {
+          final member = mapify(m);
+          return member.containsKey('disease_name') ||
+              member.containsKey('suffering_since') ||
+              member.containsKey('treatment_taken') ||
+              member.containsKey('treatment_from_when') ||
+              member.containsKey('treatment_from_where') ||
+              member.containsKey('treatment_taken_from');
+        });
+        if (looksLikeDisease) {
+          data['diseases'] = members.map((m) => _mapDiseaseMember(mapify(m))).toList();
+        }
+      }
+    }
+
+    if (data['bank_accounts'] is! List) {
+      final members = listify(data['members']);
+      final hasBankAccounts = members.any((m) => mapify(m)['bank_accounts'] is List);
+      if (hasBankAccounts) {
+        final accounts = <Map<String, dynamic>>[];
+        int srNo = 0;
+        for (final m in members) {
+          final member = mapify(m);
+          final memberName = member['name'] ?? member['member_name'];
+          final bankList = listify(member['bank_accounts']);
+          for (final account in bankList) {
+            final a = mapify(account);
+            srNo++;
+            accounts.add({
+              'sr_no': a['sr_no'] ?? srNo,
+              'member_name': memberName,
+              'account_number': a['account_number'],
+              'bank_name': a['bank_name'],
+              'ifsc_code': a['ifsc_code'],
+              'branch_name': a['branch_name'],
+              'account_type': a['account_type'],
+              'has_account': a['has_account'],
+              'details_correct': a['details_correct'],
+              'incorrect_details': a['incorrect_details'],
+            });
+          }
+        }
+        if (accounts.isNotEmpty) {
+          data['bank_accounts'] = accounts;
+        }
+      }
+    }
+
+    void mapSchemeMembers(String targetKey, String sourceKey) {
+      if (data[targetKey] is List) return;
+      final members = listify(data[sourceKey]);
+      if (members.isNotEmpty) {
+        data[targetKey] = members;
+      }
+    }
+
+    mapSchemeMembers('aadhaar_members', 'aadhaar_scheme_members');
+    mapSchemeMembers('tribal_members', 'tribal_scheme_members');
+    mapSchemeMembers('pension_members', 'pension_scheme_members');
+    mapSchemeMembers('widow_members', 'widow_scheme_members');
+    mapSchemeMembers('ayushman_members', 'ayushman_scheme_members');
+    mapSchemeMembers('ration_members', 'ration_scheme_members');
+    mapSchemeMembers('family_id_members', 'family_id_scheme_members');
+    mapSchemeMembers('samagra_members', 'samagra_scheme_members');
+    mapSchemeMembers('handicapped_members', 'handicapped_scheme_members');
+
+    if (data['vb_gram_members'] is! List && data['vb_gram'] is Map) {
+      final vbMap = mapify(data['vb_gram']);
+      final vbMembers = listify(vbMap['members']);
+      if (vbMembers.isNotEmpty) {
+        data['vb_gram_members'] = vbMembers;
+      }
+    }
+
+    if (data['pm_kisan_members'] is! List && data['pm_kisan_nidhi'] is Map) {
+      final pmMap = mapify(data['pm_kisan_nidhi']);
+      final pmMembers = listify(pmMap['members']);
+      if (pmMembers.isNotEmpty) {
+        data['pm_kisan_members'] = pmMembers;
+      }
+    }
+
+    if (data['pm_kisan_samman_members'] is! List && data['pm_kisan_samman_nidhi'] is Map) {
+      final pmMap = mapify(data['pm_kisan_samman_nidhi']);
+      final pmMembers = listify(pmMap['members']);
+      if (pmMembers.isNotEmpty) {
+        data['pm_kisan_samman_members'] = pmMembers;
+      }
+    }
+
+    return data;
+  }
+
+  Map<String, dynamic> _mapDiseaseMember(Map<String, dynamic> member) {
+    return {
+      'sr_no': member['sr_no'],
+      'family_member_name': member['family_member_name'] ?? member['name'],
+      'disease_name': member['disease_name'],
+      'suffering_since': member['suffering_since'],
+      'treatment_taken': member['treatment_taken'],
+      'treatment_from_when': member['treatment_from_when'],
+      'treatment_from_where': member['treatment_from_where'],
+      'treatment_taken_from': member['treatment_taken_from'],
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -380,7 +752,7 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
           IconButton(
             icon: const Icon(Icons.file_download),
             tooltip: 'Export to Excel',
-            onPressed: _showExportOptions,
+            onPressed: _exportToExcel,
           ),
         ],
       ),
@@ -1325,6 +1697,12 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
 
   Widget _buildMigration() {
     final migration = _surveyData['migration'] as Map<String, dynamic>? ?? {};
+    final members = _decodeJsonList(migration['migrated_members_json']);
+
+    if ((migration['no_migration'] == 1 || migration['no_migration'] == true) && members.isEmpty) {
+      return const Text('No family migration reported', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic));
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1332,8 +1710,30 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
         _buildDataRow('Reason', migration['reason']),
         _buildDataRow('Duration', migration['duration']),
         _buildDataRow('Destination', migration['destination']),
+        if (members.isNotEmpty) ...[
+          const Divider(height: 16),
+          const Text('Migrated Members:', style: TextStyle(fontWeight: FontWeight.bold)),
+          ...members.map((m) {
+            final member = m as Map<String, dynamic>;
+            return Padding(
+              padding: const EdgeInsets.only(left: 12, top: 6),
+              child: Text('• ${member['member_name'] ?? ''}'),
+            );
+          }),
+        ],
       ],
     );
+  }
+
+  List<dynamic> _decodeJsonList(dynamic raw) {
+    if (raw == null) return [];
+    try {
+      if (raw is String && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) return decoded;
+      }
+    } catch (_) {}
+    return [];
   }
 
   Widget _buildTraining() {
@@ -1408,49 +1808,7 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
     );
   }
 
-  Future<void> _showExportOptions() async {
-    if (!mounted) return;
-    final selection = await showModalBottomSheet<_ExportOption>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.file_download),
-              title: const Text('Export Excel (Quick)'),
-              subtitle: const Text('Preview data only'),
-              onTap: () => Navigator.of(sheetContext).pop(_ExportOption.quick),
-            ),
-            ListTile(
-              leading: const Icon(Icons.dataset),
-              title: const Text('Export Excel (Data Migration)'),
-              subtitle: const Text('All local data including migration details'),
-              onTap: () => Navigator.of(sheetContext).pop(_ExportOption.full),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (!mounted || selection == null) return;
-    if (selection == _ExportOption.quick) {
-      await _exportToExcelQuick();
-      return;
-    }
-    await _exportToExcelFull();
-  }
-
-  Future<void> _exportToExcelQuick() async {
-    try {
-      await DataExportService().exportCompleteSurveyData(widget.phoneNumber);
-      _showExportSuccess();
-    } catch (e) {
-      _showExportError(e);
-    }
-  }
-
-  Future<void> _exportToExcelFull() async {
+  Future<void> _exportToExcel() async {
     try {
       await ExcelService().exportCompleteSurveyToExcel(widget.phoneNumber);
       _showExportSuccess();
@@ -1536,7 +1894,3 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 }
 
-enum _ExportOption {
-  quick,
-  full,
-}

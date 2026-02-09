@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import 'irrigation_facilities_screen.dart'; // Import the previous screen
 import 'signboards_screen.dart';
@@ -41,10 +41,10 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
 
     try {
       // 1. Save to SQLite
-      await DatabaseHelper().insert('village_seed_clubs', data);
+      await databaseService.insertOrUpdate('village_seed_clubs', data, sessionId);
 
       await databaseService.markVillagePageCompleted(sessionId, 6);
-      await SyncService.instance.syncVillagePageData(sessionId, 6, data);
+      unawaited(SyncService.instance.syncVillagePageData(sessionId, 6, data));
 
       if (mounted) {
         Navigator.push(

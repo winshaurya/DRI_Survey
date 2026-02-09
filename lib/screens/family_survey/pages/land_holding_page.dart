@@ -94,7 +94,7 @@ class _LandHoldingPageState extends ConsumerState<LandHoldingPage> {
       'other_fruit_trees_count': 0, // Default or add field if needed
     };
     widget.onDataChanged(data);
-    ref.read(surveyProvider.notifier).savePageData(5, data);
+     // ref.read(surveyProvider.notifier).savePageData(5, data); // Removed direct savePageData call
   }
 
   Widget _buildCheckboxField(String label, bool value, Function(bool?) onChanged) {

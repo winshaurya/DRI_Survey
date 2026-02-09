@@ -13,15 +13,14 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
 import 'database_service.dart';
-import 'supabase_service.dart';
 
 class FileUploadService {
   static final FileUploadService _instance = FileUploadService._internal();
   static FileUploadService get instance => _instance;
 
   final DatabaseService _databaseService = DatabaseService();
-  final SupabaseService _supabaseService = SupabaseService.instance;
   final ImagePicker _imagePicker = ImagePicker();
 
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
@@ -81,20 +80,34 @@ class FileUploadService {
 
   Future<void> _loadCredentials() async {
     // Load credentials from Android environment variables or dotenv
+    // Try both GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_CLIENT_EMAIL for compatibility
     String? email = const String.fromEnvironment('GOOGLE_SERVICE_ACCOUNT_EMAIL');
-    String? key = const String.fromEnvironment('GOOGLE_PRIVATE_KEY');
-    
     if (email.isEmpty) {
       email = dotenv.env['GOOGLE_SERVICE_ACCOUNT_EMAIL'];
     }
-    
+    if (email == null || email.isEmpty) {
+      email = dotenv.env['GOOGLE_CLIENT_EMAIL'];
+    }
+    String? key = const String.fromEnvironment('GOOGLE_PRIVATE_KEY');
     if (key.isEmpty) {
       key = dotenv.env['GOOGLE_PRIVATE_KEY'];
     }
-
     _serviceAccountEmail = email;
     _privateKey = key?.replaceAll(r'\n', '\n');
-    _driveFolderId = ROOT_FOLDER_ID;
+
+    // Load folder ID from .env if present
+    String? folderUrl = dotenv.env['GOOGLE_FOLDER'];
+    if (folderUrl != null && folderUrl.contains('/folders/')) {
+      final parts = folderUrl.split('/folders/');
+      if (parts.length > 1) {
+        final id = parts[1].split('?').first;
+        _driveFolderId = id;
+        debugPrint('Loaded Google Drive folder ID from .env: $_driveFolderId');
+      }
+    }
+    if (_driveFolderId == null) {
+      _driveFolderId = ROOT_FOLDER_ID;
+    }
 
     // Also load GOOGLE_FORM if available (for alternative upload method)
     String googleFormUrl = const String.fromEnvironment('GOOGLE_FORM');
@@ -115,6 +128,7 @@ class FileUploadService {
 
   Future<auth.AuthClient> _getAuthenticatedClient() async {
     if (_serviceAccountEmail == null || _privateKey == null) {
+      debugPrint('Drive credentials not configured: email=$_serviceAccountEmail, key=${_privateKey != null}');
       throw Exception('Drive credentials not configured');
     }
 
@@ -160,6 +174,7 @@ class FileUploadService {
     String shineCode,
     String pageType,
   ) async {
+    debugPrint('Uploading $fileName to Drive for $shineCode/$pageType...');
     final client = await _getAuthenticatedClient();
     final driveApi = drive.DriveApi(client);
 
@@ -167,6 +182,7 @@ class FileUploadService {
       // Get or create village folder
       final villageFolderId = await _getOrCreateVillageFolder(shineCode, driveApi);
       if (villageFolderId == null) {
+        debugPrint('Could not create/access village folder for $shineCode');
         throw Exception('Could not create/access village folder');
       }
 
@@ -197,6 +213,7 @@ class FileUploadService {
       // Get shareable link
       final shareableLink = 'https://drive.google.com/file/d/${uploadedFile.id}/view?usp=sharing';
 
+      debugPrint('File uploaded to Drive: $shareableLink');
       return {
         'fileId': uploadedFile.id,
         'shareLink': shareableLink,
@@ -209,31 +226,50 @@ class FileUploadService {
     }
   }
 
-  Future<void> _syncFileMetadataToSupabase(
+  String? _getSocialMapLinkColumn(String component) {
+    switch (component) {
+      case 'Topography & Hydrology':
+        return 'topography_file_link';
+      case 'Enterprise Map':
+        return 'enterprise_file_link';
+      case 'Village':
+        return 'village_file_link';
+      case 'Venn Diagram':
+        return 'venn_file_link';
+      case 'Transect Map':
+        return 'transect_file_link';
+      case 'Cadastral Map':
+        return 'cadastral_file_link';
+      default:
+        return null;
+    }
+  }
+
+  Future<void> _updateLocalSocialMapLink(
     String shineCode,
-    String pageType,
     String component,
-    String fileName,
-    String fileType,
-    String driveFileId,
-    String driveShareLink,
-    String? phoneNumber,
+    String shareLink,
   ) async {
-    try {
-      await _supabaseService.client.from('uploaded_files').insert({
-        'village_smile_code': shineCode,
-        'page_type': pageType,
-        'component': component,
-        'file_name': fileName,
-        'file_type': fileType,
-        'drive_file_id': driveFileId,
-        'drive_share_link': driveShareLink,
-        'phone_number': phoneNumber,
-        'uploaded_by': _supabaseService.currentUser?.email,
-      });
-    } catch (e) {
-      debugPrint('Error syncing file metadata to Supabase: $e');
-      // Don't throw - upload succeeded, just metadata sync failed
+    final column = _getSocialMapLinkColumn(component);
+    if (column == null) return;
+
+    final session = await _databaseService.getVillageSurveyByShineCode(shineCode);
+    final sessionId = session?['session_id']?.toString();
+    if (sessionId == null || sessionId.isEmpty) return;
+
+    final existing = await _databaseService.getVillageData('village_social_maps', sessionId);
+    if (existing.isEmpty) {
+      await _databaseService.insertOrUpdate('village_social_maps', {
+        'id': const Uuid().v4(),
+        'session_id': sessionId,
+        'created_at': DateTime.now().toIso8601String(),
+        column: shareLink,
+      }, sessionId);
+    } else {
+      await _databaseService.insertOrUpdate('village_social_maps', {
+        'session_id': sessionId,
+        column: shareLink,
+      }, sessionId);
     }
   }
 
@@ -299,17 +335,9 @@ class FileUploadService {
         throw Exception('Drive upload failed');
       }
 
-      // Sync metadata to Supabase
-      await _syncFileMetadataToSupabase(
-        shineCode,
-        pageType,
-        component ?? '',
-        fileName,
-        fileType,
-        driveResult['fileId'],
-        driveResult['shareLink'],
-        shineCode, // Use shineCode as proxy for phone number if not available in context
-      );
+      if (pageType == 'social_map' && component != null) {
+        await _updateLocalSocialMapLink(shineCode, component, driveResult['shareLink']);
+      }
 
       // Update status to uploaded
       await _updateUploadStatus(uploadId, 'uploaded');
@@ -506,25 +534,6 @@ class FileUploadService {
       where: 'village_smile_code = ? AND page_type = ?',
       whereArgs: [shineCode, pageType],
     );
-  }
-
-  Future<List<Map<String, dynamic>>> getUploadedFilesForSession(
-    String shineCode,
-    String pageType,
-  ) async {
-    try {
-      final response = await _supabaseService.client
-          .from('uploaded_files')
-          .select('*')
-          .eq('village_smile_code', shineCode)
-          .eq('page_type', pageType)
-          .eq('is_deleted', false);
-
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      debugPrint('Error getting uploaded files: $e');
-      return [];
-    }
   }
 
   void dispose() {

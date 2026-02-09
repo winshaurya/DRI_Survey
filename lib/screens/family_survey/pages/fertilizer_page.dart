@@ -1,11 +1,8 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../../l10n/app_localizations.dart';
-import '../../../providers/survey_provider.dart';
 
-class FertilizerPage extends ConsumerStatefulWidget {
+class FertilizerPage extends StatefulWidget {
   final Map<String, dynamic> pageData;
   final Function(Map<String, dynamic>) onDataChanged;
 
@@ -16,10 +13,10 @@ class FertilizerPage extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<FertilizerPage> createState() => _FertilizerPageState();
+  State<FertilizerPage> createState() => _FertilizerPageState();
 }
 
-class _FertilizerPageState extends ConsumerState<FertilizerPage> {
+class _FertilizerPageState extends State<FertilizerPage> {
   late bool _ureaFertilizer;
   late bool _organicFertilizer;
   late TextEditingController _fertilizerTypesController;
@@ -64,7 +61,6 @@ class _FertilizerPageState extends ConsumerState<FertilizerPage> {
       'fertilizer_types': _fertilizerTypesController.text,
     };
     widget.onDataChanged(data);
-    ref.read(surveyProvider.notifier).savePageData(8, data);
   }
 
   Widget _buildCheckboxField(String label, bool value, Function(bool?) onChanged) {

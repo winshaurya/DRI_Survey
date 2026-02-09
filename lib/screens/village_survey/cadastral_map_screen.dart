@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import 'detailed_map_screen.dart'; // Import the previous screen
 import 'forest_map_screen.dart';
@@ -74,7 +74,7 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
       'has_cadastral_map': hasCadastralMap ? 1 : 0,
       'map_details': mapDetailsController.text,
       'availability_status': availabilityStatusController.text,
-      // 'image_path': _selectedImage?.path, // If we had a column for it
+      'image_path': _selectedImage?.path,
       'created_at': DateTime.now().toIso8601String(),
     };
 
@@ -83,10 +83,10 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
       // If not, we might need to add it or skip this.
       // Assuming it doesn't exist yet based on previous file reads of DatabaseHelper.
       // I will add the table creation to DatabaseHelper shortly.
-      await DatabaseHelper().insert('village_cadastral_maps', data);
+      await databaseService.insertOrUpdate('village_cadastral_maps', data, sessionId);
 
       await databaseService.markVillagePageCompleted(sessionId, 13);
-      await syncService.syncVillagePageData(sessionId, 13, data);
+      unawaited(syncService.syncVillagePageData(sessionId, 13, data));
 
       if (mounted) {
         Navigator.push(

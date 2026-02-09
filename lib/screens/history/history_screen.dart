@@ -178,14 +178,32 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _manualSyncAll(context),
         icon: const Icon(Icons.sync),
-        label: const Text('Force Sync'),
-        tooltip: 'Manually sync all pending surveys',
+        label: const Text('Sync'),
+        tooltip: 'Sync all pending surveys',
       ),
     );
   }
 
   Future<void> _manualSyncAll(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
+    final syncService = SyncService.instance;
+
+    if (!syncService.isOnline) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.cloud_off, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(child: Text('You are offline. Sync will run when you are back online.')),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
     
     // Show loading indicator
     messenger.showSnackBar(
@@ -198,7 +216,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
             ),
             SizedBox(width: 16),
-            Text('Syncing all pending surveys...'),
+            Text('Syncing pending surveys...'),
           ],
         ),
         duration: Duration(seconds: 30),
@@ -206,7 +224,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
     );
 
     try {
-      await SyncService.instance.forceSyncAllPendingData();
+      await syncService.forceSyncAllPendingData();
       
       // Reload sessions to reflect updated sync status
       await _loadSessions();

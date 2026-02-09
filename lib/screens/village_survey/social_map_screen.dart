@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -7,7 +8,6 @@ import 'signboards_screen.dart';
 import 'survey_details_screen.dart';
 import '../../services/file_upload_service.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 
 class SocialMapScreen extends StatefulWidget {
@@ -32,6 +32,7 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
     'Village': null,
     'Venn Diagram': null,
     'Transect Map': null,
+    'Cadastral Map': null,
   };
 
   final Map<String, String> _uploadStatuses = {
@@ -40,6 +41,7 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
     'Village': 'none',
     'Venn Diagram': 'none',
     'Transect Map': 'none',
+    'Cadastral Map': 'none',
   };
 
   @override
@@ -59,11 +61,11 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
         _currentSessionId = sessionId;
       });
       
-      // Fetch session details to get village code (shine code)
+      // Fetch session details to get shine code
       final session = await databaseService.getVillageSurveySession(sessionId);
-      if (session != null && session['village_code'] != null) {
+      if (session != null && session['shine_code'] != null) {
         setState(() {
-          _shineCode = session['village_code'];
+          _shineCode = session['shine_code'];
         });
         _loadExistingUploads();
       }
@@ -78,24 +80,33 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
         _shineCode!,
         'social_map',
       );
-      final uploadedFiles = await _fileUploadService.getUploadedFilesForSession(
-        _shineCode!,
-        'social_map',
-      );
+      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final socialMaps = _currentSessionId == null
+          ? <Map<String, dynamic>>[]
+          : await databaseService.getVillageData('village_social_maps', _currentSessionId!);
+      final socialMap = socialMaps.isNotEmpty ? socialMaps.first : <String, dynamic>{};
 
       setState(() {
         for (final upload in pendingUploads) {
           final component = upload['component'];
           if (component != null && _uploadStatuses.containsKey(component)) {
-            _uploadStatuses[component] = upload['status'];
+            _uploadStatuses[component] = upload['status'] ?? 'pending';
           }
         }
-        for (final file in uploadedFiles) {
-          final component = file['component'];
-          if (component != null && _uploadStatuses.containsKey(component)) {
+
+        void markIfLink(String component, String column) {
+          final link = socialMap[column];
+          if (link is String && link.trim().isNotEmpty) {
             _uploadStatuses[component] = 'uploaded';
           }
         }
+
+        markIfLink('Topography & Hydrology', 'topography_file_link');
+        markIfLink('Enterprise Map', 'enterprise_file_link');
+        markIfLink('Village', 'village_file_link');
+        markIfLink('Venn Diagram', 'venn_file_link');
+        markIfLink('Transect Map', 'transect_file_link');
+        markIfLink('Cadastral Map', 'cadastral_file_link');
       });
     } catch (e) {
       debugPrint('Error loading existing uploads: $e');
@@ -203,18 +214,33 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
       return;
     }
 
+    final existing = await databaseService.getVillageData('village_social_maps', _currentSessionId!);
+    final existingRow = existing.isNotEmpty ? existing.first : <String, dynamic>{};
+
+    String? _existingLink(String column) {
+      final value = existingRow[column];
+      if (value is String && value.trim().isNotEmpty) return value;
+      return null;
+    }
+
     final data = {
       'id': const Uuid().v4(),
       'session_id': _currentSessionId,
       'remarks': _remarksController.text,
+      'topography_file_link': _existingLink('topography_file_link'),
+      'enterprise_file_link': _existingLink('enterprise_file_link'),
+      'village_file_link': _existingLink('village_file_link'),
+      'venn_file_link': _existingLink('venn_file_link'),
+      'transect_file_link': _existingLink('transect_file_link'),
+      'cadastral_file_link': _existingLink('cadastral_file_link'),
       'created_at': DateTime.now().toIso8601String(),
     };
 
     try {
-      await DatabaseHelper().insert('village_social_maps', data);
+      await databaseService.insertOrUpdate('village_social_maps', data, _currentSessionId!);
 
       await databaseService.markVillagePageCompleted(_currentSessionId!, 8);
-      await syncService.syncVillagePageData(_currentSessionId!, 8, data);
+      unawaited(syncService.syncVillagePageData(_currentSessionId!, 8, data));
 
       if (mounted) {
         Navigator.push(

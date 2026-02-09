@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -233,7 +234,7 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
       
       // 2. Mark page completion and sync immediately (queue fallback)
       await databaseService.markVillagePageCompleted(sessionId, 0);
-      await syncService.syncVillagePageData(sessionId, 0, sessionData);
+      unawaited(syncService.syncVillagePageData(sessionId, 0, sessionData));
 
       if (mounted) {
         // Close loading dialog

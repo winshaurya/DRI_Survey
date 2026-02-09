@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import 'infrastructure_availability_screen.dart';
 
@@ -67,10 +67,10 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
     };
 
     try {
-      await DatabaseHelper().insert('village_infrastructure', data);
+      await databaseService.insertOrUpdate('village_infrastructure', data, sessionId);
 
       await databaseService.markVillagePageCompleted(sessionId, 1);
-      await SyncService.instance.syncVillagePageData(sessionId, 1, data);
+      unawaited(SyncService.instance.syncVillagePageData(sessionId, 1, data));
 
       if (mounted) {
         Navigator.push(

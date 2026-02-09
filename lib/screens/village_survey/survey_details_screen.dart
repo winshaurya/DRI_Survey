@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import 'social_map_screen.dart';
 import 'detailed_map_screen.dart';
@@ -69,10 +69,10 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
     };
 
     try {
-      await DatabaseHelper().insert('village_survey_details', data);
+      await databaseService.insertOrUpdate('village_survey_details', data, sessionId);
 
       await databaseService.markVillagePageCompleted(sessionId, 9);
-      await SyncService.instance.syncVillagePageData(sessionId, 9, data);
+      unawaited(SyncService.instance.syncVillagePageData(sessionId, 9, data));
 
       if (mounted) {
         Navigator.push(

@@ -49,7 +49,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 40,
+      version: 42,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -63,10 +63,47 @@ class DatabaseHelper {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     // Ensure newer columns exist for upgrades.
     await _ensurePageTrackingColumns(db);
+    await _ensureSocialConsciousnessColumns(db);
+    await _ensureFamilySessionColumns(db);
+    await _ensureLandHoldingColumns(db);
+    await _ensureCropProductivityColumns(db);
     await _ensureSchemeMemberTables(db);
+    await _ensureSocialMapLinkColumns(db);
     if (oldVersion < 38) {
       await _migrateFamilySurveySessionsPrimaryKey(db);
     }
+  }
+
+  Future<void> _ensureSocialMapLinkColumns(Database db) async {
+    await _addColumnIfMissing(db, 'village_social_maps', 'topography_file_link', 'TEXT');
+    await _addColumnIfMissing(db, 'village_social_maps', 'enterprise_file_link', 'TEXT');
+    await _addColumnIfMissing(db, 'village_social_maps', 'village_file_link', 'TEXT');
+    await _addColumnIfMissing(db, 'village_social_maps', 'venn_file_link', 'TEXT');
+    await _addColumnIfMissing(db, 'village_social_maps', 'transect_file_link', 'TEXT');
+    await _addColumnIfMissing(db, 'village_social_maps', 'cadastral_file_link', 'TEXT');
+  }
+
+  Future<void> _ensureFamilySessionColumns(Database db) async {
+    await _addColumnIfMissing(db, 'family_survey_sessions', 'state', 'TEXT');
+    await _addColumnIfMissing(db, 'family_survey_sessions', 'lgd_code', 'TEXT');
+  }
+
+  Future<void> _ensureLandHoldingColumns(Database db) async {
+    await _addColumnIfMissing(db, 'land_holding', 'banana_plants', 'INTEGER DEFAULT 0');
+    await _addColumnIfMissing(db, 'land_holding', 'papaya_trees', 'INTEGER DEFAULT 0');
+    await _addColumnIfMissing(db, 'land_holding', 'other_orchard_plants', 'TEXT');
+  }
+
+  Future<void> _ensureCropProductivityColumns(Database db) async {
+    await _addColumnIfMissing(db, 'crop_productivity', 'season', 'TEXT');
+  }
+
+  Future<void> _ensureSocialConsciousnessColumns(Database db) async {
+    await _addColumnIfMissing(db, 'social_consciousness', 'community_activities_type', 'TEXT');
+    await _addColumnIfMissing(db, 'social_consciousness', 'shram_sadhana', 'TEXT');
+    await _addColumnIfMissing(db, 'social_consciousness', 'shram_sadhana_members', 'TEXT');
+    await _addColumnIfMissing(db, 'social_consciousness', 'savings_exists', 'TEXT');
+    await _addColumnIfMissing(db, 'social_consciousness', 'savings_percentage', 'TEXT');
   }
 
   Future<void> _ensureSchemeMemberTables(Database db) async {
@@ -150,6 +187,12 @@ class DatabaseHelper {
     await _addColumnIfMissing(db, 'village_survey_sessions', 'page_completion_status', "TEXT DEFAULT '{}'");
     await _addColumnIfMissing(db, 'village_survey_sessions', 'sync_pending', 'INTEGER DEFAULT 0');
     await _addColumnIfMissing(db, 'village_survey_sessions', 'sync_status', "TEXT DEFAULT 'pending'");
+
+    await _addColumnIfMissing(db, 'village_infrastructure_details', 'has_primary_health_centre', 'INTEGER DEFAULT 0');
+    await _addColumnIfMissing(db, 'village_infrastructure_details', 'has_drinking_water_source', 'INTEGER DEFAULT 0');
+
+    await _addColumnIfMissing(db, 'migration_data', 'no_migration', 'INTEGER DEFAULT 0');
+    await _addColumnIfMissing(db, 'migration_data', 'migrated_members_json', 'TEXT');
   }
 
   Future<void> _addColumnIfMissing(
@@ -253,12 +296,14 @@ class DatabaseHelper {
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         village_name TEXT,
         village_number TEXT,
+        state TEXT,
         panchayat TEXT,
         block TEXT,
         tehsil TEXT,
         district TEXT,
         postal_address TEXT,
         pin_code TEXT,
+        lgd_code TEXT,
         shine_code TEXT,
         latitude DECIMAL(10,8),
         longitude DECIMAL(11,8),
@@ -346,6 +391,7 @@ class DatabaseHelper {
         pomegranate_trees INTEGER DEFAULT 0,
         other_fruit_trees_name TEXT,
         other_fruit_trees_count INTEGER DEFAULT 0,
+        other_orchard_plants TEXT,
         UNIQUE(phone_number)
       )
     ''');
@@ -385,7 +431,7 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS fertilizer_usage (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, urea_fertilizer TEXT, organic_fertilizer TEXT, fertilizer_types TEXT, fertilizer_expenditure REAL, created_at TEXT)');
 
     // Crop Productivity
-    await db.execute('CREATE TABLE IF NOT EXISTS crop_productivity (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, crop_name TEXT, area_hectares REAL, productivity_quintal_per_hectare REAL, total_production_quintal REAL, quantity_consumed_quintal REAL, quantity_sold_quintal REAL, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS crop_productivity (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, season TEXT, crop_name TEXT, area_hectares REAL, productivity_quintal_per_hectare REAL, total_production_quintal REAL, quantity_consumed_quintal REAL, quantity_sold_quintal REAL, created_at TEXT)');
     
     // Animals
     await db.execute('CREATE TABLE IF NOT EXISTS animals (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, sr_no INTEGER, animal_type TEXT, number_of_animals INTEGER, breed TEXT, production_per_animal REAL, quantity_sold REAL, created_at TEXT)');
@@ -473,6 +519,9 @@ class DatabaseHelper {
         family_yoga TEXT,
         yoga_members TEXT,
         community_activities TEXT,
+        community_activities_type TEXT,
+        shram_sadhana TEXT,
+        shram_sadhana_members TEXT,
         spiritual_discourses TEXT,
         discourses_members TEXT,
         personal_happiness TEXT,
@@ -488,6 +537,8 @@ class DatabaseHelper {
         addiction_gamble TEXT,
         addiction_tobacco TEXT,
         addiction_details TEXT,
+        savings_exists TEXT,
+        savings_percentage TEXT,
         created_at TEXT
       )
     ''');
@@ -511,7 +562,7 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS child_diseases (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, child_id TEXT, disease_name TEXT, sr_no INTEGER, created_at TEXT)');
 
     // Migration Data
-    await db.execute('CREATE TABLE IF NOT EXISTS migration_data (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, family_members_migrated INTEGER, reason TEXT, duration TEXT, destination TEXT, created_at TEXT)');
+    await db.execute('CREATE TABLE IF NOT EXISTS migration_data (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, family_members_migrated INTEGER, no_migration INTEGER DEFAULT 0, reason TEXT, duration TEXT, destination TEXT, migrated_members_json TEXT, created_at TEXT)');
     
     // Tribal Questions
     await db.execute('CREATE TABLE IF NOT EXISTS tribal_questions (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number TEXT, deity_name TEXT, festival_name TEXT, dance_name TEXT, language TEXT, created_at TEXT)');
@@ -1004,13 +1055,19 @@ class DatabaseHelper {
       )
     ''');
 
-    // Village Social Maps (Remarks)
+    // Village Social Maps (Remarks + File Links)
     await db.execute('''
       CREATE TABLE IF NOT EXISTS village_social_maps (
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        remarks TEXT
+        remarks TEXT,
+        topography_file_link TEXT,
+        enterprise_file_link TEXT,
+        village_file_link TEXT,
+        venn_file_link TEXT,
+        transect_file_link TEXT,
+        cadastral_file_link TEXT
       )
     ''');
     
@@ -1124,9 +1181,11 @@ class DatabaseHelper {
         post_office_distance TEXT,
         has_health_facility INTEGER DEFAULT 0,
         health_facility_distance TEXT,
+        has_primary_health_centre INTEGER DEFAULT 0,
         has_bank INTEGER DEFAULT 0,
         bank_distance TEXT,
         has_electrical_connection INTEGER DEFAULT 0,
+        has_drinking_water_source INTEGER DEFAULT 0,
         num_wells INTEGER,
         num_ponds INTEGER,
         num_hand_pumps INTEGER,

@@ -45,7 +45,7 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
     _well = widget.pageData['well'] == 1 || widget.pageData['well'] == true;
     _tubewell = widget.pageData['tubewell'] == 1 || widget.pageData['tubewell'] == true;
     _nalJaal = widget.pageData['nal_jaal'] == 1 || widget.pageData['nal_jaal'] == true;
-    _otherSources = widget.pageData['other_sources'] == 1 || widget.pageData['other_sources'] == true;
+    _otherSources = widget.pageData['other_source'] == 1 || widget.pageData['other_source'] == true;
 
     // Initialize water quality
     _handPumpsQuality = widget.pageData['hand_pumps_quality'] ?? '';
@@ -72,7 +72,7 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
         _well = widget.pageData['well'] == 1 || widget.pageData['well'] == true;
         _tubewell = widget.pageData['tubewell'] == 1 || widget.pageData['tubewell'] == true;
         _nalJaal = widget.pageData['nal_jaal'] == 1 || widget.pageData['nal_jaal'] == true;
-        _otherSources = widget.pageData['other_source'] == 1 || widget.pageData['other_source'] == true || widget.pageData['other_sources'] == 1 || widget.pageData['other_sources'] == true; // Handle both keys
+        _otherSources = widget.pageData['other_source'] == 1 || widget.pageData['other_source'] == true;
 
         _handPumpsQuality = widget.pageData['hand_pumps_quality'] ?? '';
         _wellQuality = widget.pageData['well_quality'] ?? '';
@@ -112,7 +112,6 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
       'tubewell': _tubewell ? 1 : 0,
       'nal_jaal': _nalJaal ? 1 : 0,
       'other_source': _otherSources ? 1 : 0, // Match DB column
-      'other_sources': _otherSources ? 1 : 0, // Keep for backward compatibility if needed
       'hand_pumps_distance': double.tryParse(_handPumpsDistanceController.text),
       'well_distance': double.tryParse(_wellDistanceController.text),
       'tubewell_distance': double.tryParse(_tubewellDistanceController.text),
@@ -151,7 +150,7 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
         isAvailable = _nalJaal;
         quality = _nalJaalQuality;
         break;
-      case 'other_sources':
+      case 'other_source':
         isAvailable = _otherSources;
         quality = _otherSourcesQuality;
         distanceController = _otherDistanceController;
@@ -204,7 +203,7 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
                         _nalJaal = value ?? false;
                         if (!value!) _nalJaalQuality = '';
                         break;
-                      case 'other_sources':
+                      case 'other_source':
                         _otherSources = value ?? false;
                         if (!value!) _otherSourcesQuality = '';
                         break;
@@ -279,7 +278,7 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
                                       case 'nal_jaal':
                                         _nalJaalQuality = value!;
                                         break;
-                                      case 'other_sources':
+                                      case 'other_source':
                                         _otherSourcesQuality = value!;
                                         break;
                                     }
@@ -313,7 +312,7 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
                                       case 'nal_jaal':
                                         _nalJaalQuality = value!;
                                         break;
-                                      case 'other_sources':
+                                      case 'other_source':
                                         _otherSourcesQuality = value!;
                                         break;
                                     }
@@ -347,7 +346,7 @@ class _WaterSourcesPageState extends State<WaterSourcesPage> {
                                       case 'nal_jaal':
                                         _nalJaalQuality = value!;
                                         break;
-                                      case 'other_sources':
+                                      case 'other_source':
                                         _otherSourcesQuality = value!;
                                         break;
                                     }
@@ -408,7 +407,7 @@ const SizedBox(height: 24),
           _buildWaterSourceRow('well', l10n.well ?? 'Well', 'Open well or bore well', Icons.water, Colors.brown, 250),
           _buildWaterSourceRow('tubewell', l10n.tubeWellBoreWell ?? 'Tube Well/Bore Well', 'Powered water extraction', Icons.settings, Colors.teal, 300),
           _buildWaterSourceRow('nal_jaal', l10n.nalJaalPipedWater ?? 'Nal Jaal/Piped Water', 'Government piped water supply', Icons.water_damage, Colors.green, 350),
-          _buildWaterSourceRow('other_sources', l10n.otherSources ?? 'Other Sources', 'River, pond, tanker, etc.', Icons.more_horiz, Colors.purple, 400),
+          _buildWaterSourceRow('other_source', l10n.otherSources ?? 'Other Sources', 'River, pond, tanker, etc.', Icons.more_horiz, Colors.purple, 400),
 
           const SizedBox(height: 24),
         ],

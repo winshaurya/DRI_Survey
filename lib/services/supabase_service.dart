@@ -1,6 +1,11 @@
 import 'dart:math';
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+typedef SyncErrorCallback = void Function(String message, {bool persistent});
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -14,6 +19,45 @@ class SupabaseService {
   static const int _maxRetryAttempts = 4;
   static const int _initialBackoffMs = 500;
   static const int _maxBackoffMs = 8000;
+
+  // Error escalation
+  final List<Map<String, dynamic>> _persistentSyncErrors = [];
+  SyncErrorCallback? onSyncError;
+
+  /// CRITICAL: Error escalation mechanism for sync operations
+  /// All sync errors must be escalated through this method to ensure:
+  /// - User visibility of sync failures
+  /// - Persistent logging for offline recovery
+  /// - Structured error handling across all sync operations
+  /// 
+  /// @param message: Descriptive error message
+  /// @param persistent: If true, error is saved to SharedPreferences for recovery
+  void _escalateError(String message, {bool persistent = false}) {
+    // Escalate error to user via callback, persistent log, or UI
+    if (onSyncError != null) {
+      onSyncError!(message, persistent: persistent);
+    }
+    if (persistent) {
+      _persistentSyncErrors.add({
+        'message': message,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      _savePersistentSyncErrors();
+    }
+  }
+
+  Future<void> _savePersistentSyncErrors() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('supabase_persistent_sync_errors', jsonEncode(_persistentSyncErrors));
+    } catch (_) {}
+  }
+
+  /// Public method for testing error escalation (used in unit tests)
+  @visibleForTesting
+  void testEscalateError(String message, {bool persistent = false}) {
+    _escalateError(message, persistent: persistent);
+  }
 
   // Field normalization helpers
   static const Set<String> _boolFields = {
@@ -42,14 +86,15 @@ class SupabaseService {
       } catch (e) {
         attempt++;
         if (attempt >= _maxRetryAttempts) {
+          final errMsg = 'Operation failed after $_maxRetryAttempts attempts: $e';
+          _escalateError(errMsg, persistent: true);
           rethrow;
         }
         final jitter = rng.nextInt(250);
         await Future.delayed(Duration(milliseconds: delayMs + jitter));
         delayMs = (delayMs * 2).clamp(_initialBackoffMs, _maxBackoffMs);
-        if (operation != null) {
-          print('⚠ Retry $attempt for $operation after error: $e');
-        }
+        final retryMsg = 'Retry $attempt for ${operation ?? 'operation'} after error: $e';
+        _escalateError(retryMsg);
       }
     }
   }
@@ -160,6 +205,7 @@ class SupabaseService {
         );
       } catch (e) {
         errors[table] = e.toString();
+        _escalateError('Schema validation failed for table $table: $e', persistent: true);
       }
     }
 
@@ -210,6 +256,15 @@ class SupabaseService {
   }
 
   // Sync family survey data to Supabase with error tracking
+  /// CRITICAL: Parallel sync execution to prevent partial failures
+  /// All table syncs run concurrently to avoid cascading failures where
+  /// one table failure blocks others. Errors are collected and escalated
+  /// without stopping other sync operations.
+  /// 
+  /// @param phoneNumber: Survey session identifier
+  /// @param surveyData: Complete survey data payload
+  /// @param tableSyncStatus: Tracks success/failure per table
+  /// @return: Overall success status (true if all tables synced successfully)
   Future<bool> syncFamilySurveyToSupabaseWithTracking(
     String phoneNumber, 
     Map<String, dynamic> surveyData,
@@ -220,6 +275,8 @@ class SupabaseService {
     try {
       // Get current user email for audit trail
       final userEmail = currentUser?.email ?? surveyData['surveyor_email'];
+      debugPrint('[Supabase Sync] Authenticated user email: \\${currentUser?.email}');
+      debugPrint('[Supabase Sync] surveyData["surveyor_email"]: \\${surveyData['surveyor_email']}');
 
       // Insert main survey session data
       try {
@@ -228,12 +285,14 @@ class SupabaseService {
           'surveyor_email': userEmail,
           'village_name': surveyData['village_name'],
           'village_number': surveyData['village_number'],
+          'state': surveyData['state'],
           'panchayat': surveyData['panchayat'],
           'block': surveyData['block'],
           'tehsil': surveyData['tehsil'],
           'district': surveyData['district'],
           'postal_address': surveyData['postal_address'],
           'pin_code': surveyData['pin_code'],
+          'lgd_code': surveyData['lgd_code'],
           'shine_code': surveyData['shine_code'],
           'latitude': surveyData['latitude'],
           'longitude': surveyData['longitude'],
@@ -249,7 +308,8 @@ class SupabaseService {
       } catch (e) {
         tableSyncStatus['family_survey_sessions'] = false;
         overallSuccess = false;
-        print('✗ Failed to sync family_survey_sessions: $e');
+        final errMsg = 'Failed to sync family_survey_sessions: $e';
+        _escalateError(errMsg, persistent: true);
       }
 
       // Sync related data tables in parallel for speed
@@ -263,7 +323,8 @@ class SupabaseService {
         } catch (e) {
           tableSyncStatus[tableName] = false;
           overallSuccess = false;
-          print('✗ Failed to sync $tableName: $e');
+          final errMsg = 'Failed to sync $tableName: $e';
+          _escalateError(errMsg, persistent: true);
         }
       }
 
@@ -296,8 +357,8 @@ class SupabaseService {
       syncTasks.add(syncWithTracking('bank_accounts', () => _syncBankAccounts(phoneNumber, surveyData['bank_accounts'])));
       syncTasks.add(syncWithTracking('social_consciousness', () => _syncSocialConsciousness(phoneNumber, surveyData['social_consciousness'])));
       syncTasks.add(syncWithTracking('tribal_questions', () => _syncTribalQuestions(phoneNumber, surveyData['tribal_questions'])));
-      syncTasks.add(syncWithTracking('tulsi_plants', () => _syncTulsiPlants(phoneNumber, surveyData['house_facilities'])));
-      syncTasks.add(syncWithTracking('nutritional_garden', () => _syncNutritionalGarden(phoneNumber, surveyData['house_facilities'])));
+      syncTasks.add(syncWithTracking('tulsi_plants', () => _syncTulsiPlants(phoneNumber, surveyData['tulsi_plants'] ?? surveyData['house_facilities'])));
+      syncTasks.add(syncWithTracking('nutritional_garden', () => _syncNutritionalGarden(phoneNumber, surveyData['nutritional_garden'] ?? surveyData['house_facilities'])));
 
       // Sync government schemes (tracked separately)
       syncTasks.add(syncWithTracking('government_schemes', () => _syncGovernmentSchemesParallel(phoneNumber, surveyData, tableSyncStatus)));
@@ -308,7 +369,8 @@ class SupabaseService {
       return overallSuccess;
 
     } catch (e) {
-      print('✗ CRITICAL: Failed to sync family survey to Supabase: $e');
+      final errMsg = 'CRITICAL: Failed to sync family survey to Supabase: $e';
+      _escalateError(errMsg, persistent: true);
       return false;
     }
   }
@@ -324,12 +386,14 @@ class SupabaseService {
         'surveyor_email': userEmail,
         'village_name': data['village_name'],
         'village_number': data['village_number'],
+        'state': data['state'],
         'panchayat': data['panchayat'],
         'block': data['block'],
         'tehsil': data['tehsil'],
         'district': data['district'],
         'postal_address': data['postal_address'],
         'pin_code': data['pin_code'],
+        'lgd_code': data['lgd_code'],
         'shine_code': data['shine_code'],
         'latitude': data['latitude'],
         'longitude': data['longitude'],
@@ -390,8 +454,8 @@ class SupabaseService {
       case 16:
         await _syncHouseConditions(phoneNumber, data['house_conditions'] ?? data);
         await _syncHouseFacilities(phoneNumber, data['house_facilities'] ?? data);
-        await _syncTulsiPlants(phoneNumber, data['house_facilities'] ?? data);
-        await _syncNutritionalGarden(phoneNumber, data['house_facilities'] ?? data);
+        await _syncTulsiPlants(phoneNumber, data['tulsi_plants'] ?? data['house_facilities'] ?? data);
+        await _syncNutritionalGarden(phoneNumber, data['nutritional_garden'] ?? data['house_facilities'] ?? data);
         break;
       case 17:
         await _syncDiseases(phoneNumber, data['diseases']);
@@ -409,6 +473,7 @@ class SupabaseService {
         await _syncChildrenData(phoneNumber, data['children_data'] ?? data);
         await _syncMalnourishedChildrenData(phoneNumber, data['malnourished_children_data']);
         await _syncChildDiseases(phoneNumber, data['child_diseases']);
+        await _syncMalnutritionData(phoneNumber, data['malnutrition_data']);
         break;
       case 22:
         await _syncMigration(phoneNumber, data['migration_data'] ?? data);
@@ -472,7 +537,18 @@ class SupabaseService {
         await saveVillageData('village_signboards', data);
         break;
       case 8:
-        await saveVillageData('village_social_maps', data);
+        final entries = data['map_entries'];
+        if (entries is List) {
+          for (final entry in entries) {
+            if (entry is Map<String, dynamic>) {
+              await saveVillageData('village_social_maps', entry);
+            } else if (entry is Map) {
+              await saveVillageData('village_social_maps', entry.map((k, v) => MapEntry(k.toString(), v)));
+            }
+          }
+        } else {
+          await saveVillageData('village_social_maps', data);
+        }
         break;
       case 9:
         await saveVillageData('village_survey_details', data);
@@ -529,9 +605,12 @@ class SupabaseService {
       'mango_trees',
       'guava_trees',
       'lemon_trees',
+      'banana_plants',
+      'papaya_trees',
       'pomegranate_trees',
       'other_fruit_trees_name',
       'other_fruit_trees_count',
+      'other_orchard_plants',
     };
     final filtered = <String, dynamic>{
       for (final entry in data.entries)
@@ -656,7 +735,8 @@ class SupabaseService {
         tableSyncStatus[tableName] = true;
       } catch (e) {
         tableSyncStatus[tableName] = false;
-        print('✗ Failed to sync $tableName: $e');
+        final errMsg = 'Failed to sync $tableName: $e';
+        _escalateError(errMsg, persistent: true);
       }
     }
 
@@ -1007,27 +1087,49 @@ class SupabaseService {
   }
 
   // Extract and sync tulsi_plants from house_facilities
-  Future<void> _syncTulsiPlants(String phoneNumber, Map<String, dynamic>? houseFacilitiesData) async {
-    if (houseFacilitiesData == null || houseFacilitiesData.isEmpty) return;
+  Future<void> _syncTulsiPlants(String phoneNumber, dynamic data) async {
+    if (data == null) return;
+
+    Map<String, dynamic>? tulsiRow;
+    if (data is List && data.isNotEmpty) {
+      tulsiRow = Map<String, dynamic>.from(data.first as Map);
+    } else if (data is Map<String, dynamic>) {
+      tulsiRow = data;
+    } else if (data is Map) {
+      tulsiRow = Map<String, dynamic>.from(data);
+    }
+
+    if (tulsiRow == null || tulsiRow.isEmpty) return;
 
     final tulsiData = {
       'phone_number': phoneNumber,
-      'has_plants': houseFacilitiesData['tulsi_plants_available'] ?? 'no',
-      'plant_count': houseFacilitiesData['tulsi_plants_count'] ?? 0,
+      'has_plants': tulsiRow['has_plants'] ?? tulsiRow['tulsi_plants_available'] ?? tulsiRow['tulsi_plants'] ?? 'no',
+      'plant_count': tulsiRow['plant_count'] ?? tulsiRow['tulsi_plant_count'] ?? tulsiRow['tulsi_plants_count'] ?? 0,
     };
 
     await _upsertWithRetry('tulsi_plants', _normalizeMap(tulsiData));
   }
 
   // Extract and sync nutritional_garden from house_facilities
-  Future<void> _syncNutritionalGarden(String phoneNumber, Map<String, dynamic>? houseFacilitiesData) async {
-    if (houseFacilitiesData == null || houseFacilitiesData.isEmpty) return;
+  Future<void> _syncNutritionalGarden(String phoneNumber, dynamic data) async {
+    if (data == null) return;
+
+    Map<String, dynamic>? gardenRow;
+    if (data is List && data.isNotEmpty) {
+      gardenRow = Map<String, dynamic>.from(data.first as Map);
+    } else if (data is Map<String, dynamic>) {
+      gardenRow = data;
+    } else if (data is Map) {
+      gardenRow = Map<String, dynamic>.from(data);
+    }
+
+    if (gardenRow == null || gardenRow.isEmpty) return;
 
     final gardenData = {
       'phone_number': phoneNumber,
-      'has_garden': houseFacilitiesData['nutritional_garden_available'] ?? 'no',
-      'garden_size': houseFacilitiesData['garden_size'] ?? 0.0,
-      'vegetables_grown': houseFacilitiesData['vegetables_grown'] ?? '',
+      'has_garden': gardenRow['has_garden'] ?? gardenRow['nutritional_garden_available'] ?? gardenRow['nutritional_garden'] ?? 'no',
+      'garden_size': gardenRow['garden_size'] ?? gardenRow['nutritional_garden_size'] ?? 0.0,
+      'vegetables_grown': gardenRow['vegetables_grown'] ?? gardenRow['nutritional_garden_vegetables'] ?? '',
     };
 
     await _upsertWithRetry('nutritional_garden', _normalizeMap(gardenData));
@@ -1209,8 +1311,19 @@ class SupabaseService {
         payload.remove('sync_pending');
         payload.remove('sync_status');
       }
+      if (!payload.containsKey('session_id')) {
+        final errMsg = 'WARNING: session_id missing in payload for $tableName!';
+        _escalateError(errMsg, persistent: true);
+      } else {
+        debugPrint('[Supabase Sync] Upserting $tableName with session_id=${payload['session_id']}');
+      }
+      debugPrint('[Supabase Sync] Payload: ' + payload.toString());
+      debugPrint('[Supabase Sync] Authenticated user email: \\${currentUser?.email}');
+      debugPrint('[Supabase Sync] payload["surveyor_email"]: \\${payload['surveyor_email']}');
       await _upsertWithRetry(tableName, _normalizeMap(payload));
     } catch (e) {
+      final errMsg = 'ERROR saving $tableName: $e';
+      _escalateError(errMsg, persistent: true);
       throw Exception('Failed to save village data to $tableName: $e');
     }
   }
@@ -1223,7 +1336,7 @@ class SupabaseService {
     final childTables = [
       'village_population', 'village_farm_families', 'village_housing',
       'village_agricultural_implements', 'village_crop_productivity', 'village_animals',
-      'village_irrigation_facilities', 'village_drinking_water', 'village_transport',
+      'village_irrigation_facilities', 'village_drinking_water',
       'village_entertainment', 'village_medical_treatment', 'village_disputes',
       'village_educational_facilities', 'village_social_consciousness',
       'village_children_data', 'village_malnutrition_data', 'village_bpl_families',

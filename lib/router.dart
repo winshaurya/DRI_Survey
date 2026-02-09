@@ -19,7 +19,6 @@ import 'screens/village_survey/survey_details_screen.dart';
 import 'screens/village_survey/detailed_map_screen.dart';
 import 'screens/village_survey/forest_map_screen.dart';
 import 'screens/village_survey/biodiversity_register_screen.dart';
-import 'screens/village_survey/completion_screen.dart';
 class AppRouter {
   static const String landing = '/';
   static const String auth = '/auth';
@@ -41,7 +40,6 @@ class AppRouter {
   static const String detailedMap = '/detailed-map';
   static const String forestMap = '/forest-map';
   static const String biodiversityRegister = '/biodiversity-register';
-  static const String completion = '/completion';
 
   static Map<String, WidgetBuilder> get routes => {
     landing: (context) => const LandingScreen(),
@@ -64,7 +62,6 @@ class AppRouter {
     detailedMap: (context) => DetailedMapScreen(),
     forestMap: (context) => ForestMapScreen(),
     biodiversityRegister: (context) => BiodiversityRegisterScreen(),
-    completion: (context) => CompletionScreen(),
   };
 
   // Navigation methods
@@ -108,7 +105,6 @@ class AppRouter {
     detailedMap,
     forestMap,
     biodiversityRegister,
-    completion,
   ];
 
   static void navigateToNextInFlow(BuildContext context, String currentRoute) {
@@ -187,8 +183,6 @@ class AppRouter {
         return 'Forest Map';
       case biodiversityRegister:
         return 'Biodiversity Register';
-      case completion:
-        return 'Survey Complete';
       default:
         return 'Unknown Route';
     }
@@ -230,8 +224,6 @@ class AppRouter {
         return Icons.forest;
       case biodiversityRegister:
         return Icons.eco;
-      case completion:
-        return Icons.check_circle;
       default:
         return Icons.help;
     }

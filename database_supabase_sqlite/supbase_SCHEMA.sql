@@ -15,8 +15,7 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 -- FAMILY SURVEY SESSIONS TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS family_survey_sessions (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT UNIQUE NOT NULL,
+    phone_number TEXT PRIMARY KEY,
     surveyor_email TEXT NOT NULL,
     created_at TEXT DEFAULT NOW()::TEXT,
     updated_at TEXT DEFAULT NOW()::TEXT,
@@ -963,6 +962,7 @@ CREATE TABLE IF NOT EXISTS village_farm_families (
     small_farmers INTEGER DEFAULT 0,
     marginal_farmers INTEGER DEFAULT 0,
     landless_farmers INTEGER DEFAULT 0,
+    total_farm_families INTEGER DEFAULT 0,
 
     UNIQUE(session_id)
 );
@@ -1042,9 +1042,11 @@ CREATE TABLE IF NOT EXISTS village_irrigation_facilities (
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
-    canal_available INTEGER DEFAULT 0,
-    tube_well_available INTEGER DEFAULT 0,
-    pond_available INTEGER DEFAULT 0,
+    has_canal INTEGER DEFAULT 0,
+    has_tube_well INTEGER DEFAULT 0,
+    has_ponds INTEGER DEFAULT 0,
+    has_river INTEGER DEFAULT 0,
+    has_well INTEGER DEFAULT 0,
     other_sources TEXT,
 
     UNIQUE(session_id)
@@ -1094,6 +1096,9 @@ CREATE TABLE IF NOT EXISTS village_entertainment (
     televisions_available INTEGER DEFAULT 0,
     televisions_count INTEGER DEFAULT 0,
     radios_available INTEGER DEFAULT 0,
+    radios_count INTEGER DEFAULT 0,
+    games_available INTEGER DEFAULT 0,
+    other_entertainment TEXT,
 
     UNIQUE(session_id)
 );
@@ -1108,6 +1113,7 @@ CREATE TABLE IF NOT EXISTS village_medical_treatment (
     homeopathy_available INTEGER DEFAULT 0,
     traditional_available INTEGER DEFAULT 0,
     other_treatment TEXT,
+    preference_order TEXT,
 
     UNIQUE(session_id)
 );
@@ -1118,9 +1124,18 @@ CREATE TABLE IF NOT EXISTS village_disputes (
     created_at TEXT DEFAULT NOW()::TEXT,
 
     family_disputes INTEGER DEFAULT 0,
+    family_registered INTEGER DEFAULT 0,
+    family_period TEXT,
     revenue_disputes INTEGER DEFAULT 0,
+    revenue_registered INTEGER DEFAULT 0,
+    revenue_period TEXT,
     criminal_disputes INTEGER DEFAULT 0,
+    criminal_registered INTEGER DEFAULT 0,
+    criminal_period TEXT,
     other_disputes TEXT,
+    other_description TEXT,
+    other_registered INTEGER DEFAULT 0,
+    other_period TEXT,
 
     UNIQUE(session_id)
 );
@@ -1132,9 +1147,13 @@ CREATE TABLE IF NOT EXISTS village_educational_facilities (
 
     primary_schools INTEGER DEFAULT 0,
     middle_schools INTEGER DEFAULT 0,
-    high_schools INTEGER DEFAULT 0,
-    colleges INTEGER DEFAULT 0,
+    secondary_schools INTEGER DEFAULT 0,
+    higher_secondary_schools INTEGER DEFAULT 0,
     anganwadi_centers INTEGER DEFAULT 0,
+    skill_development_centers INTEGER DEFAULT 0,
+    shiksha_guarantee_centers INTEGER DEFAULT 0,
+    other_facility_name TEXT,
+    other_facility_count INTEGER DEFAULT 0,
 
     UNIQUE(session_id)
 );
@@ -1144,10 +1163,40 @@ CREATE TABLE IF NOT EXISTS village_social_consciousness (
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
-    waste_management_system INTEGER DEFAULT 0,
-    rainwater_harvesting INTEGER DEFAULT 0,
-    solar_energy_usage INTEGER DEFAULT 0,
-    community_participation TEXT,
+    clothing_purchase_frequency TEXT,
+    food_waste_level TEXT,
+    food_waste_amount TEXT,
+    waste_disposal_method TEXT,
+    waste_segregation INTEGER DEFAULT 0,
+    compost_pit_available INTEGER DEFAULT 0,
+    toilet_available INTEGER DEFAULT 0,
+    toilet_functional INTEGER DEFAULT 0,
+    toilet_soak_pit INTEGER DEFAULT 0,
+    led_lights_used INTEGER DEFAULT 0,
+    devices_turned_off INTEGER DEFAULT 0,
+    water_leaks_fixed INTEGER DEFAULT 0,
+    plastic_avoidance INTEGER DEFAULT 0,
+    family_puja INTEGER DEFAULT 0,
+    family_meditation INTEGER DEFAULT 0,
+    meditation_participants TEXT,
+    family_yoga INTEGER DEFAULT 0,
+    yoga_participants TEXT,
+    community_activities INTEGER DEFAULT 0,
+    activity_types TEXT,
+    shram_sadhana INTEGER DEFAULT 0,
+    shram_participants TEXT,
+    spiritual_discourses INTEGER DEFAULT 0,
+    discourse_participants TEXT,
+    family_happiness TEXT,
+    happy_members TEXT,
+    happiness_reasons TEXT,
+    smoking_prevalence TEXT,
+    drinking_prevalence TEXT,
+    gudka_prevalence TEXT,
+    gambling_prevalence TEXT,
+    tobacco_prevalence TEXT,
+    saving_habit TEXT,
+    saving_percentage TEXT,
 
     UNIQUE(session_id)
 );
@@ -1157,7 +1206,8 @@ CREATE TABLE IF NOT EXISTS village_children_data (
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
-    total_children INTEGER DEFAULT 0,
+    births_last_3_years INTEGER DEFAULT 0,
+    infant_deaths_last_3_years INTEGER DEFAULT 0,
     malnourished_children INTEGER DEFAULT 0,
     children_in_school INTEGER DEFAULT 0,
 
@@ -1169,8 +1219,9 @@ CREATE TABLE IF NOT EXISTS village_malnutrition_data (
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
-    sr_no INTEGER,
-    child_name TEXT,
+    sr_no INTEGER NOT NULL,
+    name TEXT,
+    sex TEXT,
     age INTEGER,
     weight DECIMAL(5,2),
     height DECIMAL(5,2)
@@ -1182,6 +1233,8 @@ CREATE TABLE IF NOT EXISTS village_bpl_families (
     created_at TEXT DEFAULT NOW()::TEXT,
 
     total_bpl_families INTEGER DEFAULT 0,
+    bpl_families_with_job_cards INTEGER DEFAULT 0,
+    bpl_families_received_mgnrega INTEGER DEFAULT 0,
 
     UNIQUE(session_id)
 );
@@ -1191,6 +1244,7 @@ CREATE TABLE IF NOT EXISTS village_kitchen_gardens (
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
+    gardens_available INTEGER DEFAULT 0,
     total_gardens INTEGER DEFAULT 0,
 
     UNIQUE(session_id)
@@ -1201,6 +1255,7 @@ CREATE TABLE IF NOT EXISTS village_seed_clubs (
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
+    clubs_available INTEGER DEFAULT 0,
     total_clubs INTEGER DEFAULT 0,
 
     UNIQUE(session_id)
@@ -1212,6 +1267,10 @@ CREATE TABLE IF NOT EXISTS village_biodiversity_register (
     created_at TEXT DEFAULT NOW()::TEXT,
 
     register_maintained INTEGER DEFAULT 0,
+    status TEXT,
+    details TEXT,
+    components TEXT,
+    knowledge TEXT,
 
     UNIQUE(session_id)
 );
@@ -1223,7 +1282,8 @@ CREATE TABLE IF NOT EXISTS village_traditional_occupations (
 
     sr_no INTEGER,
     occupation_name TEXT,
-    number_of_families INTEGER
+    families_engaged INTEGER,
+    average_income DECIMAL(10,2)
 );
 
 CREATE TABLE IF NOT EXISTS village_drainage_waste (
@@ -1231,8 +1291,16 @@ CREATE TABLE IF NOT EXISTS village_drainage_waste (
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
-    drainage_system_available INTEGER DEFAULT 0,
-    waste_management_system INTEGER DEFAULT 0,
+    earthen_drain INTEGER DEFAULT 0,
+    masonry_drain INTEGER DEFAULT 0,
+    covered_drain INTEGER DEFAULT 0,
+    open_channel INTEGER DEFAULT 0,
+    no_drainage_system INTEGER DEFAULT 0,
+    drainage_destination TEXT,
+    drainage_remarks TEXT,
+    waste_collected_regularly INTEGER DEFAULT 0,
+    waste_segregated INTEGER DEFAULT 0,
+    waste_remarks TEXT,
 
     UNIQUE(session_id)
 );
@@ -1242,8 +1310,9 @@ CREATE TABLE IF NOT EXISTS village_signboards (
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
-    signboard_type TEXT,
-    location TEXT
+    signboards TEXT,
+    info_boards TEXT,
+    wall_writing TEXT
 );
 
 CREATE TABLE IF NOT EXISTS village_unemployment (
@@ -1251,6 +1320,8 @@ CREATE TABLE IF NOT EXISTS village_unemployment (
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
+    unemployed_youth INTEGER DEFAULT 0,
+    unemployed_adults INTEGER DEFAULT 0,
     total_unemployed INTEGER DEFAULT 0,
 
     UNIQUE(session_id)
@@ -1262,16 +1333,28 @@ CREATE TABLE IF NOT EXISTS village_social_maps (
     created_at TEXT DEFAULT NOW()::TEXT,
 
     map_type TEXT,
-    map_data TEXT
+    map_data TEXT,
+    remarks TEXT,
+    topography_file_link TEXT,
+    enterprise_file_link TEXT,
+    village_file_link TEXT,
+    venn_file_link TEXT,
+    transect_file_link TEXT,
+    cadastral_file_link TEXT
 );
+
 
 CREATE TABLE IF NOT EXISTS village_transport_facilities (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
-    road_connectivity INTEGER DEFAULT 0,
-    public_transport_available INTEGER DEFAULT 0,
+    tractor_count INTEGER DEFAULT 0,
+    car_jeep_count INTEGER DEFAULT 0,
+    motorcycle_scooter_count INTEGER DEFAULT 0,
+    cycle_count INTEGER DEFAULT 0,
+    e_rickshaw_count INTEGER DEFAULT 0,
+    pickup_truck_count INTEGER DEFAULT 0,
 
     UNIQUE(session_id)
 );
@@ -1324,9 +1407,11 @@ CREATE TABLE IF NOT EXISTS village_infrastructure_details (
     post_office_distance TEXT,
     has_health_facility INTEGER DEFAULT 0,
     health_facility_distance TEXT,
+    has_primary_health_centre INTEGER DEFAULT 0,
     has_bank INTEGER DEFAULT 0,
     bank_distance TEXT,
     has_electrical_connection INTEGER DEFAULT 0,
+    has_drinking_water_source INTEGER DEFAULT 0,
     num_wells INTEGER,
     num_ponds INTEGER,
     num_hand_pumps INTEGER,
@@ -1393,6 +1478,7 @@ CREATE TABLE IF NOT EXISTS village_cadastral_maps (
     has_cadastral_map INTEGER DEFAULT 0,
     map_details TEXT,
     availability_status TEXT,
+    image_path TEXT,
 
     UNIQUE(session_id)
 );
@@ -2038,6 +2124,7 @@ CREATE POLICY "Village social maps - Users access own data" ON village_social_ma
                  WHERE session_id = village_social_maps.session_id 
                  AND surveyor_email = auth.jwt() ->> 'email')
     );
+
 
 ALTER TABLE village_transport_facilities ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Village transport facilities - Users access own data" ON village_transport_facilities;

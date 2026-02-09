@@ -78,7 +78,6 @@ static Database? _database;
       {
         'status': status,
         'updated_at': DateTime.now().toIso8601String(),
-        'last_synced_at': status == 'completed' ? DateTime.now().toIso8601String() : null
       },
       where: 'phone_number = ?',
       whereArgs: [phoneNumber],
@@ -198,6 +197,15 @@ static Database? _database;
   Future<void> saveData(String tableName, Map<String, dynamic> data) async {
     final db = await database;
     await db.insert(tableName, data, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> deleteByPhone(String tableName, String phoneNumber) async {
+    final db = await database;
+    await db.delete(
+      tableName,
+      where: 'phone_number = ?',
+      whereArgs: [phoneNumber],
+    );
   }
 
   Future<List<Map<String, dynamic>>> getData(String tableName, String phoneNumber) async {
@@ -422,7 +430,6 @@ static Database? _database;
       {
         'status': status,
         'updated_at': DateTime.now().toIso8601String(),
-        'last_synced_at': status == 'completed' ? DateTime.now().toIso8601String() : null,
       },
       where: 'session_id = ?',
       whereArgs: [sessionId],
@@ -432,6 +439,7 @@ static Database? _database;
   // Insert or update village survey data
   Future<void> insertOrUpdate(String tableName, Map<String, dynamic> data, String sessionId) async {
     final db = await database;
+    final columns = await _getTableColumns(db, tableName);
     
     // Check if record exists
     final existing = await db.query(
@@ -441,15 +449,20 @@ static Database? _database;
       limit: 1,
     );
     
-    final dataWithTimestamp = {
+    final dataWithTimestamp = <String, dynamic>{
       ...data,
       'session_id': sessionId,
-      'updated_at': DateTime.now().toIso8601String(),
     };
+
+    if (columns.contains('updated_at')) {
+      dataWithTimestamp['updated_at'] = DateTime.now().toIso8601String();
+    }
     
     if (existing.isEmpty) {
       // Insert new
-      dataWithTimestamp['created_at'] = DateTime.now().toIso8601String();
+      if (columns.contains('created_at')) {
+        dataWithTimestamp['created_at'] = DateTime.now().toIso8601String();
+      }
       await db.insert(tableName, dataWithTimestamp);
     } else {
       // Update existing
@@ -460,5 +473,13 @@ static Database? _database;
         whereArgs: [sessionId],
       );
     }
+  }
+
+  Future<Set<String>> _getTableColumns(Database db, String tableName) async {
+    final info = await db.rawQuery('PRAGMA table_info($tableName)');
+    return info
+        .map((row) => row['name']?.toString())
+        .whereType<String>()
+        .toSet();
   }
 }

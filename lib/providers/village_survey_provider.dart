@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import 'package:dri_survey/services/database_service.dart';
 import 'package:dri_survey/services/supabase_service.dart';
 import 'package:dri_survey/services/sync_service.dart';
@@ -182,9 +183,9 @@ class VillageSurveyNotifier extends Notifier<VillageSurveyState> {
       }
 
       // Load social map
-      final socialMap = await _databaseService.getData('village_social_map', sessionId);
+      final socialMap = await _databaseService.getData('village_social_maps', sessionId);
       if (socialMap.isNotEmpty) {
-        allData.addAll(_prefixKeys(socialMap.first, 'social_map_'));
+        allData['social_map'] = socialMap;
       }
 
       // Load traditional occupations
@@ -285,7 +286,29 @@ class VillageSurveyNotifier extends Notifier<VillageSurveyState> {
         await _databaseService.insertOrUpdate('village_signboards', data, sessionId);
         break;
       case 8: // Social Map
-        await _databaseService.insertOrUpdate('village_social_map', data, sessionId);
+        final entries = data['map_entries'];
+        if (entries is List) {
+          for (final entry in entries) {
+            if (entry is Map<String, dynamic>) {
+              await _databaseService.saveData('village_social_maps', {
+                ...entry,
+                'id': entry['id'] ?? Uuid().v4(),
+                'session_id': sessionId,
+                'created_at': entry['created_at'] ?? DateTime.now().toIso8601String(),
+              });
+            } else if (entry is Map) {
+              await _databaseService.saveData(
+                'village_social_maps',
+                entry.map((k, v) => MapEntry(k.toString(), v))
+                  ..putIfAbsent('id', () => Uuid().v4())
+                  ..putIfAbsent('session_id', () => sessionId)
+                  ..putIfAbsent('created_at', () => DateTime.now().toIso8601String()),
+              );
+            }
+          }
+        } else {
+          await _databaseService.insertOrUpdate('village_social_maps', data, sessionId);
+        }
         break;
       case 9: // Survey Details
         await _databaseService.insertOrUpdate('village_survey_details', data, sessionId);

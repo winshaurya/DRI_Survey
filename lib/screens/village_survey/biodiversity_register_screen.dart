@@ -1,13 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import 'forest_map_screen.dart'; // Import the previous screen
-import 'completion_screen.dart'; // Add this import
+import 'village_survey_preview_page.dart';
 import '../../services/file_upload_service.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 
 class BiodiversityRegisterScreen extends StatefulWidget {
@@ -49,18 +49,12 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
       final sessionId = dbService.currentSessionId;
       
       if (sessionId != null) {
-        // Fetch session details to get village_code (shineCode)
-        final db = await DatabaseHelper().database;
-        final sessions = await db.query(
-          'village_survey_sessions',
-          where: 'session_id = ?',
-          whereArgs: [sessionId],
-        );
-
-        if (sessions.isNotEmpty) {
+        // Fetch session details to get shine_code
+        final session = await _databaseService.getVillageSurveySession(sessionId);
+        if (session != null) {
           setState(() {
             _currentSessionId = sessionId;
-            _shineCode = sessions.first['village_code'] as String?;
+            _shineCode = session['shine_code'] as String?;
           });
           _loadExistingUploads();
         }
@@ -78,16 +72,11 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
         _shineCode!,
         'pbr',
       );
-      final uploadedFiles = await _fileUploadService.getUploadedFilesForSession(
-        _shineCode!,
-        'pbr',
-      );
-
       setState(() {
         if (pendingUploads.isNotEmpty) {
-          _uploadStatus = pendingUploads.first['status'];
-        } else if (uploadedFiles.isNotEmpty) {
-          _uploadStatus = 'uploaded';
+          _uploadStatus = pendingUploads.first['status'] ?? 'pending';
+        } else {
+          _uploadStatus = 'none';
         }
       });
     } catch (e) {
@@ -204,16 +193,26 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
     };
 
     try {
-      await DatabaseHelper().insert('village_biodiversity_register', data);
+      await databaseService.insertOrUpdate('village_biodiversity_register', data, _currentSessionId!);
 
       await databaseService.markVillagePageCompleted(_currentSessionId!, 12);
-      await syncService.syncVillagePageData(_currentSessionId!, 12, data);
+      unawaited(syncService.syncVillagePageData(_currentSessionId!, 12, data));
 
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => CompletionScreen()),
-        );
+        if (_shineCode != null) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VillageSurveyPreviewPage(
+                shineCode: _shineCode!,
+                fromHistory: false,
+                showSubmitButton: true,
+              ),
+            ),
+          );
+        } else {
+          Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+        }
       }
     } catch (e) {
       print('Error saving data: $e');

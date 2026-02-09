@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database_service.dart';
 import 'supabase_service.dart';
@@ -27,6 +28,8 @@ class SyncProgress {
   });
 }
 
+typedef SyncErrorCallback = void Function(String message, {bool persistent});
+
 class SyncService {
   static final SyncService _instance = SyncService._internal();
   static SyncService get instance => _instance;
@@ -49,8 +52,10 @@ class SyncService {
   bool _isProcessingQueue = false;
   final Map<String, bool> _syncLocks = {};
 
-  // Sync error tracking
+  // Sync error tracking (persistent)
   final Map<String, List<String>> _syncErrors = {};
+  final List<Map<String, dynamic>> _persistentSyncErrors = [];
+  SyncErrorCallback? onSyncError;
   final Map<String, Map<String, bool>> _tableSyncStatus = {};
 
   final Map<String, DateTime> _lastSchemaCheckAt = {};
@@ -125,7 +130,6 @@ class SyncService {
     'village_animals',
     'village_irrigation_facilities',
     'village_drinking_water',
-    'village_transport',
     'village_entertainment',
     'village_medical_treatment',
     'village_disputes',
@@ -204,6 +208,45 @@ class SyncService {
     if (!_progressController.isClosed) {
       _progressController.add(progress);
     }
+    if (progress.isError && progress.message != null) {
+      _escalateError(progress.message!);
+    }
+  }
+
+  void _escalateError(String message, {bool persistent = false}) {
+    // Escalate error to user via callback, persistent log, or UI
+    if (onSyncError != null) {
+      onSyncError!(message, persistent: persistent);
+    }
+    if (persistent) {
+      _persistentSyncErrors.add({
+        'message': message,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      _savePersistentSyncErrors();
+    }
+  }
+
+  Future<void> _savePersistentSyncErrors() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('persistent_sync_errors', jsonEncode(_persistentSyncErrors));
+    } catch (_) {}
+  }
+
+  Future<void> loadPersistentSyncErrors() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final errorsJson = prefs.getString('persistent_sync_errors');
+      if (errorsJson != null && errorsJson.isNotEmpty) {
+        final decoded = jsonDecode(errorsJson);
+        if (decoded is List) {
+          _persistentSyncErrors
+            ..clear()
+            ..addAll(decoded.whereType<Map>().map((item) => item.map((k, v) => MapEntry(k.toString(), v))));
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _withSyncLock(String key, Future<void> Function() action) async {
@@ -239,7 +282,8 @@ class SyncService {
         await _supabaseService.syncFamilyPageToSupabase(phoneNumber, page, data);
         await _databaseService.markFamilyPageSynced(phoneNumber, page);
       } catch (e) {
-        debugPrint('Page sync failed for family $phoneNumber page $page: $e');
+        final errMsg = 'Page sync failed for family $phoneNumber page $page: $e';
+        _escalateError(errMsg, persistent: true);
         await queueSyncOperation('sync_family_page', {
           'phone_number': phoneNumber,
           'page': page,
@@ -272,7 +316,8 @@ class SyncService {
         await _supabaseService.syncVillagePageToSupabase(sessionId, page, data);
         await _databaseService.markVillagePageSynced(sessionId, page);
       } catch (e) {
-        debugPrint('Page sync failed for village $sessionId page $page: $e');
+        final errMsg = 'Page sync failed for village $sessionId page $page: $e';
+        _escalateError(errMsg, persistent: true);
         await queueSyncOperation('sync_village_page', {
           'session_id': sessionId,
           'page': page,
@@ -287,12 +332,18 @@ class SyncService {
     try {
       final survey = await _databaseService.getVillageSurveySession(sessionId);
       if (survey == null) {
-        throw Exception('Survey not found for session ID: $sessionId');
+        _escalateError('Survey not found for session ID: $sessionId', persistent: true);
+        return;
       }
+
+      if (!_isOnline) {
+        await queueSyncOperation('sync_village_survey', survey);
+        return;
+      }
+
       await _syncVillageSurveyToSupabase(survey);
     } catch (e) {
-      debugPrint('Error syncing village survey: $e');
-      rethrow;
+      _escalateError('Error syncing village survey: $e', persistent: true);
     }
   }
 
@@ -308,11 +359,13 @@ class SyncService {
     _cachedSchemaIssues[cacheKey] = issues;
     _lastSchemaCheckAt[cacheKey] = now;
     if (issues.isNotEmpty) {
+      final msg = 'Schema validation failed for ${issues.length} tables: ${issues.keys.join(", ")}';
       _emitProgress(SyncProgress(
         stage: 'schema_check',
-        message: 'Schema validation failed for ${issues.length} tables',
+        message: msg,
         isError: true,
       ));
+      _escalateError(msg, persistent: true);
     }
     return issues;
   }
@@ -385,8 +438,9 @@ class SyncService {
       _emitProgress(const SyncProgress(stage: 'complete', message: 'Background sync completed'));
 
     } catch (e) {
-      debugPrint('Background sync failed: $e');
-      _emitProgress(SyncProgress(stage: 'error', message: 'Background sync failed: $e', isError: true));
+      final msg = 'Background sync failed: $e';
+      _emitProgress(SyncProgress(stage: 'error', message: msg, isError: true));
+      _escalateError(msg, persistent: true);
     }
   }
 
@@ -416,7 +470,8 @@ class SyncService {
           await _supabaseService.syncFamilyPageToSupabase(phoneNumber, page, pageData);
           await _databaseService.markFamilyPageSynced(phoneNumber, page);
         } catch (e) {
-          debugPrint('Failed to sync pending family page $page for $phoneNumber: $e');
+          final errMsg = 'Failed to sync pending family page $page for $phoneNumber: $e';
+          _escalateError(errMsg, persistent: true);
           await queueSyncOperation('sync_family_page', {
             'phone_number': phoneNumber,
             'page': page,
@@ -453,7 +508,8 @@ class SyncService {
           await _supabaseService.syncVillagePageToSupabase(sessionId, page, pageData);
           await _databaseService.markVillagePageSynced(sessionId, page);
         } catch (e) {
-          debugPrint('Failed to sync pending village page $page for $sessionId: $e');
+          final errMsg = 'Failed to sync pending village page $page for $sessionId: $e';
+          _escalateError(errMsg, persistent: true);
           await queueSyncOperation('sync_village_page', {
             'session_id': sessionId,
             'page': page,
@@ -654,7 +710,7 @@ class SyncService {
         return status == 'completed' || status == 'exported';
       }).toList();
     } catch (e) {
-      debugPrint('Error getting pending surveys: $e');
+      _escalateError('Error getting pending surveys: $e', persistent: true);
       return [];
     }
   }
@@ -680,7 +736,7 @@ class SyncService {
         return status == 'completed' || status == 'exported';
       }).toList();
     } catch (e) {
-      debugPrint('Error getting pending village surveys: $e');
+      _escalateError('Error getting pending village surveys: $e', persistent: true);
       return [];
     }
   }
@@ -697,6 +753,7 @@ class SyncService {
 
       return response.isNotEmpty;
     } catch (e) {
+      _escalateError('Error checking survey existence in Supabase: $e');
       return false;
     }
   }
@@ -713,6 +770,7 @@ class SyncService {
 
       return response.isNotEmpty;
     } catch (e) {
+      _escalateError('Error checking village survey existence in Supabase: $e');
       return false;
     }
   }
@@ -741,6 +799,7 @@ class SyncService {
           message: error,
           isError: true,
         ));
+        _escalateError(error, persistent: true);
         await _markSurveyAsFailed(phoneNumber, ['AUTH_REQUIRED']);
         return;
       }
@@ -759,6 +818,7 @@ class SyncService {
           message: error,
           isError: true,
         ));
+        _escalateError(error + ': ' + schemaIssues.toString(), persistent: true);
         await _markSurveyAsFailed(phoneNumber, schemaIssues.keys.toList());
         return;
       }
@@ -768,7 +828,7 @@ class SyncService {
       if (localSessionData == null) {
         final error = 'Survey not found locally';
         _syncErrors[phoneNumber]!.add(error);
-        debugPrint('⚠ WARNING: $phoneNumber - $error. Skipping cloud sync.');
+        _escalateError('⚠ $phoneNumber - $error. Skipping cloud sync.', persistent: true);
         return;
       }
 
@@ -791,7 +851,7 @@ class SyncService {
       if (surveyData.isEmpty || surveyData['phone_number'] == null) {
         final error = 'Survey data incomplete';
         _syncErrors[phoneNumber]!.add(error);
-        debugPrint('✗ ERROR: $phoneNumber - $error. Not syncing.');
+        _escalateError('✗ $phoneNumber - $error. Not syncing.', persistent: true);
         return;
       }
 
@@ -799,10 +859,7 @@ class SyncService {
       final validationErrors = _validateSurveyCompleteness(surveyData);
       if (validationErrors.isNotEmpty) {
         _syncErrors[phoneNumber]!.addAll(validationErrors);
-        debugPrint('⚠ WARNING: $phoneNumber has ${validationErrors.length} validation issues:');
-        for (final error in validationErrors) {
-          debugPrint('  - $error');
-        }
+        _escalateError('⚠ $phoneNumber has ${validationErrors.length} validation issues: ${validationErrors.join(", ")}', persistent: true);
         final criticalErrors = validationErrors.where(_isCriticalValidationError).toList();
         if (criticalErrors.isNotEmpty) {
           _emitProgress(SyncProgress(
@@ -811,6 +868,7 @@ class SyncService {
             message: 'Critical validation errors: ${criticalErrors.join('; ')}',
             isError: true,
           ));
+          _escalateError('Critical validation errors: ${criticalErrors.join('; ')}', persistent: true);
           await _markSurveyAsFailed(phoneNumber, ['VALIDATION_FAILED']);
           return;
         }
@@ -838,7 +896,7 @@ class SyncService {
         // Mark as synced only if ALL tables succeeded
         await _markSurveyAsSynced(phoneNumber);
         await _updateSyncMetadata(phoneNumber, surveyData);
-        debugPrint('✓ Successfully synced survey: $phoneNumber (${_tableSyncStatus[phoneNumber]!.length} tables)');
+        // Optionally notify user of success
         _emitProgress(SyncProgress(
           stage: 'survey_sync',
           surveyId: phoneNumber?.toString(),
@@ -847,10 +905,7 @@ class SyncService {
       } else {
         // Partial sync - mark as failed
         await _markSurveyAsFailed(phoneNumber, failedTables);
-        debugPrint('⚠ PARTIAL SYNC: $phoneNumber - ${failedTables.length} tables failed:');
-        for (final table in failedTables) {
-          debugPrint('  ✗ $table');
-        }
+        _escalateError('⚠ PARTIAL SYNC: $phoneNumber - ${failedTables.length} tables failed: ${failedTables.join(", ")}', persistent: true);
         _emitProgress(SyncProgress(
           stage: 'survey_sync',
           surveyId: phoneNumber?.toString(),
@@ -860,19 +915,17 @@ class SyncService {
       }
 
       } catch (e, stackTrace) {
-      final error = 'Sync exception: $e';
-      _syncErrors[phoneNumber]!.add(error);
-      debugPrint('✗ Failed to sync survey $phoneNumber: $e');
-      debugPrint('Stack trace: $stackTrace');
-      _emitProgress(SyncProgress(
-        stage: 'survey_sync',
-        surveyId: phoneNumber?.toString(),
-        message: error,
-        isError: true,
-      ));
-      
-      // Mark survey as failed and queue for retry
-      await _markSurveyAsFailed(phoneNumber, ['SYNC_EXCEPTION']);
+        final error = 'Sync exception: $e';
+        _syncErrors[phoneNumber]!.add(error);
+        _escalateError('✗ Failed to sync survey $phoneNumber: $e', persistent: true);
+        _emitProgress(SyncProgress(
+          stage: 'survey_sync',
+          surveyId: phoneNumber?.toString(),
+          message: error,
+          isError: true,
+        ));
+        // Mark survey as failed and queue for retry
+        await _markSurveyAsFailed(phoneNumber, ['SYNC_EXCEPTION']);
         await queueSyncOperation('sync_survey', survey);
       }
     });
@@ -891,11 +944,12 @@ class SyncService {
       ));
 
       if (_supabaseService.currentUser == null) {
-        debugPrint('⚠ WARNING: Not authenticated. Skipping village sync.');
+        final msg = 'Not authenticated. Skipping village sync.';
+        _escalateError(msg, persistent: true);
         _emitProgress(SyncProgress(
           stage: 'village_sync',
           surveyId: sessionId?.toString(),
-          message: 'Not authenticated with Supabase',
+          message: msg,
           isError: true,
         ));
         return;
@@ -903,7 +957,8 @@ class SyncService {
 
       final schemaIssues = await _checkSchemaWithCache(_requiredVillageTables, 'village');
       if (schemaIssues.isNotEmpty) {
-        debugPrint('⚠ WARNING: Supabase schema issues found. Skipping village sync.');
+        final msg = 'Supabase schema issues found. Skipping village sync.';
+        _escalateError(msg + ': ' + schemaIssues.toString(), persistent: true);
         _emitProgress(SyncProgress(
           stage: 'village_sync',
           surveyId: sessionId?.toString(),
@@ -916,7 +971,7 @@ class SyncService {
       // CRITICAL FIX: Validate local save BEFORE syncing to cloud
       final localSessionData = await _databaseService.getVillageSurveySession(sessionId);
       if (localSessionData == null) {
-        debugPrint('⚠ WARNING: Village survey $sessionId not found locally. Skipping cloud sync.');
+        _escalateError('⚠ Village survey $sessionId not found locally. Skipping cloud sync.', persistent: true);
         return;
       }
 
@@ -930,7 +985,7 @@ class SyncService {
 
       // Verify critical data exists before syncing
       if (surveyData.isEmpty || surveyData['session_id'] == null) {
-        debugPrint('✗ ERROR: Village survey data incomplete for $sessionId. Not syncing.');
+        _escalateError('✗ Village survey data incomplete for $sessionId. Not syncing.', persistent: true);
         return;
       }
 
@@ -960,13 +1015,13 @@ class SyncService {
       ));
 
       } catch (e) {
-      debugPrint('✗ Failed to sync village survey ${survey['session_id']}: $e');
-      _emitProgress(SyncProgress(
-        stage: 'village_sync',
-        surveyId: survey['session_id']?.toString(),
-        message: 'Village sync failed: $e',
-        isError: true,
-      ));
+        _escalateError('✗ Failed to sync village survey ${survey['session_id']}: $e', persistent: true);
+        _emitProgress(SyncProgress(
+          stage: 'village_sync',
+          surveyId: survey['session_id']?.toString(),
+          message: 'Village sync failed: $e',
+          isError: true,
+        ));
         await queueSyncOperation('sync_village_survey', survey); 
       }
     });
@@ -1002,7 +1057,6 @@ class SyncService {
       'village_animals',
       'village_irrigation_facilities',
       'village_drinking_water',
-      'village_transport',
       'village_entertainment',
       'village_medical_treatment',
       'village_disputes',
@@ -1044,7 +1098,7 @@ class SyncService {
           }
         }
       } catch (e) {
-        debugPrint('Error collecting data for table $table: $e');
+        _escalateError('Error collecting data for table $table: $e');
       }
     }
 
@@ -1120,6 +1174,22 @@ class SyncService {
   Future<Map<String, dynamic>> _collectGovernmentSchemesData(String phoneNumber) async {
     final schemesData = <String, dynamic>{};
 
+    final schemeInfoTables = <String>{
+      'aadhaar_info',
+      'ayushman_card',
+      'family_id',
+      'ration_card',
+      'samagra_id',
+      'tribal_card',
+      'handicapped_allowance',
+      'pension_allowance',
+      'widow_allowance',
+      'vb_gram',
+      'pm_kisan_nidhi',
+      'pm_kisan_samman_nidhi',
+      'merged_govt_schemes',
+    };
+
     final schemeTables = [
       'aadhaar_info', 'aadhaar_scheme_members',
       'ayushman_card', 'ayushman_scheme_members',
@@ -1142,7 +1212,11 @@ class SyncService {
     for (final table in schemeTables) {
       final data = await _databaseService.getData(table, phoneNumber);
       if (data.isNotEmpty) {
-        schemesData[table] = data;
+        if (schemeInfoTables.contains(table)) {
+          schemesData[table] = data.first;
+        } else {
+          schemesData[table] = data;
+        }
       }
     }
 
@@ -1167,6 +1241,27 @@ class SyncService {
     }
 
     // Get all related data
+    final singleRowTables = <String>{
+      'land_holding',
+      'irrigation_facilities',
+      'fertilizer_usage',
+      'agricultural_equipment',
+      'entertainment_facilities',
+      'transport_facilities',
+      'drinking_water_sources',
+      'medical_treatment',
+      'disputes',
+      'house_conditions',
+      'house_facilities',
+      'social_consciousness',
+      'children_data',
+      'health_programmes',
+      'migration_data',
+      'tribal_questions',
+      'tulsi_plants',
+      'nutritional_garden',
+    };
+
     final dataMappings = {
       'family_members': 'family_members',
       'land_holding': 'land_holding',
@@ -1196,17 +1291,23 @@ class SyncService {
       'fpo_members': 'fpo_members',
       'bank_accounts': 'bank_accounts',
       'tribal_questions': 'tribal_questions',
+      'tulsi_plants': 'tulsi_plants',
+      'nutritional_garden': 'nutritional_garden',
     };
 
     for (final entry in dataMappings.entries) {
       try {
         final data = await _databaseService.getData(entry.key, phoneNumber);
         if (data.isNotEmpty) {
-          surveyData[entry.value] = data;
+          if (singleRowTables.contains(entry.key)) {
+            surveyData[entry.value] = data.first;
+          } else {
+            surveyData[entry.value] = data;
+          }
         }
       } catch (e) {
         errors.add('Failed to fetch ${entry.key}: $e');
-        debugPrint('⚠ Warning: Could not fetch ${entry.key} for $phoneNumber: $e');
+        _escalateError('⚠ Could not fetch ${entry.key} for $phoneNumber: $e');
       }
     }
 
@@ -1216,6 +1317,7 @@ class SyncService {
       surveyData.addAll(governmentSchemes);
     } catch (e) {
       errors.add('Failed to fetch government schemes: $e');
+      _escalateError('⚠ Could not fetch government schemes for $phoneNumber: $e');
     }
 
     return surveyData;
@@ -1225,6 +1327,22 @@ class SyncService {
   Future<Map<String, dynamic>> _collectGovernmentSchemesDataWithTracking(String phoneNumber) async {
     final schemesData = <String, dynamic>{};
     final errors = _syncErrors[phoneNumber]!;
+
+    final schemeInfoTables = <String>{
+      'aadhaar_info',
+      'ayushman_card',
+      'family_id',
+      'ration_card',
+      'samagra_id',
+      'tribal_card',
+      'handicapped_allowance',
+      'pension_allowance',
+      'widow_allowance',
+      'vb_gram',
+      'pm_kisan_nidhi',
+      'pm_kisan_samman_nidhi',
+      'merged_govt_schemes',
+    };
 
     final schemeTables = [
       'aadhaar_info', 'aadhaar_scheme_members',
@@ -1249,11 +1367,15 @@ class SyncService {
       try {
         final data = await _databaseService.getData(table, phoneNumber);
         if (data.isNotEmpty) {
-          schemesData[table] = data;
+          if (schemeInfoTables.contains(table)) {
+            schemesData[table] = data.first;
+          } else {
+            schemesData[table] = data;
+          }
         }
       } catch (e) {
         errors.add('Failed to fetch $table: $e');
-        debugPrint('⚠ Warning: Could not fetch $table for $phoneNumber: $e');
+        _escalateError('⚠ Could not fetch $table for $phoneNumber: $e');
       }
     }
 
@@ -1320,7 +1442,7 @@ class SyncService {
       await _databaseService.saveData('sync_failures', failureInfo);
       debugPrint('✗ Marked $phoneNumber as failed. Failed tables: ${failedTables.join(", ")}');
     } catch (e) {
-      debugPrint('Error marking survey as failed: $e');
+      _escalateError('Error marking survey as failed: $e');
     }
   }
 
@@ -1342,7 +1464,7 @@ class SyncService {
 
       await _databaseService.saveData('sync_metadata', metadata);
     } catch (e) {
-      debugPrint('Error updating sync metadata: $e');
+      _escalateError('Error updating sync metadata: $e');
     }
   }
 
@@ -1441,7 +1563,7 @@ class SyncService {
       await prefs.setString('sync_queue', jsonEncode(_syncQueue));
       debugPrint('Sync queue saved with ${_syncQueue.length} operations');
     } catch (e) {
-      debugPrint('Failed to save sync queue: $e');
+      _escalateError('Failed to save sync queue: $e', persistent: true);
     }
   }
 
@@ -1459,7 +1581,7 @@ class SyncService {
         }
       }
     } catch (e) {
-      debugPrint('Failed to load sync queue: $e');
+      _escalateError('Failed to load sync queue: $e', persistent: true);
     }
   }
 

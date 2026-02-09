@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
@@ -49,11 +49,11 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
 
     try {
       // 1. Save to SQLite
-      await DatabaseHelper().insert('village_irrigation_facilities', data);
+      await databaseService.insertOrUpdate('village_irrigation_facilities', data, sessionId);
       print('Saved irrigation facilities to SQLite');
 
       await databaseService.markVillagePageCompleted(sessionId, 5);
-      await SyncService.instance.syncVillagePageData(sessionId, 5, data);
+      unawaited(SyncService.instance.syncVillagePageData(sessionId, 5, data));
 
       if (mounted) {
         Navigator.push(

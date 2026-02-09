@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../providers/village_survey_provider.dart';
 import '../../services/database_service.dart';
+import '../../services/data_export_service.dart';
 
 class VillageSurveyPreviewPage extends ConsumerStatefulWidget {
   final String shineCode;
@@ -218,37 +219,37 @@ class _VillageSurveyPreviewPageState extends ConsumerState<VillageSurveyPreviewP
 
             // Data Sections
             _buildSection('Basic Information', _buildBasicInfo(), Icons.info),
-            _buildSection('Population & Demographics', _buildPopulation(), Icons.people),
-            _buildSection('Farm Families', _buildFarmFamilies(), Icons.agriculture),
-            _buildSection('Housing Details', _buildHousing(), Icons.home_work),
-            _buildSection('Infrastructure - Roads & Lanes', _buildInfrastructure(), Icons.engineering),
-            _buildSection('Infrastructure Availability', _buildInfrastructureDetails(), Icons.business),
-            _buildSection('Educational Facilities', _buildEducational(), Icons.school),
-            _buildSection('Drainage & Waste Management', _buildDrainage(), Icons.water_drop),
-            _buildSection('Irrigation Facilities', _buildIrrigation(), Icons.agriculture),
-            _buildSection('Seed Clubs', _buildSeedClubs(), Icons.grass),
-            _buildSection('Kitchen Gardens', _buildKitchenGardens(), Icons.yard),
-            _buildSection('Biodiversity Register', _buildBiodiversity(), Icons.eco),
-            _buildSection('Crops Productivity', _buildCrops(), Icons.grass),
-            _buildSection('Animals/Livestock', _buildAnimals(), Icons.pets),
-            _buildSection('Agricultural Implements', _buildAgriculturalImplements(), Icons.build),
-            _buildSection('Drinking Water Sources', _buildWater(), Icons.water),
-            _buildSection('Transport Facilities', _buildTransport(), Icons.directions_car),
-            _buildSection('Entertainment Facilities', _buildEntertainment(), Icons.tv),
-            _buildSection('Medical Treatment', _buildMedical(), Icons.local_hospital),
-            _buildSection('Disputes', _buildDisputes(), Icons.gavel),
-            _buildSection('Social Consciousness', _buildSocialConsciousness(), Icons.psychology),
-            _buildSection('Social Map', _buildSocialMap(), Icons.map),
-            _buildSection('Signboards & Information', _buildSignboards(), Icons.signpost),
-            _buildSection('Detailed Map Points', _buildMapPoints(), Icons.location_on),
-            _buildSection('Cadastral Maps', _buildCadastralMaps(), Icons.map_outlined),
-            _buildSection('Forest Maps', _buildForestMaps(), Icons.forest),
-            _buildSection('Traditional Occupations', _buildTraditional(), Icons.work),
-            _buildSection('Children Data', _buildChildren(), Icons.child_care),
-            _buildSection('Malnutrition Data', _buildMalnutrition(), Icons.medical_services),
-            _buildSection('BPL Families', _buildBPL(), Icons.volunteer_activism),
-            _buildSection('Unemployment', _buildUnemployment(), Icons.work_off),
-            _buildSection('Survey Details & Biodiversity', _buildSurveyDetails(), Icons.description),
+            _buildSectionIfHasData('Population & Demographics', _buildPopulation(), Icons.people, _surveyData['population']),
+            _buildSectionIfHasData('Farm Families', _buildFarmFamilies(), Icons.agriculture, _surveyData['farm_families']),
+            _buildSectionIfHasData('Housing Details', _buildHousing(), Icons.home_work, _surveyData['housing']),
+            _buildSectionIfHasData('Infrastructure - Roads & Lanes', _buildInfrastructure(), Icons.engineering, _surveyData['infrastructure']),
+            _buildSectionIfHasData('Infrastructure Availability', _buildInfrastructureDetails(), Icons.business, _surveyData['infrastructure_details']),
+            _buildSectionIfHasData('Educational Facilities', _buildEducational(), Icons.school, _surveyData['educational']),
+            _buildSectionIfHasData('Drainage & Waste Management', _buildDrainage(), Icons.water_drop, _surveyData['drainage']),
+            _buildSectionIfHasData('Irrigation Facilities', _buildIrrigation(), Icons.agriculture, _surveyData['irrigation']),
+            _buildSectionIfHasData('Seed Clubs', _buildSeedClubs(), Icons.grass, _surveyData['seed_clubs']),
+            _buildSectionIfHasData('Kitchen Gardens', _buildKitchenGardens(), Icons.yard, _surveyData['kitchen_gardens']),
+            _buildSectionIfHasData('Biodiversity Register', _buildBiodiversity(), Icons.eco, _surveyData['biodiversity']),
+            _buildSectionIfHasData('Crops Productivity', _buildCrops(), Icons.grass, _surveyData['crops']),
+            _buildSectionIfHasData('Animals/Livestock', _buildAnimals(), Icons.pets, _surveyData['animals']),
+            _buildSectionIfHasData('Agricultural Implements', _buildAgriculturalImplements(), Icons.build, _surveyData['agricultural_implements']),
+            _buildSectionIfHasData('Drinking Water Sources', _buildWater(), Icons.water, _surveyData['water']),
+            _buildSectionIfHasData('Transport Facilities', _buildTransport(), Icons.directions_car, _surveyData['transport']),
+            _buildSectionIfHasData('Entertainment Facilities', _buildEntertainment(), Icons.tv, _surveyData['entertainment']),
+            _buildSectionIfHasData('Medical Treatment', _buildMedical(), Icons.local_hospital, _surveyData['medical']),
+            _buildSectionIfHasData('Disputes', _buildDisputes(), Icons.gavel, _surveyData['disputes']),
+            _buildSectionIfHasData('Social Consciousness', _buildSocialConsciousness(), Icons.psychology, _surveyData['social']),
+            _buildSectionIfHasData('Social Map', _buildSocialMap(), Icons.map, _surveyData['social_map']),
+            _buildSectionIfHasData('Signboards & Information', _buildSignboards(), Icons.signpost, _surveyData['signboards']),
+            _buildSectionIfHasData('Detailed Map Points', _buildMapPoints(), Icons.location_on, _surveyData['map_points']),
+            _buildSectionIfHasData('Cadastral Maps', _buildCadastralMaps(), Icons.map_outlined, _surveyData['cadastral_maps']),
+            _buildSectionIfHasData('Forest Maps', _buildForestMaps(), Icons.forest, _surveyData['forest_maps']),
+            _buildSectionIfHasData('Traditional Occupations', _buildTraditional(), Icons.work, _surveyData['traditional']),
+            _buildSectionIfHasData('Children Data', _buildChildren(), Icons.child_care, _surveyData['children']),
+            _buildSectionIfHasData('Malnutrition Data', _buildMalnutrition(), Icons.medical_services, _surveyData['malnutrition']),
+            _buildSectionIfHasData('BPL Families', _buildBPL(), Icons.volunteer_activism, _surveyData['bpl']),
+            _buildSectionIfHasData('Unemployment', _buildUnemployment(), Icons.work_off, _surveyData['unemployment']),
+            _buildSectionIfHasData('Survey Details & Biodiversity', _buildSurveyDetails(), Icons.description, _surveyData['survey_details']),
 
             const SizedBox(height: 24),
             
@@ -361,6 +362,25 @@ class _VillageSurveyPreviewPageState extends ConsumerState<VillageSurveyPreviewP
         ],
       ),
     );
+  }
+
+  Widget _buildSectionIfHasData(String title, Widget content, IconData icon, dynamic sectionData) {
+    if (!_hasSectionData(sectionData)) {
+      return const SizedBox.shrink();
+    }
+    return _buildSection(title, content, icon);
+  }
+
+  bool _hasSectionData(dynamic sectionData) {
+    if (sectionData == null) return false;
+    if (sectionData is Map) {
+      if (sectionData.isEmpty) return false;
+      return sectionData.values.any(_hasValue);
+    }
+    if (sectionData is List) {
+      return sectionData.isNotEmpty;
+    }
+    return _hasValue(sectionData);
   }
 
   Widget _buildBasicInfo() {
@@ -582,12 +602,12 @@ class _VillageSurveyPreviewPageState extends ConsumerState<VillageSurveyPreviewP
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildDataRow('Cars Available', transport['cars_available']),
-        _buildDataRow('Motorcycles Available', transport['motorcycles_available']),
-        _buildDataRow('E-Rickshaws Available', transport['e_rickshaws_available']),
-        _buildDataRow('Cycles Available', transport['cycles_available']),
-        _buildDataRow('Pickup Trucks Available', transport['pickup_trucks_available']),
-        _buildDataRow('Bullock Carts Available', transport['bullock_carts_available']),
+        _buildDataRow('Tractor Count', transport['tractor_count']),
+        _buildDataRow('Car/Jeep Count', transport['car_jeep_count']),
+        _buildDataRow('Motorcycle/Scooter Count', transport['motorcycle_scooter_count']),
+        _buildDataRow('Cycle Count', transport['cycle_count']),
+        _buildDataRow('E-Rickshaw Count', transport['e_rickshaw_count']),
+        _buildDataRow('Pickup/Truck Count', transport['pickup_truck_count']),
       ],
     );
   }
@@ -1079,6 +1099,9 @@ class _VillageSurveyPreviewPageState extends ConsumerState<VillageSurveyPreviewP
   }
 
   Widget _buildDataRow(String label, dynamic value) {
+    if (!_hasValue(value)) {
+      return const SizedBox.shrink();
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1102,6 +1125,19 @@ class _VillageSurveyPreviewPageState extends ConsumerState<VillageSurveyPreviewP
     );
   }
 
+  bool _hasValue(dynamic value) {
+    if (value == null) return false;
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return false;
+      if (trimmed.toLowerCase() == 'n/a' || trimmed.toLowerCase() == 'null') return false;
+      return true;
+    }
+    if (value is List) return value.isNotEmpty;
+    if (value is Map) return value.isNotEmpty;
+    return true;
+  }
+
   Widget _buildBottomSubmit() {
     return SizedBox(
       width: double.infinity,
@@ -1120,16 +1156,18 @@ class _VillageSurveyPreviewPageState extends ConsumerState<VillageSurveyPreviewP
 
   Future<void> _exportToExcel() async {
     try {
-      // TODO: Implement village survey export functionality
-      // await DataExportService().exportVillageSurveyData(widget.shineCode);
+      if (_sessionId == null) {
+        throw Exception('No active village survey session found');
+      }
+      await DataExportService().exportCompleteVillageSurveyData(_sessionId!);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Row(
               children: [
-                Icon(Icons.info, color: Colors.white),
+                Icon(Icons.check_circle, color: Colors.white),
                 SizedBox(width: 8),
-                Text('Village survey export coming'),
+                Text('Village survey exported to Excel successfully!'),
               ],
             ),
             backgroundColor: Colors.green,

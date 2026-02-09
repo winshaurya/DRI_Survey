@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import 'educational_facilities_screen.dart';
 
@@ -88,9 +88,11 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
       'post_office_distance': postOfficeDistanceController.text,
       'has_health_facility': _hasHealthFacility ? 1 : 0,
       'health_facility_distance': healthFacilityDistanceController.text,
+      'has_primary_health_centre': _hasPrimaryHealthCentre ? 1 : 0,
       'has_bank': _hasBank ? 1 : 0,
       'bank_distance': bankDistanceController.text,
       'has_electrical_connection': _hasElectricalConnection ? 1 : 0,
+      'has_drinking_water_source': _hasDrinkingWaterSource ? 1 : 0,
       'num_wells': int.tryParse(numWellsController.text),
       'num_ponds': int.tryParse(numPondsController.text),
       'num_hand_pumps': int.tryParse(numHandPumpsController.text),
@@ -100,10 +102,10 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
     };
 
     try {
-      await DatabaseHelper().insert('village_infrastructure_details', data);
+      await databaseService.insertOrUpdate('village_infrastructure_details', data, sessionId);
 
       await databaseService.markVillagePageCompleted(sessionId, 2);
-      await SyncService.instance.syncVillagePageData(sessionId, 2, data);
+      unawaited(SyncService.instance.syncVillagePageData(sessionId, 2, data));
 
       if (mounted) {
         Navigator.push(

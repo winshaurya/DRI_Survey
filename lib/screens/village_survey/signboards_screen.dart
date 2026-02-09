@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
-import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import 'seed_clubs_screen.dart';
 import 'social_map_screen.dart';
@@ -41,10 +41,10 @@ class _SignboardsScreenState extends State<SignboardsScreen> {
     };
 
     try {
-      await DatabaseHelper().insert('village_signboards', data);
+      await databaseService.insertOrUpdate('village_signboards', data, sessionId);
 
       await databaseService.markVillagePageCompleted(sessionId, 7);
-      await SyncService.instance.syncVillagePageData(sessionId, 7, data);
+      unawaited(SyncService.instance.syncVillagePageData(sessionId, 7, data));
 
       if (mounted) {
         Navigator.push(
