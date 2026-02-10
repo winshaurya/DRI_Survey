@@ -66,31 +66,25 @@ class VillageSurveyNotifier extends Notifier<VillageSurveyState> {
         throw Exception('Shine code and session ID are required');
       }
 
+      // Ensure surveyor_email is set properly
+      final resolvedEmail = formData['surveyor_email'] ?? _supabaseService.currentUser?.email ?? 'unknown';
+      final formDataWithEmail = {
+        ...formData,
+        'surveyor_email': resolvedEmail,
+      };
+
       // Store basic form data
       state = state.copyWith(
         shineCode: shineCode,
         sessionId: sessionId,
-        surveyData: Map<String, dynamic>.from(formData),
+        surveyData: Map<String, dynamic>.from(formDataWithEmail),
       );
 
       // Create record in database
-      await _databaseService.createVillageSurveySession(formData);
+      await _databaseService.createVillageSurveySession(formDataWithEmail);
 
-      // Try to sync to Supabase if online
-      if (await _supabaseService.isOnline()) {
-        try {
-          await _supabaseService.client
-              .from('village_survey_sessions')
-              .upsert({
-            ...formData,
-            'created_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-            'user_id': _supabaseService.currentUser?.id,
-          });
-        } catch (e) {
-          print('Error syncing to Supabase: $e');
-        }
-      }
+      // Note: Sync to Supabase will happen when survey is completed
+      // This ensures all data is available and authentication is stable
     } catch (e) {
       print('Error initializing village survey: $e');
       rethrow;
@@ -242,6 +236,9 @@ class VillageSurveyNotifier extends Notifier<VillageSurveyState> {
 
       // Sync to Supabase
       await _syncService.syncVillagePageData(state.sessionId!, screenIndex, data);
+
+      // Also trigger partial survey sync to ensure progress is saved
+      await syncPartialSurvey();
     } catch (e) {
       print('Error saving screen data: $e');
       rethrow;
@@ -357,19 +354,69 @@ class VillageSurveyNotifier extends Notifier<VillageSurveyState> {
     state = state.copyWith(isLoading: loading);
   }
 
+  Future<void> syncPartialSurvey() async {
+    if (state.sessionId != null && await _supabaseService.isOnline()) {
+      try {
+        // Update surveyor_email if needed
+        final currentEmail = _supabaseService.currentUser?.email;
+        if (currentEmail != null && currentEmail != 'unknown') {
+          final sessionData = await _databaseService.getVillageSurveySession(state.sessionId!);
+          if (sessionData != null && sessionData['surveyor_email'] == 'unknown') {
+            await _databaseService.updateVillageSurveySession(state.sessionId!, {
+              'surveyor_email': currentEmail,
+              'updated_at': DateTime.now().toIso8601String(),
+            });
+          }
+        }
+
+        // Sync current progress to Supabase
+        await _syncService.syncVillageSurveyImmediately(state.sessionId!);
+      } catch (e) {
+        print('Error syncing partial village survey: $e');
+      }
+    }
+  }
+
   // Complete survey
   Future<void> completeSurvey() async {
     if (state.sessionId == null) return;
 
     try {
+      // Update surveyor_email if it was set to 'unknown' but user is now authenticated
+      final currentEmail = _supabaseService.currentUser?.email;
+      if (currentEmail != null && currentEmail != 'unknown') {
+        final sessionData = await _databaseService.getVillageSurveySession(state.sessionId!);
+        if (sessionData != null && sessionData['surveyor_email'] == 'unknown') {
+          await _databaseService.updateVillageSurveySession(state.sessionId!, {
+            'surveyor_email': currentEmail,
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+        }
+      }
+
       // Mark as completed in database
       await _databaseService.updateVillageSurveyStatus(
         state.sessionId!,
         'completed',
       );
 
+      // Update status in Supabase directly (like family surveys do)
+      if (await _supabaseService.isOnline()) {
+        try {
+          await _supabaseService.client
+              .from('village_survey_sessions')
+              .update({
+                'status': 'completed',
+                'updated_at': DateTime.now().toIso8601String(),
+              })
+              .eq('session_id', state.sessionId!);
+        } catch (e) {
+          print('Error updating village survey completion status in Supabase: $e');
+        }
+      }
+
       // Final sync to Supabase
-      await _syncService.syncVillageSurveyToSupabase(state.sessionId!);
+      await _syncService.syncVillageSurveyImmediately(state.sessionId!);
     } catch (e) {
       print('Error completing survey: $e');
       rethrow;

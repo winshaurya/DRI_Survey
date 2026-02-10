@@ -168,11 +168,15 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                         return SurveyPage(
                           pageIndex: index,
                           onNext: ([Map<String, dynamic>? pageData]) async {
+                            // Update survey data with current page data
+                            if (pageData != null) {
+                              surveyNotifier.updateSurveyDataMap(pageData);
+                            }
                             if (index < surveyState.totalPages - 1) {
                               // Constraints disabled: always allow next page
                               if (index == 0) {
                                 final phoneNumber =
-                                    (surveyState.surveyData['phone_number'] ?? '').toString().trim();
+                                    (pageData?['phone_number'] ?? '').toString().trim();
                                 if (phoneNumber.isEmpty) {
                                   if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -181,20 +185,21 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                                   return;
                                 }
                                 await surveyNotifier.initializeSurvey(
-                                  villageName: surveyState.surveyData['village_name'] ?? '',
-                                  villageNumber: surveyState.surveyData['village_number'],
-                                  panchayat: surveyState.surveyData['panchayat'],
-                                  block: surveyState.surveyData['block'],
-                                  tehsil: surveyState.surveyData['tehsil'],
-                                  district: surveyState.surveyData['district'],
-                                  postalAddress: surveyState.surveyData['postal_address'],
-                                  pinCode: surveyState.surveyData['pin_code'],
-                                  surveyorName: surveyState.surveyData['surveyor_name'],
+                                  villageName: pageData?['village_name'] ?? '',
+                                  villageNumber: pageData?['village_number'],
+                                  panchayat: pageData?['panchayat'],
+                                  block: pageData?['block'],
+                                  tehsil: pageData?['tehsil'],
+                                  district: pageData?['district'],
+                                  postalAddress: pageData?['postal_address'],
+                                  pinCode: pageData?['pin_code'],
+                                  surveyorName: pageData?['surveyor_name'],
                                   phoneNumber: phoneNumber,
                                 );
                               }
-                              // CRITICAL FIX: Save current page data before navigation
-                              await surveyNotifier.saveCurrentPageData();
+                              // OPTIMIZATION: Save current page data asynchronously without blocking navigation
+                              // This prevents slow page transitions while still ensuring data is saved
+                              surveyNotifier.saveCurrentPageData();
                               _jumpToPage(index + 1);
                             } else {
                               // Complete survey
@@ -491,8 +496,8 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
 
     if (pageIndex == currentPage) return;
 
-    // Save current page data before navigating
-    await surveyNotifier.saveCurrentPageData();
+    // Save current page data asynchronously before navigating
+    surveyNotifier.saveCurrentPageData();
 
     // Navigate to the selected page
     _pageController.animateToPage(

@@ -35,8 +35,8 @@ class SyncService {
   static SyncService get instance => _instance;
 
   final DatabaseService _databaseService = DatabaseService();
-  final SupabaseService _supabaseService = SupabaseService.instance;
-  final FileUploadService _fileUploadService = FileUploadService.instance;
+  late final SupabaseService _supabaseService;
+  late final FileUploadService _fileUploadService;
 
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
   Timer? _syncTimer;
@@ -156,11 +156,28 @@ class SyncService {
   ];
 
   SyncService._internal() {
-    _initializeConnectivityMonitoring();
+    // Lazy initialization to make service testable
+    _supabaseService = SupabaseService.instance;
+    _fileUploadService = FileUploadService.instance;
+    // Connectivity monitoring will be initialized lazily when needed
     loadSyncQueue();
   }
 
-  void _initializeConnectivityMonitoring() {
+  void _ensureConnectivityMonitoringInitialized() {
+    // Connectivity monitoring is now initialized in constructor
+  }
+
+  // Public method to check if online (ensures connectivity monitoring is initialized)
+  Future<bool> get isOnlineAsync async {
+    _ensureConnectivityMonitoringInitialized();
+    return _isOnline;
+  }
+
+  Future<void> _initializeConnectivityMonitoring() async {
+    // Check initial connectivity first
+    final initialResult = await Connectivity().checkConnectivity();
+    _isOnline = initialResult != ConnectivityResult.none;
+
     // Monitor connectivity changes
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
       (ConnectivityResult result) {
@@ -180,15 +197,12 @@ class SyncService {
       },
     );
 
-    // Check initial connectivity
-    Connectivity().checkConnectivity().then((ConnectivityResult result) {
-      _isOnline = result != ConnectivityResult.none;
-      if (_isOnline) {
-        _startPeriodicSync();
-        _syncPendingFamilyPages();
-        _syncPendingVillagePages();
-      }
-    });
+    // Start syncing if initially online
+    if (_isOnline) {
+      _startPeriodicSync();
+      _syncPendingFamilyPages();
+      _syncPendingVillagePages();
+    }
   }
 
   void _startPeriodicSync() {
@@ -260,6 +274,7 @@ class SyncService {
   }
 
   Future<void> syncFamilyPageData(String phoneNumber, int page, Map<String, dynamic> data) async {
+    _ensureConnectivityMonitoringInitialized();
     if (phoneNumber.isEmpty || page < 0) return;
     await _withSyncLock('family:$phoneNumber', () async {
       if (!_isOnline || _supabaseService.currentUser == null) {
@@ -329,6 +344,7 @@ class SyncService {
 
   /// Public method to sync a village survey by session ID
   Future<void> syncVillageSurveyToSupabase(String sessionId) async {
+    _ensureConnectivityMonitoringInitialized();
     try {
       final survey = await _databaseService.getVillageSurveySession(sessionId);
       if (survey == null) {
@@ -383,6 +399,7 @@ class SyncService {
       List<String>.from(_syncErrors[phoneNumber] ?? const []);
 
   Future<void> _performBackgroundSync() async {
+    _ensureConnectivityMonitoringInitialized();
     if (!_isOnline || _isProcessingQueue) return;
 
     try {
@@ -742,6 +759,7 @@ class SyncService {
   }
 
   Future<bool> _checkSurveyExistsInSupabase(String phoneNumber) async {
+    _ensureConnectivityMonitoringInitialized();
     if (!_isOnline) return false;
 
     try {
@@ -759,6 +777,7 @@ class SyncService {
   }
 
   Future<bool> _checkVillageSurveyExistsInSupabase(String sessionId) async {
+    _ensureConnectivityMonitoringInitialized();
     if (!_isOnline) return false;
 
     try {
@@ -776,6 +795,7 @@ class SyncService {
   }
 
   Future<void> _syncSurveyToSupabase(Map<String, dynamic> survey) async {
+    _ensureConnectivityMonitoringInitialized();
     if (!_isOnline) return;
 
     final phoneNumber = survey['phone_number'];
@@ -932,6 +952,7 @@ class SyncService {
   }
 
   Future<void> _syncVillageSurveyToSupabase(Map<String, dynamic> survey) async {
+    _ensureConnectivityMonitoringInitialized();
     if (!_isOnline) return;
     await _withSyncLock('village:${survey['session_id']}', () async {
       try {
@@ -1499,6 +1520,7 @@ class SyncService {
   }
 
   Future<void> _processSyncQueue() async {
+    _ensureConnectivityMonitoringInitialized();
     if (_isProcessingQueue || !_isOnline || _syncQueue.isEmpty) return;
 
     _isProcessingQueue = true;
@@ -1639,6 +1661,7 @@ class SyncService {
 
   // Public methods
   Future<void> syncSurveyImmediately(String phoneNumber) async {
+    _ensureConnectivityMonitoringInitialized();
     if (!_isOnline) {
       await queueSyncOperation('sync_survey', {'phone_number': phoneNumber});
       return;
@@ -1651,6 +1674,7 @@ class SyncService {
   }
 
   Future<void> syncVillageSurveyImmediately(String sessionId) async {
+     _ensureConnectivityMonitoringInitialized();
      if (!_isOnline) {
       await queueSyncOperation('sync_village_survey', {'session_id': sessionId});
       return;
@@ -1663,12 +1687,19 @@ class SyncService {
   }
 
   Future<void> forceSyncAllPendingData() async {
+    _ensureConnectivityMonitoringInitialized();
     if (!_isOnline) return;
 
     await _performBackgroundSync();
   }
 
-  bool get isOnline => _isOnline;
+  Future<bool> get isOnline async {
+    // Ensure connectivity monitoring is initialized
+    if (_connectivitySubscription == null) {
+      await _initializeConnectivityMonitoring();
+    }
+    return _isOnline;
+  }
 
   Stream<bool> get connectivityStream => Connectivity().onConnectivityChanged
       .map((result) => result != ConnectivityResult.none);

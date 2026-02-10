@@ -312,13 +312,48 @@ class SupabaseService {
         _escalateError(errMsg, persistent: true);
       }
 
-      // Sync related data tables in parallel for speed
-      final syncTasks = <Future<void>>[];
-      
-      // Helper to wrap sync calls with error tracking
-      Future<void> syncWithTracking(String tableName, Future<void> Function() syncFn) async {
+      // Execute syncs sequentially to avoid foreign key constraint violations
+      // All child tables depend on family_survey_sessions, so sync them one by one
+
+      // Define sync operations with their table names for status tracking
+      final syncOperations = [
+        ('family_members', () => _syncFamilyMembers(phoneNumber, surveyData['family_members'])),
+        ('land_holding', () => _syncLandHolding(phoneNumber, surveyData['land_holding'])),
+        ('irrigation_facilities', () => _syncIrrigationFacilities(phoneNumber, surveyData['irrigation_facilities'])),
+        ('crop_productivity', () => _syncCropProductivity(phoneNumber, surveyData['crop_productivity'])),
+        ('fertilizer_usage', () => _syncFertilizerUsage(phoneNumber, surveyData['fertilizer_usage'])),
+        ('animals', () => _syncAnimals(phoneNumber, surveyData['animals'])),
+        ('agricultural_equipment', () => _syncAgriculturalEquipment(phoneNumber, surveyData['agricultural_equipment'])),
+        ('entertainment_facilities', () => _syncEntertainmentFacilities(phoneNumber, surveyData['entertainment_facilities'])),
+        ('transport_facilities', () => _syncTransportFacilities(phoneNumber, surveyData['transport_facilities'])),
+        ('drinking_water_sources', () => _syncDrinkingWaterSources(phoneNumber, surveyData['drinking_water_sources'])),
+        ('medical_treatment', () => _syncMedicalTreatment(phoneNumber, surveyData['medical_treatment'])),
+        ('disputes', () => _syncDisputes(phoneNumber, surveyData['disputes'])),
+        ('house_conditions', () => _syncHouseConditions(phoneNumber, surveyData['house_conditions'])),
+        ('house_facilities', () => _syncHouseFacilities(phoneNumber, surveyData['house_facilities'])),
+        ('diseases', () => _syncDiseases(phoneNumber, surveyData['diseases'])),
+        ('children_data', () => _syncChildrenData(phoneNumber, surveyData['children_data'])),
+        ('malnourished_children_data', () => _syncMalnourishedChildrenData(phoneNumber, surveyData['malnourished_children_data'])),
+        ('child_diseases', () => _syncChildDiseases(phoneNumber, surveyData['child_diseases'])),
+        ('folklore_medicine', () => _syncFolkloreMedicine(phoneNumber, surveyData['folklore_medicine'])),
+        ('health_programmes', () => _syncHealthProgrammes(phoneNumber, surveyData['health_programmes'])),
+        ('malnutrition_data', () => _syncMalnutritionData(phoneNumber, surveyData['malnutrition_data'])),
+        ('migration_data', () => _syncMigration(phoneNumber, surveyData['migration_data'])),
+        ('training_data', () => _syncTraining(phoneNumber, surveyData['training_data'])),
+        ('shg_members', () => _syncSelfHelpGroups(phoneNumber, surveyData['shg_members'])),
+        ('fpo_members', () => _syncFpoMembership(phoneNumber, surveyData['fpo_members'])),
+        ('bank_accounts', () => _syncBankAccounts(phoneNumber, surveyData['bank_accounts'])),
+        ('social_consciousness', () => _syncSocialConsciousness(phoneNumber, surveyData['social_consciousness'])),
+        ('tribal_questions', () => _syncTribalQuestions(phoneNumber, surveyData['tribal_questions'])),
+        ('tulsi_plants', () => _syncTulsiPlants(phoneNumber, surveyData['tulsi_plants'] ?? surveyData['house_facilities'])),
+        ('nutritional_garden', () => _syncNutritionalGarden(phoneNumber, surveyData['nutritional_garden'] ?? surveyData['house_facilities'])),
+        ('government_schemes', () => _syncGovernmentSchemesParallel(phoneNumber, surveyData, tableSyncStatus)),
+      ];
+
+      // Execute each sync operation sequentially with error tracking
+      for (final (tableName, operation) in syncOperations) {
         try {
-          await syncFn();
+          await operation();
           tableSyncStatus[tableName] = true;
         } catch (e) {
           tableSyncStatus[tableName] = false;
@@ -327,44 +362,6 @@ class SupabaseService {
           _escalateError(errMsg, persistent: true);
         }
       }
-
-      // Add all sync tasks (parallel execution)
-      syncTasks.add(syncWithTracking('family_members', () => _syncFamilyMembers(phoneNumber, surveyData['family_members'])));
-      syncTasks.add(syncWithTracking('land_holding', () => _syncLandHolding(phoneNumber, surveyData['land_holding'])));
-      syncTasks.add(syncWithTracking('irrigation_facilities', () => _syncIrrigationFacilities(phoneNumber, surveyData['irrigation_facilities'])));
-      syncTasks.add(syncWithTracking('crop_productivity', () => _syncCropProductivity(phoneNumber, surveyData['crop_productivity'])));
-      syncTasks.add(syncWithTracking('fertilizer_usage', () => _syncFertilizerUsage(phoneNumber, surveyData['fertilizer_usage'])));
-      syncTasks.add(syncWithTracking('animals', () => _syncAnimals(phoneNumber, surveyData['animals'])));
-      syncTasks.add(syncWithTracking('agricultural_equipment', () => _syncAgriculturalEquipment(phoneNumber, surveyData['agricultural_equipment'])));
-      syncTasks.add(syncWithTracking('entertainment_facilities', () => _syncEntertainmentFacilities(phoneNumber, surveyData['entertainment_facilities'])));
-      syncTasks.add(syncWithTracking('transport_facilities', () => _syncTransportFacilities(phoneNumber, surveyData['transport_facilities'])));
-      syncTasks.add(syncWithTracking('drinking_water_sources', () => _syncDrinkingWaterSources(phoneNumber, surveyData['drinking_water_sources'])));
-      syncTasks.add(syncWithTracking('medical_treatment', () => _syncMedicalTreatment(phoneNumber, surveyData['medical_treatment'])));
-      syncTasks.add(syncWithTracking('disputes', () => _syncDisputes(phoneNumber, surveyData['disputes'])));
-      syncTasks.add(syncWithTracking('house_conditions', () => _syncHouseConditions(phoneNumber, surveyData['house_conditions'])));
-      syncTasks.add(syncWithTracking('house_facilities', () => _syncHouseFacilities(phoneNumber, surveyData['house_facilities'])));
-      syncTasks.add(syncWithTracking('diseases', () => _syncDiseases(phoneNumber, surveyData['diseases'])));
-      syncTasks.add(syncWithTracking('children_data', () => _syncChildrenData(phoneNumber, surveyData['children_data'])));
-      syncTasks.add(syncWithTracking('malnourished_children_data', () => _syncMalnourishedChildrenData(phoneNumber, surveyData['malnourished_children_data'])));
-      syncTasks.add(syncWithTracking('child_diseases', () => _syncChildDiseases(phoneNumber, surveyData['child_diseases'])));
-      syncTasks.add(syncWithTracking('folklore_medicine', () => _syncFolkloreMedicine(phoneNumber, surveyData['folklore_medicine'])));
-      syncTasks.add(syncWithTracking('health_programmes', () => _syncHealthProgrammes(phoneNumber, surveyData['health_programmes'])));
-      syncTasks.add(syncWithTracking('malnutrition_data', () => _syncMalnutritionData(phoneNumber, surveyData['malnutrition_data'])));
-      syncTasks.add(syncWithTracking('migration_data', () => _syncMigration(phoneNumber, surveyData['migration_data'])));
-      syncTasks.add(syncWithTracking('training_data', () => _syncTraining(phoneNumber, surveyData['training_data'])));
-      syncTasks.add(syncWithTracking('shg_members', () => _syncSelfHelpGroups(phoneNumber, surveyData['shg_members'])));
-      syncTasks.add(syncWithTracking('fpo_members', () => _syncFpoMembership(phoneNumber, surveyData['fpo_members'])));
-      syncTasks.add(syncWithTracking('bank_accounts', () => _syncBankAccounts(phoneNumber, surveyData['bank_accounts'])));
-      syncTasks.add(syncWithTracking('social_consciousness', () => _syncSocialConsciousness(phoneNumber, surveyData['social_consciousness'])));
-      syncTasks.add(syncWithTracking('tribal_questions', () => _syncTribalQuestions(phoneNumber, surveyData['tribal_questions'])));
-      syncTasks.add(syncWithTracking('tulsi_plants', () => _syncTulsiPlants(phoneNumber, surveyData['tulsi_plants'] ?? surveyData['house_facilities'])));
-      syncTasks.add(syncWithTracking('nutritional_garden', () => _syncNutritionalGarden(phoneNumber, surveyData['nutritional_garden'] ?? surveyData['house_facilities'])));
-
-      // Sync government schemes (tracked separately)
-      syncTasks.add(syncWithTracking('government_schemes', () => _syncGovernmentSchemesParallel(phoneNumber, surveyData, tableSyncStatus)));
-
-      // Execute all syncs in parallel (don't fail fast - collect all errors)
-      await Future.wait(syncTasks, eagerError: false);
 
       return overallSuccess;
 

@@ -49,7 +49,7 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
   bool _hasPrimaryHealthCentre = false;
   bool _hasBank = false;
   bool _hasElectricalConnection = false;
-  bool _hasDrinkingWaterSource = false;
+  bool _hasDrinkingWaterSource = true; // Always true - drinking water source is always available
 
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
@@ -92,7 +92,7 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
       'has_bank': _hasBank ? 1 : 0,
       'bank_distance': bankDistanceController.text,
       'has_electrical_connection': _hasElectricalConnection ? 1 : 0,
-      'has_drinking_water_source': _hasDrinkingWaterSource ? 1 : 0,
+      'has_drinking_water_source': 1, // Always true - drinking water source is always available
       'num_wells': int.tryParse(numWellsController.text),
       'num_ponds': int.tryParse(numPondsController.text),
       'num_hand_pumps': int.tryParse(numHandPumpsController.text),
@@ -487,85 +487,65 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSimpleRadioField(
-          label: 'Source of Drinking Water',
-          hasFacility: _hasDrinkingWaterSource,
-          onChanged: (value) {
-            setState(() {
-              _hasDrinkingWaterSource = value == 'Yes';
-              if (!_hasDrinkingWaterSource) {
-                numWellsController.clear();
-                numPondsController.clear();
-                numHandPumpsController.clear();
-                numTubeWellsController.clear();
-                numTapWaterController.clear();
-              }
-            });
-          },
+        Text(
+          'Source of Drinking Water (Always Available):',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
+          ),
         ),
-        
-        if (_hasDrinkingWaterSource) ...[
-          SizedBox(height: 15),
-          Text(
-            'Water Source Details:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade800,
+        SizedBox(height: 10),
+
+        Row(
+          children: [
+            Expanded(
+              child: NumberInput(
+                label: 'No. of Wells',
+                controller: numWellsController,
+                prefixIcon: Icons.water,
+              ),
             ),
-          ),
-          SizedBox(height: 10),
-          
-          Row(
-            children: [
-              Expanded(
-                child: NumberInput(
-                  label: 'No. of Wells',
-                  controller: numWellsController,
-                  prefixIcon: Icons.water,
-                ),
+            SizedBox(width: 10),
+            Expanded(
+              child: NumberInput(
+                label: 'No. of Ponds',
+                controller: numPondsController,
+                prefixIcon: Icons.waves,
               ),
-              SizedBox(width: 10),
-              Expanded(
-                child: NumberInput(
-                  label: 'No. of Ponds',
-                  controller: numPondsController,
-                  prefixIcon: Icons.waves,
-                ),
+            ),
+          ],
+        ),
+
+        SizedBox(height: 15),
+
+        Row(
+          children: [
+            Expanded(
+              child: NumberInput(
+                label: 'No. of Hand Pumps',
+                controller: numHandPumpsController,
+                prefixIcon: Icons.build,
               ),
-            ],
-          ),
-          
-          SizedBox(height: 15),
-          
-          Row(
-            children: [
-              Expanded(
-                child: NumberInput(
-                  label: 'No. of Hand Pumps',
-                  controller: numHandPumpsController,
-                  prefixIcon: Icons.build,
-                ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: NumberInput(
+                label: 'No. of Tube Wells',
+                controller: numTubeWellsController,
+                prefixIcon: Icons.opacity,
               ),
-              SizedBox(width: 10),
-              Expanded(
-                child: NumberInput(
-                  label: 'No. of Tube Wells',
-                  controller: numTubeWellsController,
-                  prefixIcon: Icons.opacity,
-                ),
-              ),
-            ],
-          ),
-          
-          SizedBox(height: 15),
-          
-          NumberInput(
-            label: 'No. of Tap Water connections (Nal Jaal)',
-            controller: numTapWaterController,
-            prefixIcon: Icons.water_damage,
-          ),
-        ],
+            ),
+          ],
+        ),
+
+        SizedBox(height: 15),
+
+        NumberInput(
+          label: 'No. of Tap Water connections (Nal Jaal)',
+          controller: numTapWaterController,
+          prefixIcon: Icons.water_damage,
+        ),
       ],
     );
   }

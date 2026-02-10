@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../components/logo_widget.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/locale_provider.dart';
+import '../../providers/survey_provider.dart';
 import '../family_survey/widgets/side_navigation.dart';
 
 class LandingScreen extends ConsumerWidget {
@@ -19,6 +20,11 @@ class LandingScreen extends ConsumerWidget {
         ),
       );
     }
+
+    // Update existing surveys with correct email after authentication
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateExistingSurveyEmailsIfNeeded(ref);
+    });
 
     return Scaffold(
       drawer: SideNavigation(),
@@ -232,5 +238,14 @@ class LandingScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _updateExistingSurveyEmailsIfNeeded(WidgetRef ref) {
+    try {
+      final surveyNotifier = ref.read(surveyProvider.notifier);
+      surveyNotifier.updateExistingSurveyEmails();
+    } catch (e) {
+      print('Error updating existing survey emails: $e');
+    }
   }
 }

@@ -31,7 +31,9 @@ Future<void> main() async {
 
     // Initialize sync service for offline data management
     // This will start monitoring connectivity and syncing data when online
-    SyncService.instance; // Access the singleton to initialize it
+    final syncService = SyncService.instance;
+    // Ensure connectivity monitoring is initialized by accessing the isOnline getter
+    await syncService.isOnline;
   } catch (e) {
     // If Supabase initialization fails, continue without it
   }
@@ -45,6 +47,9 @@ Future<void> main() async {
           ),
           p.Provider<SupabaseService>(
             create: (_) => SupabaseService.instance,
+          ),
+          p.Provider<SyncService>(
+            create: (_) => SyncService.instance,
           ),
         ],
         child: const FamilySurveyApp(),

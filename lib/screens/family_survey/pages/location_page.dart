@@ -564,6 +564,18 @@ options: MapOptions(
           ),
           keyboardType: TextInputType.phone,
           maxLength: 10,
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Phone number is required';
+            }
+            if (value.length != 10) {
+              return 'Phone number must be 10 digits';
+            }
+            if (!RegExp(r'^\d{10}$').hasMatch(value)) {
+              return 'Phone number must contain only digits';
+            }
+            return null;
+          },
           onSaved: (value) => widget.pageData['phone_number'] = value,
           onChanged: (value) {
             widget.pageData['phone_number'] = value;

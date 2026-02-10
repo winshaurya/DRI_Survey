@@ -36,8 +36,17 @@ class FileUploadService {
   static const String ROOT_FOLDER_ID = '1vSI4mzbITbsAdJRhYR8rraR_8y1ie7QF';
 
   FileUploadService._internal() {
-    _initializeConnectivityMonitoring();
-    _loadCredentials();
+    // Delay initialization to make service testable
+    // Platform-dependent initialization will happen lazily when needed
+  }
+
+  void _ensureInitialized() {
+    if (_connectivitySubscription == null) {
+      _initializeConnectivityMonitoring();
+    }
+    if (_serviceAccountEmail == null) {
+      _loadCredentials();
+    }
   }
 
   void _initializeConnectivityMonitoring() {
@@ -274,6 +283,7 @@ class FileUploadService {
   }
 
   Future<void> processPendingUploads() async {
+    _ensureInitialized();
     debugPrint('Processing pending uploads... Online: $_isOnline');
     if (!_isOnline) return;
 
@@ -415,6 +425,7 @@ class FileUploadService {
     String component,
     String fileType,
   ) async {
+    _ensureInitialized();
     try {
       // Save file locally
       final localPath = await _saveFileLocally(file, shineCode, pageType);

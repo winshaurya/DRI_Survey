@@ -242,7 +242,9 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
 
 
   Future<void> _handleNext(WidgetRef ref) async {
-    _formKey.currentState?.save();
-    widget.onNext(_pageData);
+    if (_formKey.currentState?.validate() ?? false) {
+      _formKey.currentState?.save();
+      widget.onNext(_pageData);
+    }
   }
 }

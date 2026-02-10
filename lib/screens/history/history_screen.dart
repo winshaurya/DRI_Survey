@@ -188,7 +188,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
     final messenger = ScaffoldMessenger.of(context);
     final syncService = SyncService.instance;
 
-    if (!syncService.isOnline) {
+    if (!(await syncService.isOnline)) {
       messenger.showSnackBar(
         const SnackBar(
           content: Row(
@@ -479,9 +479,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
     ).then((_) => _loadSessions());
   }
 
-  void _showSyncStatusDialog(BuildContext context) {
+  Future<void> _showSyncStatusDialog(BuildContext context) async {
     final syncService = SyncService.instance;
-    final isOnline = syncService.isOnline;
+    final isOnline = await syncService.isOnline;
 
     showDialog(
       context: context,

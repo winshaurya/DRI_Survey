@@ -807,36 +807,55 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildActionButtons() {
-    return Row(
+    return Column(
       children: [
-        if (widget.fromHistory)
-          Expanded(
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.edit),
-              label: const Text('Edit Survey'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+        Row(
+          children: [
+            if (widget.fromHistory)
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Edit Survey'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _editSurvey,
+                ),
               ),
-              onPressed: _editSurvey,
-            ),
-          ),
-        if (widget.fromHistory && widget.showSubmitButton)
-          const SizedBox(width: 16),
-        if (widget.showSubmitButton)
-          Expanded(
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.check_circle),
-              label: const Text('Submit & Complete'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+            if (widget.fromHistory && widget.showSubmitButton)
+              const SizedBox(width: 16),
+            if (widget.showSubmitButton)
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.check_circle),
+                  label: const Text('Submit & Complete'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _submitSurvey,
+                ),
               ),
-              onPressed: _submitSurvey,
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Excel Export Button
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.file_download),
+            label: const Text('Export to Excel'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
+            onPressed: _exportToExcel,
           ),
+        ),
       ],
     );
   }

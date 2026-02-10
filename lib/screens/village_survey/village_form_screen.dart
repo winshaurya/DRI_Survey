@@ -4,25 +4,28 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 import 'package:uuid/uuid.dart';
-import 'package:provider/provider.dart';
+import 'package:provider/provider.dart' as provider_package;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../data/india_states_districts.dart';
 import '../../data/shine_villages.dart';
 import '../../form_template.dart';
 import '../../services/location_service.dart';
+import '../../providers/village_survey_provider.dart';
 import '../family_survey/widgets/side_navigation.dart';
 import 'infrastructure_screen.dart';
 
-class VillageFormScreen extends StatefulWidget {
+class VillageFormScreen extends ConsumerStatefulWidget {
   const VillageFormScreen({super.key});
 
   @override
-  _VillageFormScreenState createState() => _VillageFormScreenState();
+  ConsumerState<VillageFormScreen> createState() => _VillageFormScreenState();
 }
 
-class _VillageFormScreenState extends State<VillageFormScreen> {
+class _VillageFormScreenState extends ConsumerState<VillageFormScreen> {
   // Form controllers
   final TextEditingController villageNameController = TextEditingController();
   final TextEditingController villageCodeController = TextEditingController();
@@ -69,7 +72,7 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
   }
 
   Future<void> _checkForExistingSession() async {
-    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final databaseService = provider_package.Provider.of<DatabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;
     
     if (sessionId != null) {
@@ -202,69 +205,212 @@ class _VillageFormScreenState extends State<VillageFormScreen> {
       },
     );
 
-    final databaseService = Provider.of<DatabaseService>(context, listen: false);
-    final syncService = SyncService.instance;
-    
-    // Create a new session ID
-    final sessionId = const Uuid().v4();
-    
-    final sessionData = {
-      'session_id': sessionId,
-      'village_name': villageNameController.text.isEmpty ? 'Unknown Village' : villageNameController.text,
-      'village_code': villageCodeController.text,
-      'state': selectedState,
-      'district': selectedDistrict,
-      'block': blockController.text,
-      'panchayat': panchayatController.text,
-      'tehsil': tehsilController.text,
-      'ldg_code': ldgCodeController.text,
-      'shine_code': shineCodeController.text,
-      'latitude': _latitude,
-      'longitude': _longitude,
-      'location_accuracy': _accuracy,
-      'location_timestamp': _locationTimestamp,
-      'status': 'in_progress',
-      'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-    };
-
     try {
-      // 1. Save to SQLite and set current session
-      await databaseService.createNewVillageSurveySession(sessionData); // This sets _currentSessionId
-      
-      // 2. Mark page completion and sync immediately (queue fallback)
-      await databaseService.markVillagePageCompleted(sessionId, 0);
-      unawaited(syncService.syncVillagePageData(sessionId, 0, sessionData));
+      // Get the village survey provider
+      final villageSurveyNotifier = ref.read(villageSurveyProvider.notifier);
+
+      // Create session data with form values
+      final sessionId = const Uuid().v4();
+      final formData = {
+        'session_id': sessionId,
+        'shine_code': shineCodeController.text,
+        'village_name': villageNameController.text.isEmpty ? 'Unknown Village' : villageNameController.text,
+        'village_code': villageCodeController.text,
+        'state': selectedState,
+        'district': selectedDistrict,
+        'block': blockController.text,
+        'panchayat': panchayatController.text,
+        'tehsil': tehsilController.text,
+        'ldg_code': ldgCodeController.text,
+        'latitude': _latitude,
+        'longitude': _longitude,
+        'location_accuracy': _accuracy,
+        'location_timestamp': _locationTimestamp,
+        'status': 'in_progress',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      // Use the provider to initialize the village survey (this handles surveyor_email)
+      await villageSurveyNotifier.initializeVillageSurvey(formData);
+
+      // Mark page 0 as completed and sync immediately
+      final currentSessionId = formData['session_id'] as String;
+      await provider_package.Provider.of<DatabaseService>(context, listen: false)
+          .markVillagePageCompleted(currentSessionId, 0);
+
+      // Sync immediately to Supabase
+      try {
+        await provider_package.Provider.of<SyncService>(context, listen: false)
+            .syncVillagePageData(currentSessionId, 0, formData);
+        debugPrint('✅ Village survey session $currentSessionId synced successfully');
+      } catch (e) {
+        debugPrint('❌ Failed to sync village survey session $currentSessionId: $e');
+        // Don't fail the form submission, just log the error
+      }
 
       if (mounted) {
         // Close loading dialog
         Navigator.pop(context);
-        
+
+        // Navigate to next screen
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => InfrastructureScreen()),
         );
       }
     } catch (e) {
-      print('Error saving session: $e');
+      print('Error initializing village survey: $e');
       if (mounted) {
         // Close loading dialog
         Navigator.pop(context);
 
-        // Even if save fails, try to navigate if we have a session ID locally set (which we might not if createNewVillageSurveySession failed)
-        // Ideally we should navigate anyway for "no blocking" policy, but without session subsequent screens might fail.
-        // Let's assume database failure is critical, but we can try to proceed if it's just sync error.
-         Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => InfrastructureScreen()),
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating village survey: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
+  Future<void> _saveFormData() async {
+    final databaseService = provider_package.Provider.of<DatabaseService>(context, listen: false);
+    final supabaseService = provider_package.Provider.of<SupabaseService>(context, listen: false);
+    final syncService = SyncService.instance;
+
+    // Get current authenticated user email
+    final currentUserEmail = supabaseService.currentUser?.email ?? 'unknown';
+
+    // Check if we have an existing session
+    final existingSessionId = databaseService.currentSessionId;
+    if (existingSessionId == null) {
+      // No existing session, create a new one
+      final sessionId = const Uuid().v4();
+
+      final sessionData = {
+        'session_id': sessionId,
+        'village_name': villageNameController.text.isEmpty ? 'Unknown Village' : villageNameController.text,
+        'village_code': villageCodeController.text,
+        'state': selectedState,
+        'district': selectedDistrict,
+        'block': blockController.text,
+        'panchayat': panchayatController.text,
+        'tehsil': tehsilController.text,
+        'ldg_code': ldgCodeController.text,
+        'shine_code': shineCodeController.text,
+        'latitude': _latitude,
+        'longitude': _longitude,
+        'location_accuracy': _accuracy,
+        'location_timestamp': _locationTimestamp,
+        'surveyor_email': currentUserEmail,  // ✅ ADD SURVEYOR EMAIL
+        'status': 'in_progress',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      try {
+        await databaseService.createNewVillageSurveySession(sessionData);
+        await databaseService.markVillagePageCompleted(sessionId, 0);
+        unawaited(syncService.syncVillagePageData(sessionId, 0, sessionData));
+      } catch (e) {
+        print('Error saving form data: $e');
+      }
+    } else {
+      // Update existing session
+      final sessionData = {
+        'village_name': villageNameController.text.isEmpty ? 'Unknown Village' : villageNameController.text,
+        'village_code': villageCodeController.text,
+        'state': selectedState,
+        'district': selectedDistrict,
+        'block': blockController.text,
+        'panchayat': panchayatController.text,
+        'tehsil': tehsilController.text,
+        'ldg_code': ldgCodeController.text,
+        'shine_code': shineCodeController.text,
+        'latitude': _latitude,
+        'longitude': _longitude,
+        'location_accuracy': _accuracy,
+        'location_timestamp': _locationTimestamp,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      try {
+        final db = await databaseService.database;
+        await db.update(
+          'village_survey_sessions',
+          sessionData,
+          where: 'session_id = ?',
+          whereArgs: [existingSessionId],
+        );
+        await databaseService.markVillagePageCompleted(existingSessionId, 0);
+        unawaited(syncService.syncVillagePageData(existingSessionId, 0, sessionData));
+      } catch (e) {
+        print('Error updating form data: $e');
+      }
+    }
+  }
+
   // SIMPLE BACK FUNCTION
-  void _goBack() {
-    Navigator.pop(context);
+  void _goBack() async {
+    final shouldPop = await _onWillPop();
+    if (shouldPop && mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<bool> _onWillPop() async {
+    // Check if any form data has been entered
+    final hasData = villageNameController.text.isNotEmpty ||
+        villageCodeController.text.isNotEmpty ||
+        blockController.text.isNotEmpty ||
+        panchayatController.text.isNotEmpty ||
+        tehsilController.text.isNotEmpty ||
+        ldgCodeController.text.isNotEmpty ||
+        shineCodeController.text.isNotEmpty ||
+        selectedState.isNotEmpty ||
+        selectedDistrict.isNotEmpty ||
+        _latitude != null ||
+        _longitude != null;
+
+    // If no data entered, allow exit without prompt
+    if (!hasData) {
+      return true;
+    }
+
+    // Show confirmation dialog
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Exit Village Survey'),
+        content: const Text(
+          'You have unsaved progress. Would you like to save your current village details before leaving?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false), // Don't exit
+            child: const Text('Continue Survey'),
+          ),
+          TextButton(
+            onPressed: () async {
+              // Save current form data
+              await _saveFormData();
+              Navigator.of(context).pop(true); // Exit after saving
+            },
+            child: const Text('Save & Exit'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true), // Exit without saving
+            child: const Text('Exit Without Saving'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+          ),
+        ],
+      ),
+    );
+
+    return result ?? false;
   }
 
   void _resetForm() {

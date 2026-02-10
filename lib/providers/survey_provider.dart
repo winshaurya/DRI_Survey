@@ -81,8 +81,16 @@ class SurveyNotifier extends Notifier<SurveyState> {
         throw Exception('Phone number is required to create a survey');
       }
 
-        final resolvedEmail =
-          surveyorEmail ?? _supabaseService.currentUser?.email ?? 'unknown';
+      // Get authenticated user's email - this should be available after login
+      final currentUser = _supabaseService.currentUser;
+      if (currentUser == null) {
+        throw Exception('Authentication required. Please login first.');
+      }
+
+      final resolvedEmail = currentUser.email;
+      if (resolvedEmail == null || resolvedEmail.isEmpty) {
+        throw Exception('User email not available. Please check your authentication.');
+      }
 
       // Create local survey record first
       final surveyId = await _databaseService.createNewSurveyRecord({
@@ -123,7 +131,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
                 'survey_date': DateTime.now().toIso8601String(),
                 'created_at': DateTime.now().toIso8601String(),
                 'updated_at': DateTime.now().toIso8601String(),
-                'user_id': _supabaseService.currentUser?.id,
+                'created_by': _supabaseService.currentUser?.id,
               });
         } catch (e) {
           print('Error creating survey in Supabase: $e');
@@ -157,13 +165,24 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> saveCurrentPageData() async {
-    if (state.phoneNumber == null) return;
+    if (state.phoneNumber == null) {
+      print('❌ saveCurrentPageData: phoneNumber is null, skipping save');
+      return;
+    }
 
     try {
+      print('💾 saveCurrentPageData: Saving page ${state.currentPage} for phone ${state.phoneNumber}');
+      print('📊 Survey data keys: ${state.surveyData.keys.toList()}');
+      
       // Save data based on current page
       await _savePageData(state.currentPage, state.surveyData);
+
+      // Also trigger partial survey sync to ensure progress is saved
+      await syncPartialSurvey();
+      
+      print('✅ saveCurrentPageData: Successfully saved page ${state.currentPage}');
     } catch (e) {
-      print('Error saving page data: $e');
+      print('❌ saveCurrentPageData: Error saving page data: $e');
     }
   }
 
@@ -707,6 +726,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
       case 1: // Family details page
         await _replaceTable('family_members');
         if (data['family_members'] != null) {
+          print('👥 _savePageData: Saving ${data['family_members'].length} family members');
           int srNo = 0;
           for (final member in data['family_members']) {
             srNo++;
@@ -732,6 +752,8 @@ class SurveyNotifier extends Notifier<SurveyState> {
               'insurance_company': member['insurance_company'],
             });
           }
+        } else {
+          print('❌ _savePageData: No family_members data found');
         }
         await _syncPageDataToSupabase(page, data);
         break;
@@ -761,6 +783,8 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _syncPageDataToSupabase(page, data);
         break;
       case 5: // Land Holding
+        print('🌾 _savePageData: Saving land holding data');
+        print('📊 Land data keys: ${data.keys.where((k) => k.contains('land') || k.contains('irrigated') || k.contains('cultivable') || k.contains('mango') || k.contains('guava')).toList()}');
         await _replaceTable('land_holding');
         await _databaseService.saveData('land_holding', {
           'phone_number': state.phoneNumber,
@@ -1650,9 +1674,11 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   void updateSurveyDataMap(Map<String, dynamic> data) {
+    print('📝 updateSurveyDataMap: Updating survey data with ${data.keys.length} keys');
     final newData = Map<String, dynamic>.from(state.surveyData);
     newData.addAll(data);
     state = state.copyWith(surveyData: newData);
+    print('✅ updateSurveyDataMap: Survey data now has ${state.surveyData.keys.length} keys');
   }
 
   Future<void> savePageData(int page, Map<String, dynamic> data) async {
@@ -1663,14 +1689,30 @@ class SurveyNotifier extends Notifier<SurveyState> {
     state = state.copyWith(isLoading: loading);
   }
 
+  Future<void> syncPartialSurvey() async {
+    if (state.phoneNumber != null && await _supabaseService.isOnline()) {
+      try {
+        // Sync current page data to Supabase
+        await _syncService.syncFamilyPageData(
+          state.phoneNumber!,
+          state.currentPage,
+          state.surveyData,
+        );
+      } catch (e) {
+        print('Error syncing partial survey: $e');
+      }
+    }
+  }
+
   Future<void> completeSurvey() async {
     if (state.phoneNumber != null) {
       await saveCurrentPageData();
       await _databaseService.updateSurveyStatus(state.phoneNumber!, 'completed');
-      
+
       // Sync complete survey to Supabase if online
       if (await _supabaseService.isOnline()) {
         try {
+          // Update status in Supabase
           await _supabaseService.client
               .from('family_survey_sessions')
               .update({
@@ -1678,6 +1720,9 @@ class SurveyNotifier extends Notifier<SurveyState> {
                 'updated_at': DateTime.now().toIso8601String(),
               })
               .eq('phone_number', state.phoneNumber!);
+
+          // Immediately trigger full sync of the survey to Supabase
+          await _syncService.syncSurveyImmediately(state.phoneNumber!);
         } catch (e) {
           print('Error updating survey completion status in Supabase: $e');
         }
@@ -1730,8 +1775,12 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> _syncPageDataToSupabase(int page, Map<String, dynamic> data) async {
-    if (state.phoneNumber == null) return;
+    if (state.phoneNumber == null) {
+      print('❌ _syncPageDataToSupabase: phoneNumber is null');
+      return;
+    }
 
+    print('🔄 _syncPageDataToSupabase: Syncing page $page for ${state.phoneNumber}');
     await _databaseService.markFamilyPageCompleted(state.phoneNumber!, page);
 
     // Sync immediately if possible, otherwise queue fallback
@@ -1742,10 +1791,68 @@ class SurveyNotifier extends Notifier<SurveyState> {
     );
   }
 
+  /// Update existing surveys with correct surveyor email after authentication
+  Future<void> updateExistingSurveyEmails() async {
+    try {
+      final currentUser = _supabaseService.currentUser;
+      if (currentUser == null || currentUser.email == null) {
+        print('No authenticated user found for email update');
+        return;
+      }
+
+      final userEmail = currentUser.email!;
+      print('Updating existing surveys with email: $userEmail');
+
+      // Get all surveys that have 'unknown' or null surveyor_email
+      final db = await _databaseService.database;
+      final surveysToUpdate = await db.query(
+        'family_survey_sessions',
+        where: 'surveyor_email IS NULL OR surveyor_email = ?',
+        whereArgs: ['unknown'],
+      );
+
+      print('Found ${surveysToUpdate.length} surveys to update');
+
+      for (final survey in surveysToUpdate) {
+        final phoneNumber = survey['phone_number'] as String?;
+        if (phoneNumber != null) {
+          await db.update(
+            'family_survey_sessions',
+            {
+              'surveyor_email': userEmail,
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'phone_number = ?',
+            whereArgs: [phoneNumber],
+          );
+          print('Updated survey $phoneNumber with email $userEmail');
+        }
+      }
+
+      // Now try to sync any surveys that were previously blocked due to auth issues
+      if (await _supabaseService.isOnline()) {
+        for (final survey in surveysToUpdate) {
+          final phoneNumber = survey['phone_number'] as String?;
+          if (phoneNumber != null) {
+            try {
+              await _syncService.syncSurveyImmediately(phoneNumber);
+              print('Successfully synced updated survey: $phoneNumber');
+            } catch (e) {
+              print('Failed to sync survey $phoneNumber: $e');
+            }
+          }
+        }
+      }
+
+    } catch (e) {
+      print('Error updating existing survey emails: $e');
+    }
+  }
+
   void reset() {
     state = const SurveyState(
       currentPage: 0,
-      totalPages: 31, // Pages indexed 0-30 in survey_page.dart
+      totalPages: 32, // Pages indexed 0-31 in survey_page.dart
       surveyData: {},
       isLoading: false,
     );

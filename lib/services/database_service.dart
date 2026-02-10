@@ -194,6 +194,19 @@ static Database? _database;
     );
   }
 
+  Future<void> updateVillageSurveySession(String sessionId, Map<String, dynamic> data) async {
+    final db = await database;
+    await db.update(
+      'village_survey_sessions',
+      {
+        ...data,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+    );
+  }
+
   Future<void> saveData(String tableName, Map<String, dynamic> data) async {
     final db = await database;
     await db.insert(tableName, data, conflictAlgorithm: ConflictAlgorithm.replace);
