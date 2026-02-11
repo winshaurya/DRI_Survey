@@ -1527,27 +1527,50 @@ class SyncService {
 
     try {
       final queueCopy = List<Map<String, dynamic>>.from(_syncQueue);
+      final successfulOperations = <int>[];
+      final failedOperations = <int>[];
 
       for (int i = 0; i < queueCopy.length; i++) {
         final operation = queueCopy[i];
         try {
           await _executeQueuedOperation(operation);
-          _syncQueue.removeAt(i);
-          i--; // Adjust index after removal
+          successfulOperations.add(i);
         } catch (e) {
           debugPrint('Failed to execute queued operation: $e');
           operation['retry_count'] = (operation['retry_count'] ?? 0) + 1;
+          operation['last_error'] = e.toString();
+          operation['last_attempt'] = DateTime.now().toIso8601String();
 
           // Remove from queue if max retries exceeded
           if (operation['retry_count'] >= 3) {
-            _syncQueue.removeAt(i);
-            i--;
+            failedOperations.add(i);
+            _escalateError('Operation failed permanently after 3 retries: ${operation['operation']} - $e', persistent: true);
           }
         }
       }
 
+      // Remove successful operations from queue (in reverse order to maintain indices)
+      successfulOperations.sort((a, b) => b.compareTo(a));
+      for (final index in successfulOperations) {
+        _syncQueue.removeAt(index);
+      }
+
+      // Remove permanently failed operations
+      failedOperations.sort((a, b) => b.compareTo(a));
+      for (final index in failedOperations) {
+        _syncQueue.removeAt(index);
+      }
+
       // Save updated queue
       await _saveSyncQueue();
+
+      // Report results
+      if (successfulOperations.isNotEmpty) {
+        debugPrint('✅ Successfully processed ${successfulOperations.length} queued operations');
+      }
+      if (failedOperations.isNotEmpty) {
+        debugPrint('❌ Permanently failed ${failedOperations.length} queued operations');
+      }
 
     } finally {
       _isProcessingQueue = false;
@@ -1690,6 +1713,12 @@ class SyncService {
     _ensureConnectivityMonitoringInitialized();
     if (!_isOnline) return;
 
+    // Check authentication before syncing
+    if (_supabaseService.currentUser == null) {
+      _escalateError('Authentication required. Please sign in with Google to sync data.', persistent: true);
+      throw Exception('Authentication required for syncing. Please sign in first.');
+    }
+
     await _performBackgroundSync();
   }
 
@@ -1701,8 +1730,20 @@ class SyncService {
     return _isOnline;
   }
 
+  bool get isAuthenticated => _supabaseService.currentUser != null;
+
   Stream<bool> get connectivityStream => Connectivity().onConnectivityChanged
       .map((result) => result != ConnectivityResult.none);
+
+  // Clear sync queue (useful for resetting stuck operations)
+  Future<void> clearSyncQueue() async {
+    _syncQueue.clear();
+    await _saveSyncQueue();
+    debugPrint('Sync queue cleared');
+  }
+
+  // Get current queue status
+  List<Map<String, dynamic>> get syncQueue => List.unmodifiable(_syncQueue);
 
   // Cleanup
   void dispose() {

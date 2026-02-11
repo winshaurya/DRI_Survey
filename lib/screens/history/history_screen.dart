@@ -204,7 +204,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
       );
       return;
     }
-    
+
     // Show loading indicator
     messenger.showSnackBar(
       const SnackBar(
@@ -225,10 +225,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
 
     try {
       await syncService.forceSyncAllPendingData();
-      
+
       // Reload sessions to reflect updated sync status
       await _loadSessions();
-      
+
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
         const SnackBar(
@@ -245,19 +245,45 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
       );
     } catch (e) {
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(child: Text('Sync failed: $e')),
-            ],
+
+      // Handle authentication error specifically
+      if (e.toString().contains('Authentication required')) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.login, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Please sign in with Google first to sync data.')),
+              ],
+            ),
+            backgroundColor: Colors.blue,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Sign In',
+              textColor: Colors.white,
+              onPressed: () {
+                // Navigate to auth screen
+                Navigator.pushReplacementNamed(context, '/auth');
+              },
+            ),
           ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Sync failed: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -482,6 +508,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
   Future<void> _showSyncStatusDialog(BuildContext context) async {
     final syncService = SyncService.instance;
     final isOnline = await syncService.isOnline;
+    final isAuthenticated = syncService.isAuthenticated;
 
     showDialog(
       context: context,
@@ -489,28 +516,60 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
         title: Row(
           children: [
             Icon(
-              isOnline ? Icons.cloud_done : Icons.cloud_off,
-              color: isOnline ? Colors.green : Colors.grey,
+              isOnline && isAuthenticated ? Icons.cloud_done : Icons.cloud_off,
+              color: isOnline && isAuthenticated ? Colors.green : Colors.grey,
             ),
             const SizedBox(width: 8),
-            Text(isOnline ? 'Online' : 'Offline'),
+            Text(isOnline && isAuthenticated ? 'Ready to Sync' : 'Sync Unavailable'),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Network Status: ${isOnline ? "Connected" : "Disconnected"}'),
+            Row(
+              children: [
+                Icon(
+                  isOnline ? Icons.wifi : Icons.wifi_off,
+                  size: 16,
+                  color: isOnline ? Colors.green : Colors.red,
+                ),
+                const SizedBox(width: 8),
+                Text('Network: ${isOnline ? "Connected" : "Disconnected"}'),
+              ],
+            ),
             const SizedBox(height: 8),
-            Text('Auto-sync: ${isOnline ? "Active (every 5 min)" : "Paused"}'),
+            Row(
+              children: [
+                Icon(
+                  isAuthenticated ? Icons.verified_user : Icons.login,
+                  size: 16,
+                  color: isAuthenticated ? Colors.green : Colors.red,
+                ),
+                const SizedBox(width: 8),
+                Text('Authentication: ${isAuthenticated ? "Signed In" : "Required"}'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text('Auto-sync: ${isOnline && isAuthenticated ? "Active (every 5 min)" : "Paused"}'),
             const SizedBox(height: 16),
-            const Text(
-              'Pending surveys will sync automatically when online.',
+            Text(
+              isAuthenticated
+                ? 'Pending surveys will sync automatically when online.'
+                : 'Please sign in with Google to enable syncing.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
         ),
         actions: [
+          if (!isAuthenticated)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pushReplacementNamed(context, '/auth');
+              },
+              child: const Text('Sign In'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),
