@@ -64,6 +64,7 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
       'internal_condition': _internalCondition,
       'internal_remarks': _internalRemarks,
       'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
     };
 
     try {

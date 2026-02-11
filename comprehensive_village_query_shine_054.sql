@@ -333,8 +333,8 @@ SELECT
   -- SEED CLUBS (village_seed_clubs)
   -- ===========================================
   json_build_object(
-    'clubs_available', vsc.clubs_available,
-    'total_clubs', vsc.total_clubs
+    'clubs_available', vsc_clubs.clubs_available,
+    'total_clubs', vsc_clubs.total_clubs
   ) as seed_clubs_data,
 
   -- ===========================================
@@ -368,16 +368,16 @@ SELECT
   -- DRAINAGE & WASTE (village_drainage_waste)
   -- ===========================================
   json_build_object(
-    'earthen_drain', vdw.earthen_drain,
-    'masonry_drain', vdw.masonry_drain,
-    'covered_drain', vdw.covered_drain,
-    'open_channel', vdw.open_channel,
-    'no_drainage_system', vdw.no_drainage_system,
-    'drainage_destination', vdw.drainage_destination,
-    'drainage_remarks', vdw.drainage_remarks,
-    'waste_collected_regularly', vdw.waste_collected_regularly,
-    'waste_segregated', vdw.waste_segregated,
-    'waste_remarks', vdw.waste_remarks
+    'earthen_drain', vdw_waste.earthen_drain,
+    'masonry_drain', vdw_waste.masonry_drain,
+    'covered_drain', vdw_waste.covered_drain,
+    'open_channel', vdw_waste.open_channel,
+    'no_drainage_system', vdw_waste.no_drainage_system,
+    'drainage_destination', vdw_waste.drainage_destination,
+    'drainage_remarks', vdw_waste.drainage_remarks,
+    'waste_collected_regularly', vdw_waste.waste_collected_regularly,
+    'waste_segregated', vdw_waste.waste_segregated,
+    'waste_remarks', vdw_waste.waste_remarks
   ) as drainage_waste_data,
 
   -- ===========================================
@@ -561,4 +561,4 @@ LEFT JOIN village_survey_details vsd ON vsd.session_id = vss.session_id
 LEFT JOIN village_forest_maps vfm ON vfm.session_id = vss.session_id
 LEFT JOIN village_cadastral_maps vcm ON vcm.session_id = vss.session_id
 
-WHERE vss.shine_code = 'SHINE_054';
+WHERE vss.shine_code = 'SHINE_001';

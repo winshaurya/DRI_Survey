@@ -41,6 +41,7 @@ class SyncService {
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
   Timer? _syncTimer;
   bool _isOnline = false;
+  bool _connectivityInitialized = false;
 
   // Progress and error reporting
   final StreamController<SyncProgress> _progressController = StreamController<SyncProgress>.broadcast();
@@ -159,12 +160,16 @@ class SyncService {
     // Lazy initialization to make service testable
     _supabaseService = SupabaseService.instance;
     _fileUploadService = FileUploadService.instance;
-    // Connectivity monitoring will be initialized lazily when needed
+    // Initialize connectivity monitoring and load queue
+    _ensureConnectivityMonitoringInitialized();
     loadSyncQueue();
   }
 
   void _ensureConnectivityMonitoringInitialized() {
-    // Connectivity monitoring is now initialized in constructor
+    if (_connectivityInitialized) return;
+    _connectivityInitialized = true;
+    // Initialize connectivity monitoring asynchronously (do not await here)
+    _initializeConnectivityMonitoring();
   }
 
   // Public method to check if online (ensures connectivity monitoring is initialized)

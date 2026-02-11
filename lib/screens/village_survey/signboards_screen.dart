@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import 'seed_clubs_screen.dart';
 import 'social_map_screen.dart';
@@ -31,13 +32,28 @@ class _SignboardsScreenState extends State<SignboardsScreen> {
       return;
     }
 
+    // Check authentication before syncing
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final currentUser = supabaseService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User not authenticated. Please login again.')),
+        );
+      }
+      return;
+    }
+
     final data = {
       'id': const Uuid().v4(),
       'session_id': sessionId,
+      'signboard_type': '',
+      'location': '',
       'signboards': _signboardsController.text,
       'info_boards': _infoBoardsController.text,
       'wall_writing': _wallWritingController.text,
       'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
     };
 
     try {
@@ -74,42 +90,21 @@ class _SignboardsScreenState extends State<SignboardsScreen> {
     return Scaffold(
       backgroundColor: Color(0xFFF5F5F5),
       body: Column(children: [
-        // Header - Made more compact
+        // Header - compact (Govt/platform labels removed)
         Container(
           padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           color: Colors.white,
-          child: Column(children: [
-            Text('Government of India', 
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Signboards', 
               style: TextStyle(
                 fontSize: 18, 
                 fontWeight: FontWeight.bold, 
                 color: Color(0xFF003366)
               ),
-              textAlign: TextAlign.center,
             ),
-            SizedBox(height: 4),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 6,
-              runSpacing: 2,
-              children: [
-                Text('Digital India', 
-                  style: TextStyle(
-                    fontSize: 14, 
-                    color: Color(0xFFFF9933), 
-                    fontWeight: FontWeight.w600
-                  )
-                ),
-                Text('Power To Empower', 
-                  style: TextStyle(
-                    fontSize: 13, 
-                    color: Color(0xFF138808), 
-                    fontStyle: FontStyle.italic
-                  )
-                ),
-              ],
-            ),
-          ]),
+          ),
+        ),
         ),
 
         // Main Content

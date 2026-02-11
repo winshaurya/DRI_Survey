@@ -8,6 +8,7 @@ import 'forest_map_screen.dart'; // Import the previous screen
 import 'village_survey_preview_page.dart';
 import '../../services/file_upload_service.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 
 class BiodiversityRegisterScreen extends StatefulWidget {
@@ -182,6 +183,18 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
       return;
     }
 
+    // Check authentication before syncing
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final currentUser = supabaseService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User not authenticated. Please login again.')),
+        );
+      }
+      return;
+    }
+
     final data = {
       'id': const Uuid().v4(),
       'session_id': _currentSessionId,
@@ -280,45 +293,18 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header - Made more compact
+            // Header - compact (Govt/platform labels removed)
             Container(
-              height: 90, // Reduced from 100
+              height: 60,
               color: Colors.white,
               padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Government of India', 
-                    style: TextStyle(
-                      fontSize: 18, // Reduced from 22
-                      fontWeight: FontWeight.bold, 
-                      color: Color(0xFF003366)
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 4),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 6,
-                    runSpacing: 2,
-                    children: [
-                      Text('Digital India', 
-                        style: TextStyle(
-                          fontSize: 14, // Reduced from 16
-                          color: Color(0xFFFF9933), 
-                          fontWeight: FontWeight.w600
-                        )
-                      ),
-                      Text('Power To Empower', 
-                        style: TextStyle(
-                          fontSize: 13, // Reduced from 14
-                          color: Color(0xFF138808), 
-                          fontStyle: FontStyle.italic
-                        )
-                      ),
-                    ],
-                  ),
-                ],
+              alignment: Alignment.centerLeft,
+              child: Text('Biodiversity Register',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF003366),
+                ),
               ),
             ),
             

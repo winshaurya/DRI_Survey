@@ -67,6 +67,7 @@ class DatabaseHelper {
     await _ensureFamilySessionColumns(db);
     await _ensureLandHoldingColumns(db);
     await _ensureCropProductivityColumns(db);
+    await _ensureVillageEducationalFacilitiesColumns(db);
     await _ensureSchemeMemberTables(db);
     await _ensureSocialMapLinkColumns(db);
     if (oldVersion < 38) {
@@ -96,6 +97,10 @@ class DatabaseHelper {
 
   Future<void> _ensureCropProductivityColumns(Database db) async {
     await _addColumnIfMissing(db, 'crop_productivity', 'season', 'TEXT');
+  }
+
+  Future<void> _ensureVillageEducationalFacilitiesColumns(Database db) async {
+    await _addColumnIfMissing(db, 'village_educational_facilities', 'colleges', 'INTEGER DEFAULT 0');
   }
 
   Future<void> _ensureSocialConsciousnessColumns(Database db) async {
@@ -868,6 +873,7 @@ class DatabaseHelper {
         middle_schools INTEGER DEFAULT 0,
         secondary_schools INTEGER DEFAULT 0,
         higher_secondary_schools INTEGER DEFAULT 0,
+        colleges INTEGER DEFAULT 0,
         anganwadi_centers INTEGER DEFAULT 0,
         skill_development_centers INTEGER DEFAULT 0,
         shiksha_guarantee_centers INTEGER DEFAULT 0,

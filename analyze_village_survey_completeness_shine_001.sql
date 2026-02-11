@@ -1,80 +1,87 @@
- -- ===========================================
--- VILLAGE SURVEY COMPLETENESS ANALYSIS FOR SHINE_019
+-- ===========================================
+-- VILLAGE SURVEY COMPLETENESS ANALYSIS FOR SHINE_001
 -- ===========================================
 -- This query analyzes every village survey table to determine:
 -- 1. How many tables have data vs are completely empty
 -- 2. How many columns are filled vs null/empty in each table
 -- 3. Overall completeness percentage
+--
+-- Usage:
+-- - Supabase SQL editor: Open the SQL editor, paste the entire file and run.
+-- - psql / local Postgres: Save file and run `psql -h HOST -U USER -d DB -f analyze_village_survey_completeness_shine_001.sql`
+-- - Export to CSV (psql): e.g.
+--   \copy (SELECT * FROM village_table_existence_summary) TO 'village_table_existence_shine_001.csv' CSV HEADER;
+-- Note: This script targets SHINE_001. To run for a different shine code, replace 'SHINE_001' with the desired code.
 
 -- First, let's check which tables have ANY data for this shine_code
 WITH village_table_existence AS (
     SELECT
         'village_survey_sessions' as table_name,
-        CASE WHEN EXISTS (SELECT 1 FROM village_survey_sessions WHERE shine_code = 'SHINE_019') THEN 1 ELSE 0 END as has_data
+        CASE WHEN EXISTS (SELECT 1 FROM village_survey_sessions WHERE shine_code = 'SHINE_001') THEN 1 ELSE 0 END as has_data
     UNION ALL
-    SELECT 'village_population', CASE WHEN EXISTS (SELECT 1 FROM village_population WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_population', CASE WHEN EXISTS (SELECT 1 FROM village_population WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_farm_families', CASE WHEN EXISTS (SELECT 1 FROM village_farm_families WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_farm_families', CASE WHEN EXISTS (SELECT 1 FROM village_farm_families WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_housing', CASE WHEN EXISTS (SELECT 1 FROM village_housing WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_housing', CASE WHEN EXISTS (SELECT 1 FROM village_housing WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_agricultural_implements', CASE WHEN EXISTS (SELECT 1 FROM village_agricultural_implements WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_agricultural_implements', CASE WHEN EXISTS (SELECT 1 FROM village_agricultural_implements WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_crop_productivity', CASE WHEN EXISTS (SELECT 1 FROM village_crop_productivity WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_crop_productivity', CASE WHEN EXISTS (SELECT 1 FROM village_crop_productivity WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_animals', CASE WHEN EXISTS (SELECT 1 FROM village_animals WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_animals', CASE WHEN EXISTS (SELECT 1 FROM village_animals WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_irrigation_facilities', CASE WHEN EXISTS (SELECT 1 FROM village_irrigation_facilities WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_irrigation_facilities', CASE WHEN EXISTS (SELECT 1 FROM village_irrigation_facilities WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_drinking_water', CASE WHEN EXISTS (SELECT 1 FROM village_drinking_water WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_drinking_water', CASE WHEN EXISTS (SELECT 1 FROM village_drinking_water WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_transport', CASE WHEN EXISTS (SELECT 1 FROM village_transport WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_transport', CASE WHEN EXISTS (SELECT 1 FROM village_transport WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_entertainment', CASE WHEN EXISTS (SELECT 1 FROM village_entertainment WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_entertainment', CASE WHEN EXISTS (SELECT 1 FROM village_entertainment WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_medical_treatment', CASE WHEN EXISTS (SELECT 1 FROM village_medical_treatment WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_medical_treatment', CASE WHEN EXISTS (SELECT 1 FROM village_medical_treatment WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_disputes', CASE WHEN EXISTS (SELECT 1 FROM village_disputes WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_disputes', CASE WHEN EXISTS (SELECT 1 FROM village_disputes WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_educational_facilities', CASE WHEN EXISTS (SELECT 1 FROM village_educational_facilities WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_educational_facilities', CASE WHEN EXISTS (SELECT 1 FROM village_educational_facilities WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_social_consciousness', CASE WHEN EXISTS (SELECT 1 FROM village_social_consciousness WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_social_consciousness', CASE WHEN EXISTS (SELECT 1 FROM village_social_consciousness WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_children_data', CASE WHEN EXISTS (SELECT 1 FROM village_children_data WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_children_data', CASE WHEN EXISTS (SELECT 1 FROM village_children_data WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_malnutrition_data', CASE WHEN EXISTS (SELECT 1 FROM village_malnutrition_data WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_malnutrition_data', CASE WHEN EXISTS (SELECT 1 FROM village_malnutrition_data WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_bpl_families', CASE WHEN EXISTS (SELECT 1 FROM village_bpl_families WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_bpl_families', CASE WHEN EXISTS (SELECT 1 FROM village_bpl_families WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_kitchen_gardens', CASE WHEN EXISTS (SELECT 1 FROM village_kitchen_gardens WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_kitchen_gardens', CASE WHEN EXISTS (SELECT 1 FROM village_kitchen_gardens WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_seed_clubs', CASE WHEN EXISTS (SELECT 1 FROM village_seed_clubs WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_seed_clubs', CASE WHEN EXISTS (SELECT 1 FROM village_seed_clubs WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_biodiversity_register', CASE WHEN EXISTS (SELECT 1 FROM village_biodiversity_register WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_biodiversity_register', CASE WHEN EXISTS (SELECT 1 FROM village_biodiversity_register WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_traditional_occupations', CASE WHEN EXISTS (SELECT 1 FROM village_traditional_occupations WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_traditional_occupations', CASE WHEN EXISTS (SELECT 1 FROM village_traditional_occupations WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_drainage_waste', CASE WHEN EXISTS (SELECT 1 FROM village_drainage_waste WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_drainage_waste', CASE WHEN EXISTS (SELECT 1 FROM village_drainage_waste WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_signboards', CASE WHEN EXISTS (SELECT 1 FROM village_signboards WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_signboards', CASE WHEN EXISTS (SELECT 1 FROM village_signboards WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_unemployment', CASE WHEN EXISTS (SELECT 1 FROM village_unemployment WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_unemployment', CASE WHEN EXISTS (SELECT 1 FROM village_unemployment WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_social_maps', CASE WHEN EXISTS (SELECT 1 FROM village_social_maps WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_social_maps', CASE WHEN EXISTS (SELECT 1 FROM village_social_maps WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_transport_facilities', CASE WHEN EXISTS (SELECT 1 FROM village_transport_facilities WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_transport_facilities', CASE WHEN EXISTS (SELECT 1 FROM village_transport_facilities WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_infrastructure', CASE WHEN EXISTS (SELECT 1 FROM village_infrastructure WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_infrastructure', CASE WHEN EXISTS (SELECT 1 FROM village_infrastructure WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_infrastructure_details', CASE WHEN EXISTS (SELECT 1 FROM village_infrastructure_details WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_infrastructure_details', CASE WHEN EXISTS (SELECT 1 FROM village_infrastructure_details WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_survey_details', CASE WHEN EXISTS (SELECT 1 FROM village_survey_details WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_survey_details', CASE WHEN EXISTS (SELECT 1 FROM village_survey_details WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_map_points', CASE WHEN EXISTS (SELECT 1 FROM village_map_points WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_map_points', CASE WHEN EXISTS (SELECT 1 FROM village_map_points WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_forest_maps', CASE WHEN EXISTS (SELECT 1 FROM village_forest_maps WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_forest_maps', CASE WHEN EXISTS (SELECT 1 FROM village_forest_maps WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
     UNION ALL
-    SELECT 'village_cadastral_maps', CASE WHEN EXISTS (SELECT 1 FROM village_cadastral_maps WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019')) THEN 1 ELSE 0 END
+    SELECT 'village_cadastral_maps', CASE WHEN EXISTS (SELECT 1 FROM village_cadastral_maps WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001')) THEN 1 ELSE 0 END
 )
 
 SELECT
@@ -86,9 +93,9 @@ SELECT
 FROM village_table_existence;
 
 -- Now let's analyze column completeness for tables that have data
--- Get the session_id for SHINE_019
+-- Get the session_id for SHINE_001
 WITH session_data AS (
-    SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019'
+    SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001'
 )
 
 -- VILLAGE_SURVEY_SESSIONS analysis
@@ -107,7 +114,7 @@ SELECT
     SUM(CASE WHEN shine_code IS NOT NULL AND shine_code != '' THEN 1 ELSE 0 END) as shine_code_filled,
     SUM(CASE WHEN status IS NOT NULL AND status != '' THEN 1 ELSE 0 END) as status_filled
 FROM village_survey_sessions
-WHERE shine_code = 'SHINE_019';
+WHERE shine_code = 'SHINE_001';
 
 -- VILLAGE_POPULATION analysis
 SELECT
@@ -128,7 +135,7 @@ SELECT
     SUM(CASE WHEN working_population IS NOT NULL THEN 1 ELSE 0 END) as working_population_filled,
     SUM(CASE WHEN unemployed_population IS NOT NULL THEN 1 ELSE 0 END) as unemployed_population_filled
 FROM village_population
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_HOUSING analysis
 SELECT
@@ -150,7 +157,7 @@ SELECT
     SUM(CASE WHEN houses_with_solar IS NOT NULL THEN 1 ELSE 0 END) as houses_with_solar_filled,
     SUM(CASE WHEN houses_with_electricity IS NOT NULL THEN 1 ELSE 0 END) as houses_with_electricity_filled
 FROM village_housing
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_AGRICULTURAL_IMPLEMENTS analysis
 SELECT
@@ -164,7 +171,7 @@ SELECT
     SUM(CASE WHEN diesel_engine_available IS NOT NULL THEN 1 ELSE 0 END) as diesel_engine_available_filled,
     SUM(CASE WHEN other_implements IS NOT NULL AND other_implements != '' THEN 1 ELSE 0 END) as other_implements_filled
 FROM village_agricultural_implements
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_CROP_PRODUCTIVITY analysis
 SELECT
@@ -178,7 +185,7 @@ SELECT
     SUM(CASE WHEN quantity_consumed_quintal IS NOT NULL THEN 1 ELSE 0 END) as quantity_consumed_filled,
     SUM(CASE WHEN quantity_sold_quintal IS NOT NULL THEN 1 ELSE 0 END) as quantity_sold_filled
 FROM village_crop_productivity
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_ANIMALS analysis
 SELECT
@@ -189,7 +196,7 @@ SELECT
     SUM(CASE WHEN total_count IS NOT NULL THEN 1 ELSE 0 END) as total_count_filled,
     SUM(CASE WHEN breed IS NOT NULL AND breed != '' THEN 1 ELSE 0 END) as breed_filled
 FROM village_animals
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_IRRIGATION_FACILITIES analysis
 SELECT
@@ -202,7 +209,7 @@ SELECT
     SUM(CASE WHEN has_well IS NOT NULL THEN 1 ELSE 0 END) as has_well_filled,
     SUM(CASE WHEN other_sources IS NOT NULL AND other_sources != '' THEN 1 ELSE 0 END) as other_sources_filled
 FROM village_irrigation_facilities
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_DRINKING_WATER analysis
 SELECT
@@ -217,7 +224,7 @@ SELECT
     SUM(CASE WHEN nal_jal_available IS NOT NULL THEN 1 ELSE 0 END) as nal_jal_available_filled,
     SUM(CASE WHEN other_sources IS NOT NULL AND other_sources != '' THEN 1 ELSE 0 END) as other_sources_filled
 FROM village_drinking_water
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_TRANSPORT analysis
 SELECT
@@ -230,7 +237,7 @@ SELECT
     SUM(CASE WHEN pickup_trucks_available IS NOT NULL THEN 1 ELSE 0 END) as pickup_trucks_available_filled,
     SUM(CASE WHEN bullock_carts_available IS NOT NULL THEN 1 ELSE 0 END) as bullock_carts_available_filled
 FROM village_transport
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_ENTERTAINMENT analysis
 SELECT
@@ -247,7 +254,7 @@ SELECT
     SUM(CASE WHEN games_available IS NOT NULL THEN 1 ELSE 0 END) as games_available_filled,
     SUM(CASE WHEN other_entertainment IS NOT NULL AND other_entertainment != '' THEN 1 ELSE 0 END) as other_entertainment_filled
 FROM village_entertainment
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_MEDICAL_TREATMENT analysis
 SELECT
@@ -260,7 +267,7 @@ SELECT
     SUM(CASE WHEN other_treatment IS NOT NULL AND other_treatment != '' THEN 1 ELSE 0 END) as other_treatment_filled,
     SUM(CASE WHEN preference_order IS NOT NULL AND preference_order != '' THEN 1 ELSE 0 END) as preference_order_filled
 FROM village_medical_treatment
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_DISPUTES analysis
 SELECT
@@ -280,7 +287,9 @@ SELECT
     SUM(CASE WHEN other_registered IS NOT NULL THEN 1 ELSE 0 END) as other_registered_filled,
     SUM(CASE WHEN other_period IS NOT NULL AND other_period != '' THEN 1 ELSE 0 END) as other_period_filled
 FROM village_disputes
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
+
+-- (remaining analyses unchanged, all using SHINE_001)
 
 -- VILLAGE_EDUCATIONAL_FACILITIES analysis
 SELECT
@@ -296,7 +305,7 @@ SELECT
     SUM(CASE WHEN other_facility_name IS NOT NULL AND other_facility_name != '' THEN 1 ELSE 0 END) as other_facility_name_filled,
     SUM(CASE WHEN other_facility_count IS NOT NULL THEN 1 ELSE 0 END) as other_facility_count_filled
 FROM village_educational_facilities
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_SOCIAL_CONSCIOUSNESS analysis
 SELECT
@@ -337,7 +346,7 @@ SELECT
     SUM(CASE WHEN saving_habit IS NOT NULL AND saving_habit != '' THEN 1 ELSE 0 END) as saving_habit_filled,
     SUM(CASE WHEN saving_percentage IS NOT NULL AND saving_percentage != '' THEN 1 ELSE 0 END) as saving_percentage_filled
 FROM village_social_consciousness
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_CHILDREN_DATA analysis
 SELECT
@@ -348,7 +357,7 @@ SELECT
     SUM(CASE WHEN malnourished_children IS NOT NULL THEN 1 ELSE 0 END) as malnourished_children_filled,
     SUM(CASE WHEN children_in_school IS NOT NULL THEN 1 ELSE 0 END) as children_in_school_filled
 FROM village_children_data
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_BIODIVERSITY_REGISTER analysis
 SELECT
@@ -360,7 +369,7 @@ SELECT
     SUM(CASE WHEN components IS NOT NULL AND components != '' THEN 1 ELSE 0 END) as components_filled,
     SUM(CASE WHEN knowledge IS NOT NULL AND knowledge != '' THEN 1 ELSE 0 END) as knowledge_filled
 FROM village_biodiversity_register
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_DRAINAGE_WASTE analysis
 SELECT
@@ -377,7 +386,7 @@ SELECT
     SUM(CASE WHEN waste_segregated IS NOT NULL THEN 1 ELSE 0 END) as waste_segregated_filled,
     SUM(CASE WHEN waste_remarks IS NOT NULL AND waste_remarks != '' THEN 1 ELSE 0 END) as waste_remarks_filled
 FROM village_drainage_waste
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');
 
 -- VILLAGE_UNEMPLOYMENT analysis
 SELECT
@@ -387,4 +396,4 @@ SELECT
     SUM(CASE WHEN unemployed_adults IS NOT NULL THEN 1 ELSE 0 END) as unemployed_adults_filled,
     SUM(CASE WHEN total_unemployed IS NOT NULL THEN 1 ELSE 0 END) as total_unemployed_filled
 FROM village_unemployment
-WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_019');
+WHERE session_id IN (SELECT session_id FROM village_survey_sessions WHERE shine_code = 'SHINE_001');

@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import 'educational_facilities_screen.dart';
 import 'irrigation_facilities_screen.dart';
@@ -64,11 +65,25 @@ class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
       return;
     }
 
+    // Check authentication before syncing
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final currentUser = supabaseService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User not authenticated. Please login again.')),
+        );
+      }
+      return;
+    }
+
     try {
       // Prepare drainage data
       final drainageData = {
         'id': const Uuid().v4(),
         'session_id': sessionId,
+        'drainage_system_available': _selectedDrainageTypes.values.any((selected) => selected) ? 1 : 0,
+        'waste_management_system': (_hasWasteCollection || _hasWasteSegregation) ? 1 : 0,
         'earthen_drain': _selectedDrainageTypes[_getDrainageOptions(AppLocalizations.of(context)!) [0]] ?? false ? 1 : 0,
         'masonry_drain': _selectedDrainageTypes[_getDrainageOptions(AppLocalizations.of(context)!) [1]] ?? false ? 1 : 0,
         'covered_drain': _selectedDrainageTypes[_getDrainageOptions(AppLocalizations.of(context)!) [2]] ?? false ? 1 : 0,
@@ -80,7 +95,6 @@ class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
         'waste_segregated': _hasWasteSegregation ? 1 : 0,
         'waste_remarks': wasteRemarksController.text.trim(),
         'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
       };
 
       // 1. Save to SQLite

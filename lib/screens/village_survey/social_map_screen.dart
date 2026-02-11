@@ -8,6 +8,7 @@ import 'signboards_screen.dart';
 import 'survey_details_screen.dart';
 import '../../services/file_upload_service.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 
 class SocialMapScreen extends StatefulWidget {
@@ -214,6 +215,18 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
       return;
     }
 
+    // Check authentication before syncing
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final currentUser = supabaseService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User not authenticated. Please login again.')),
+        );
+      }
+      return;
+    }
+
     final existing = await databaseService.getVillageData('village_social_maps', _currentSessionId!);
     final existingRow = existing.isNotEmpty ? existing.first : <String, dynamic>{};
 
@@ -234,6 +247,7 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
       'transect_file_link': _existingLink('transect_file_link'),
       'cadastral_file_link': _existingLink('cadastral_file_link'),
       'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
     };
 
     try {

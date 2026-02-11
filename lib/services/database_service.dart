@@ -453,7 +453,7 @@ static Database? _database;
   Future<void> insertOrUpdate(String tableName, Map<String, dynamic> data, String sessionId) async {
     final db = await database;
     final columns = await _getTableColumns(db, tableName);
-    
+
     // Check if record exists
     final existing = await db.query(
       tableName,
@@ -461,7 +461,7 @@ static Database? _database;
       whereArgs: [sessionId],
       limit: 1,
     );
-    
+
     final dataWithTimestamp = <String, dynamic>{
       ...data,
       'session_id': sessionId,
@@ -470,18 +470,23 @@ static Database? _database;
     if (columns.contains('updated_at')) {
       dataWithTimestamp['updated_at'] = DateTime.now().toIso8601String();
     }
-    
+
+    // Filter to known columns only to prevent unknown-column errors
+    final filteredData = Map<String, dynamic>.fromEntries(
+      dataWithTimestamp.entries.where((e) => columns.contains(e.key))
+    );
+
     if (existing.isEmpty) {
       // Insert new
       if (columns.contains('created_at')) {
-        dataWithTimestamp['created_at'] = DateTime.now().toIso8601String();
+        filteredData['created_at'] = DateTime.now().toIso8601String();
       }
-      await db.insert(tableName, dataWithTimestamp);
+      await db.insert(tableName, filteredData);
     } else {
       // Update existing
       await db.update(
         tableName,
-        dataWithTimestamp,
+        filteredData,
         where: 'session_id = ?',
         whereArgs: [sessionId],
       );

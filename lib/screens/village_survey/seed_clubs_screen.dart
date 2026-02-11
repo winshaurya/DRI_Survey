@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import 'irrigation_facilities_screen.dart'; // Import the previous screen
 import 'signboards_screen.dart';
@@ -29,13 +30,25 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
       return;
     }
 
+    // Check authentication before syncing
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final currentUser = supabaseService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User not authenticated. Please login again.')),
+        );
+      }
+      return;
+    }
+
     final int clubsCount = int.tryParse(_seedClubsController.text) ?? 0;
 
     final data = {
       'id': const Uuid().v4(),
       'session_id': sessionId,
-      'clubs_available': clubsCount > 0 ? 1 : 0,
       'total_clubs': clubsCount,
+      'clubs_available': clubsCount > 0 ? 1 : 0,
       'created_at': DateTime.now().toIso8601String(),
     };
 
@@ -75,28 +88,11 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
     return Scaffold(
       backgroundColor: Color(0xFFF5F5F5),
       body: Column(children: [
-        // Header
+        // Header (Govt/platform labels removed)
         Container(
-          padding: EdgeInsets.symmetric(vertical: 15),
+          padding: EdgeInsets.symmetric(vertical: 12),
           color: Colors.white,
-          child: Column(children: [
-            Text('Government of India', style: TextStyle(
-              fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF003366)
-            )),
-            SizedBox(height: 5),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Digital India', style: TextStyle(
-                  fontSize: 16, color: Color(0xFFFF9933), fontWeight: FontWeight.w600
-                )),
-                SizedBox(width: 8),
-                Text('Power To Empower', style: TextStyle(
-                  fontSize: 14, color: Color(0xFF138808), fontStyle: FontStyle.italic
-                )),
-              ],
-            ),
-            SizedBox(height: 5),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Text('Step 7', style: TextStyle(
               fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF800080)
             )),

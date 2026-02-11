@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import 'detailed_map_screen.dart'; // Import the previous screen
 import 'forest_map_screen.dart';
@@ -55,7 +56,7 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final syncService = SyncService.instance;
-    
+
     // Get session ID (ensure DatabaseService is updated to return String ID)
     final sessionId = databaseService.currentSessionId;
 
@@ -63,6 +64,18 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
            const SnackBar(content: Text('Error: No active session found')),
+        );
+      }
+      return;
+    }
+
+    // Check authentication before syncing
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final currentUser = supabaseService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User not authenticated. Please login again.')),
         );
       }
       return;
@@ -76,6 +89,7 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
       'availability_status': availabilityStatusController.text,
       'image_path': _selectedImage?.path,
       'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
     };
 
     try {
@@ -121,59 +135,9 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Government of India Header
-            Container(
-              width: double.infinity,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.3),
-                    blurRadius: 5,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Government of India',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF003366),
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Digital India',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFF9933),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        Text(
-                          'Power To Empower',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF138808),
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+            // Header removed (Govt/Platform labels stripped)
+            SizedBox(height: 12),
+
               ),
             ),
             

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import 'cadastral_map_screen.dart'; // Import the previous screen
 import 'biodiversity_register_screen.dart';
@@ -16,7 +17,7 @@ class ForestMapScreen extends StatefulWidget {
 
 class _ForestMapScreenState extends State<ForestMapScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+
   TextEditingController forestAreaController = TextEditingController();
   TextEditingController forestTypesController = TextEditingController();
   TextEditingController forestResourcesController = TextEditingController();
@@ -35,6 +36,18 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
       return;
     }
 
+    // Check authentication before syncing
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final currentUser = supabaseService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User not authenticated. Please login again.')),
+        );
+      }
+      return;
+    }
+
     final data = {
       'id': const Uuid().v4(),
       'session_id': sessionId,
@@ -44,6 +57,7 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
       'conservation_status': conservationStatusController.text,
       'remarks': remarksController.text,
       'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
     };
 
     try {
@@ -82,48 +96,9 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Government of India Header
-            Container(
-              width: double.infinity,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.3),
-                    blurRadius: 5,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Government of India',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF003366),
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Digital India',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFF9933),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        Text(
-                          'Power To Empower',
+            // Header removed (Govt/Platform labels stripped)
+            SizedBox(height: 12),
+
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w500,
@@ -137,7 +112,7 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
                 ),
               ),
             ),
-            
+
             Container(
               padding: EdgeInsets.all(20),
               child: Form(
@@ -191,9 +166,9 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
                         ),
                       ),
                     ),
-                    
+
                     SizedBox(height: 25),
-                    
+
                     // Forest Area
                     Container(
                       padding: EdgeInsets.all(15),
@@ -232,9 +207,9 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
                         ],
                       ),
                     ),
-                    
+
                     SizedBox(height: 20),
-                    
+
                     // Forest Types
                     Container(
                       padding: EdgeInsets.all(15),
@@ -274,9 +249,9 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
                         ],
                       ),
                     ),
-                    
+
                     SizedBox(height: 20),
-                    
+
                     // Forest Resources
                     Container(
                       padding: EdgeInsets.all(15),
@@ -316,9 +291,9 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
                         ],
                       ),
                     ),
-                    
+
                     SizedBox(height: 20),
-                    
+
                     // Conservation Status
                     Container(
                       padding: EdgeInsets.all(15),
@@ -352,9 +327,9 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
                         ],
                       ),
                     ),
-                    
+
                     SizedBox(height: 20),
-                    
+
                     // Remarks Input Box
                     Container(
                       padding: EdgeInsets.all(15),
@@ -388,9 +363,9 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
                         ],
                       ),
                     ),
-                    
+
                     SizedBox(height: 30),
-                    
+
                     // Buttons - Previous and Continue
                     Row(
                       children: [
@@ -431,7 +406,7 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
                         ),
                       ],
                     ),
-                    
+
                     SizedBox(height: 40), // Extra padding at bottom
                   ],
                 ),

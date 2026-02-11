@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import 'drainage_waste_screen.dart';
 
@@ -17,7 +18,13 @@ class EducationalFacilitiesScreen extends StatefulWidget {
 
 class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScreen> {
   // Controllers
+  final TextEditingController primarySchoolsController = TextEditingController();
+  final TextEditingController middleSchoolsController = TextEditingController();
+  final TextEditingController secondarySchoolsController = TextEditingController();
+  final TextEditingController higherSecondarySchoolsController = TextEditingController();
+  final TextEditingController collegesController = TextEditingController();
   final TextEditingController numAnganwadiController = TextEditingController();
+  final TextEditingController skillDevelopmentCentersController = TextEditingController();
   final TextEditingController numShikshaGuaranteeController = TextEditingController();
   final TextEditingController otherFacilityNameController = TextEditingController();
   final TextEditingController otherFacilityCountController = TextEditingController();
@@ -35,13 +42,31 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
       return;
     }
 
+    // Check authentication before syncing
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final currentUser = supabaseService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User not authenticated. Please login again.')),
+        );
+      }
+      return;
+    }
+
     final data = {
       'id': const Uuid().v4(),
       'session_id': sessionId,
-      'anganwadi_centers': int.tryParse(numAnganwadiController.text),
-      'shiksha_guarantee_centers': int.tryParse(numShikshaGuaranteeController.text),
+      'primary_schools': int.tryParse(primarySchoolsController.text) ?? 0,
+      'middle_schools': int.tryParse(middleSchoolsController.text) ?? 0,
+      'secondary_schools': int.tryParse(secondarySchoolsController.text) ?? 0,
+      'higher_secondary_schools': int.tryParse(higherSecondarySchoolsController.text) ?? 0,
+      'colleges': int.tryParse(collegesController.text) ?? 0,
+      'anganwadi_centers': int.tryParse(numAnganwadiController.text) ?? 0,
+      'skill_development_centers': int.tryParse(skillDevelopmentCentersController.text) ?? 0,
+      'shiksha_guarantee_centers': int.tryParse(numShikshaGuaranteeController.text) ?? 0,
       'other_facility_name': otherFacilityNameController.text,
-      'other_facility_count': int.tryParse(otherFacilityCountController.text),
+      'other_facility_count': int.tryParse(otherFacilityCountController.text) ?? 0,
       'created_at': DateTime.now().toIso8601String(),
     };
 
@@ -84,6 +109,71 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
     final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
+        // Primary Schools Section
+        QuestionCard(
+          question: 'Primary Schools',
+          description: 'Number of primary schools (up to 5th standard)',
+          child: NumberInput(
+            label: 'Enter number of primary schools',
+            controller: primarySchoolsController,
+            prefixIcon: Icons.school,
+          ),
+        ),
+
+        SizedBox(height: 25),
+
+        // Middle Schools Section
+        QuestionCard(
+          question: 'Middle Schools',
+          description: 'Number of middle schools (6th to 8th standard)',
+          child: NumberInput(
+            label: 'Enter number of middle schools',
+            controller: middleSchoolsController,
+            prefixIcon: Icons.school,
+          ),
+        ),
+
+        SizedBox(height: 25),
+
+        // Secondary Schools Section
+        QuestionCard(
+          question: 'Secondary Schools',
+          description: 'Number of secondary schools (9th to 10th standard)',
+          child: NumberInput(
+            label: 'Enter number of secondary schools',
+            controller: secondarySchoolsController,
+            prefixIcon: Icons.school,
+          ),
+        ),
+
+        SizedBox(height: 25),
+
+        // Higher Secondary Schools Section
+        QuestionCard(
+          question: 'Higher Secondary Schools',
+          description: 'Number of higher secondary schools (11th to 12th standard)',
+          child: NumberInput(
+            label: 'Enter number of higher secondary schools',
+            controller: higherSecondarySchoolsController,
+            prefixIcon: Icons.school,
+          ),
+        ),
+
+        SizedBox(height: 25),
+
+        // Colleges Section
+        QuestionCard(
+          question: 'Colleges',
+          description: 'Number of colleges and higher education institutions',
+          child: NumberInput(
+            label: 'Enter number of colleges',
+            controller: collegesController,
+            prefixIcon: Icons.account_balance,
+          ),
+        ),
+
+        SizedBox(height: 25),
+
         // Anganwadi Section
         QuestionCard(
           question: l10n.numberOfAnganwadi,
@@ -92,6 +182,19 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
             label: l10n.enterNumberOfAnganwadi,
             controller: numAnganwadiController,
             prefixIcon: Icons.child_care,
+          ),
+        ),
+
+        SizedBox(height: 25),
+
+        // Skill Development Centers Section
+        QuestionCard(
+          question: 'Skill Development Centers',
+          description: 'Number of skill development and vocational training centers',
+          child: NumberInput(
+            label: 'Enter number of skill development centers',
+            controller: skillDevelopmentCentersController,
+            prefixIcon: Icons.build,
           ),
         ),
 
@@ -134,8 +237,6 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
           ),
         ),
 
-        // Removed: Progress Indicator (Step Locator)
-
       ],
     );
   }
@@ -156,7 +257,13 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
       onSubmit: _submitForm,
       onBack: _goToPreviousScreen,
       onReset: () {
+        primarySchoolsController.clear();
+        middleSchoolsController.clear();
+        secondarySchoolsController.clear();
+        higherSecondarySchoolsController.clear();
+        collegesController.clear();
         numAnganwadiController.clear();
+        skillDevelopmentCentersController.clear();
         numShikshaGuaranteeController.clear();
         otherFacilityNameController.clear();
         otherFacilityCountController.clear();
@@ -167,7 +274,13 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
 
   @override
   void dispose() {
+    primarySchoolsController.dispose();
+    middleSchoolsController.dispose();
+    secondarySchoolsController.dispose();
+    higherSecondarySchoolsController.dispose();
+    collegesController.dispose();
     numAnganwadiController.dispose();
+    skillDevelopmentCentersController.dispose();
     numShikshaGuaranteeController.dispose();
     otherFacilityNameController.dispose();
     otherFacilityCountController.dispose();

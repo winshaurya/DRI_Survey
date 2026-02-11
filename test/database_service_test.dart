@@ -637,6 +637,20 @@ void main() {
       print('✅ Test passed: Data upserted successfully');
     });
 
+    test('insertOrUpdate should accept extra `colleges` key and persist it', () async {
+      print('🧪 Testing insertOrUpdate with colleges key');
+      const sessionId = 'test-session-edu';
+      const tableName = 'village_educational_facilities';
+      final data = {'primary_schools': 3, 'colleges': 2};
+      print('📊 Inserting/updating educational data in $tableName for session $sessionId: $data');
+      await databaseService.insertOrUpdate(tableName, data, sessionId);
+      final eduData = await databaseService.getVillageData(tableName, sessionId);
+      print('📊 Educational data after upsert: $eduData');
+      expect(eduData, isNotEmpty);
+      expect(eduData.first['colleges'], 2);
+      print('✅ Test passed: Educational data with colleges persisted successfully');
+    });
+
     test('saveData should insert data - Testing data saving', () async {
       print('🧪 Testing saveData method');
       const tableName = 'village_drainage_waste';

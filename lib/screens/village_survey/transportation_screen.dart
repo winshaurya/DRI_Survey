@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import '../../form_template.dart';
 import 'irrigation_facilities_screen.dart'; // Import the previous screen
@@ -35,9 +36,23 @@ class _TransportationScreenState extends State<TransportationScreen> {
       return;
     }
 
+    // Check authentication before syncing
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final currentUser = supabaseService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User not authenticated. Please login again.')),
+        );
+      }
+      return;
+    }
+
     final data = {
       'id': const Uuid().v4(),
       'session_id': sessionId,
+      'road_connectivity': 0,
+      'public_transport_available': 0,
       'tractor_count': int.tryParse(vehicles['Tractor']?.text ?? '') ?? 0,
       'car_jeep_count': int.tryParse(vehicles['Car/Jeep']?.text ?? '') ?? 0,
       'motorcycle_scooter_count': int.tryParse(vehicles['Motorcycle/Scooter']?.text ?? '') ?? 0,

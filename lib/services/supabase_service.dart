@@ -59,15 +59,13 @@ class SupabaseService {
     _escalateError(message, persistent: persistent);
   }
 
-  // Field normalization helpers
-  static const Set<String> _boolFields = {
-    'is_deleted',
-    'has_account',
-    'details_correct',
-    'name_included',
-    'received',
-    'is_auto_save',
-  };
+  // Boolean normalization rules:
+  // We always store boolean-like values as integers 0/1 in Supabase to keep a consistent representation.
+  // Removed the per-field boolean whitelist for simplicity and to avoid inconsistent storage formats.
+  // Remote table columns are cached and used to filter upsert payloads to known columns only.
+  final Map<String, Set<String>> _remoteTableColumnsCache = {};
+  final Map<String, DateTime> _tableCacheFetchedAt = {};
+  final Duration _tableCacheTtl = Duration(minutes: 10);
 
   Future<void> initialize() async {
     // Supabase is already initialized in main.dart
@@ -102,9 +100,8 @@ class SupabaseService {
   dynamic _normalizeValue(String key, dynamic value) {
     if (value == null) return null;
 
-    if (value is bool) {
-      return _boolFields.contains(key) ? (value ? 1 : 0) : value;
-    }
+    // Always normalize boolean values to integer 0/1 for consistency
+    if (value is bool) return value ? 1 : 0;
 
     if (value is num) return value;
 
@@ -113,10 +110,9 @@ class SupabaseService {
       if (trimmed.isEmpty) return null;
       final lower = trimmed.toLowerCase();
 
-      if (_boolFields.contains(key)) {
-        if (lower == 'true' || lower == 'yes' || lower == '1') return 1;
-        if (lower == 'false' || lower == 'no' || lower == '0') return 0;
-      }
+      // Recognize common boolean-like strings and convert to 0/1
+      if (lower == 'true' || lower == 'yes' || lower == '1') return 1;
+      if (lower == 'false' || lower == 'no' || lower == '0') return 0;
 
       if (_shouldParseNumber(key) && _isNumericString(trimmed)) {
         return _parseNumber(trimmed);
@@ -172,6 +168,72 @@ class SupabaseService {
     return normalized;
   }
 
+  Future<Set<String>> _getRemoteTableColumns(String table) async {
+    try {
+      final now = DateTime.now();
+      final cached = _remoteTableColumnsCache[table];
+      final fetchedAt = _tableCacheFetchedAt[table];
+      if (cached != null && fetchedAt != null && now.difference(fetchedAt) < _tableCacheTtl) {
+        return cached;
+      }
+
+      // Attempt to fetch a single row to inspect the keys (column names).
+      final res = await _withRetry(() => client.from(table).select().limit(1), operation: 'fetch columns $table');
+      if (res is List && res.isNotEmpty) {
+        final row = res.first as Map<String, dynamic>;
+        final keys = row.keys.map((k) => k.toString()).toSet();
+        _remoteTableColumnsCache[table] = keys;
+        _tableCacheFetchedAt[table] = now;
+        return keys;
+      }
+
+      // If table is empty or no rows returned, store empty set as fetched so we don't spam the server
+      _remoteTableColumnsCache[table] = <String>{};
+      _tableCacheFetchedAt[table] = now;
+      return <String>{};
+    } catch (e) {
+      _escalateError('Failed to fetch table columns for $table: $e');
+      return <String>{};
+    }
+  }
+
+  dynamic _filterPayloadToColumns(String table, dynamic data, Set<String> columns) {
+    // If we couldn't fetch columns, fall back to original payload
+    if (columns.isEmpty) return data;
+
+    if (data is List) {
+      final filteredList = <Map<String, dynamic>>[];
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          filteredList.add(Map<String, dynamic>.fromEntries(item.entries.where((e) => columns.contains(e.key))));
+        } else if (item is Map) {
+          final casted = <String, dynamic>{};
+          for (final entry in item.entries) {
+            final key = entry.key.toString();
+            if (columns.contains(key)) casted[key] = entry.value;
+          }
+          filteredList.add(_normalizeMap(casted));
+        }
+      }
+      return filteredList;
+    }
+
+    if (data is Map<String, dynamic>) {
+      return Map<String, dynamic>.fromEntries(data.entries.where((e) => columns.contains(e.key)));
+    }
+
+    if (data is Map) {
+      final casted = <String, dynamic>{};
+      for (final entry in data.entries) {
+        final key = entry.key.toString();
+        if (columns.contains(key)) casted[key] = entry.value;
+      }
+      return casted;
+    }
+
+    return data;
+  }
+
   List<Map<String, dynamic>> _normalizeList(List<dynamic> data) {
     final normalized = <Map<String, dynamic>>[];
     for (final item in data) {
@@ -191,7 +253,37 @@ class SupabaseService {
   Future<void> _upsertWithRetry(String table, dynamic data) async {
     if (data == null) return;
     if (data is List && data.isEmpty) return;
-    await _withRetry(() => client.from(table).upsert(data), operation: 'upsert $table');
+
+    // Fetch and cache remote table columns, then filter payload to known columns to avoid unknown-column errors
+    final columns = await _getRemoteTableColumns(table);
+    var filtered = _filterPayloadToColumns(table, data, columns);
+
+    // Normalize values (booleans -> 0/1, strings -> trimmed, numbers parsed when applicable)
+    if (filtered is List) {
+      final normalizedList = <Map<String, dynamic>>[];
+      for (final item in filtered) {
+        if (item is Map<String, dynamic>) {
+          normalizedList.add(_normalizeMap(item));
+        } else if (item is Map) {
+          final casted = <String, dynamic>{};
+          for (final entry in item.entries) {
+            casted[entry.key.toString()] = entry.value;
+          }
+          normalizedList.add(_normalizeMap(casted));
+        }
+      }
+      filtered = normalizedList;
+    } else if (filtered is Map<String, dynamic>) {
+      filtered = _normalizeMap(filtered);
+    } else if (filtered is Map) {
+      final casted = <String, dynamic>{};
+      for (final entry in filtered.entries) {
+        casted[entry.key.toString()] = entry.value;
+      }
+      filtered = _normalizeMap(casted);
+    }
+
+    await _withRetry(() => client.from(table).upsert(filtered), operation: 'upsert $table');
   }
 
   Future<Map<String, String>> validateSchema(List<String> tableNames) async {
@@ -1303,6 +1395,12 @@ class SupabaseService {
   Future<void> saveVillageData(String tableName, Map<String, dynamic> data) async {
     try {
       final payload = Map<String, dynamic>.from(data);
+
+      // Add surveyor_email from authenticated user if not already present
+      if (!payload.containsKey('surveyor_email') && currentUser?.email != null) {
+        payload['surveyor_email'] = currentUser!.email;
+      }
+
       if (tableName == 'village_survey_sessions') {
         payload.remove('page_completion_status');
         payload.remove('sync_pending');

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
@@ -35,16 +36,31 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
       return;
     }
 
+    // Check authentication before syncing
+    final supabaseService = Provider.of<SupabaseService>(context, listen: false);
+    final currentUser = supabaseService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User not authenticated. Please login again.')),
+        );
+      }
+      return;
+    }
+
     final data = {
       'id': const Uuid().v4(),
       'session_id': sessionId,
+      'canal_available': _hasCanal == true ? 1 : 0,
+      'tube_well_available': _hasTubeWell == true ? 1 : 0,
+      'pond_available': _hasPonds == true ? 1 : 0,
       'has_canal': _hasCanal == true ? 1 : 0,
       'has_tube_well': _hasTubeWell == true ? 1 : 0,
       'has_ponds': _hasPonds == true ? 1 : 0,
       'has_river': _hasRiver == true ? 1 : 0,
       'has_well': _hasWell == true ? 1 : 0,
+      'other_sources': '',
       'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
     };
 
     try {
