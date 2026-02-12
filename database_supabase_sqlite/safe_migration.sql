@@ -6,6 +6,10 @@ ALTER TABLE family_survey_sessions
 ADD COLUMN IF NOT EXISTS page_completion_status TEXT DEFAULT '{}',
 ADD COLUMN IF NOT EXISTS sync_pending INTEGER DEFAULT 0;
 
+-- Step 1.5: Add missing updated_at column to village_map_points table
+ALTER TABLE village_map_points
+ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT NOW()::TEXT;
+
 -- Step 2: Drop all foreign key constraints that reference family_survey_sessions
 -- This is necessary to change the primary key
 ALTER TABLE aadhaar_info DROP CONSTRAINT IF EXISTS aadhaar_info_phone_number_fkey;

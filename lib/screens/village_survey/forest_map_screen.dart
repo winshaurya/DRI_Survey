@@ -99,20 +99,6 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
             // Header removed (Govt/Platform labels stripped)
             SizedBox(height: 12),
 
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF138808),
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
             Container(
               padding: EdgeInsets.all(20),
               child: Form(

@@ -70,6 +70,7 @@ class DatabaseHelper {
     await _ensureVillageEducationalFacilitiesColumns(db);
     await _ensureSchemeMemberTables(db);
     await _ensureSocialMapLinkColumns(db);
+    await _ensureVillageMapPointsColumns(db);
     if (oldVersion < 38) {
       await _migrateFamilySurveySessionsPrimaryKey(db);
     }
@@ -109,6 +110,10 @@ class DatabaseHelper {
     await _addColumnIfMissing(db, 'social_consciousness', 'shram_sadhana_members', 'TEXT');
     await _addColumnIfMissing(db, 'social_consciousness', 'savings_exists', 'TEXT');
     await _addColumnIfMissing(db, 'social_consciousness', 'savings_percentage', 'TEXT');
+  }
+
+  Future<void> _ensureVillageMapPointsColumns(Database db) async {
+    await _addColumnIfMissing(db, 'village_map_points', 'updated_at', 'TEXT DEFAULT CURRENT_TIMESTAMP');
   }
 
   Future<void> _ensureSchemeMemberTables(Database db) async {

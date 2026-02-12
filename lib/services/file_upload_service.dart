@@ -15,6 +15,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'database_service.dart';
+import 'sync_service.dart';
 
 class FileUploadService {
   static final FileUploadService _instance = FileUploadService._internal();
@@ -353,6 +354,13 @@ class FileUploadService {
       await _updateUploadStatus(uploadId, 'uploaded');
       debugPrint('File upload successful: $fileName');
 
+      // Trigger immediate sync of village social maps page (page 8) in background with limited retries
+      try {
+        _triggerImmediateVillagePageSync(shineCode, page: 8, maxRetries: 3);
+      } catch (e) {
+        debugPrint('Failed to trigger immediate village page sync: $e');
+      }
+
       // Optionally delete local file after successful upload
       // File(localPath).deleteSync();
 
@@ -401,6 +409,61 @@ class FileUploadService {
       where: 'id = ?',
       whereArgs: [uploadId],
     );
+  }
+
+  void _triggerImmediateVillagePageSync(String shineCode, {int page = 8, int maxRetries = 3}) {
+    // Run in background, do not block upload flow
+    Future(() async {
+      try {
+        final session = await _databaseService.getVillageSurveyByShineCode(shineCode);
+        final sessionId = session?['session_id']?.toString();
+        if (sessionId == null || sessionId.isEmpty) return;
+
+        final pageDataList = await _databaseService.getVillageData('village_social_maps', sessionId);
+        final Map<String, dynamic> pageData = pageDataList.isNotEmpty ? Map<String, dynamic>.from(pageDataList.first) : {};
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            debugPrint('Attempting immediate sync for session $sessionId page $page (attempt $attempt)');
+            await SyncService.instance.syncVillagePageData(sessionId, page, pageData);
+
+            final status = await _databaseService.getVillagePageStatus(sessionId);
+            final pageStatus = status['page_completion_status'] as Map<String, dynamic>? ?? {};
+            final value = pageStatus[page.toString()];
+            final bool synced = (value is Map && value['synced'] == true) || (value is bool && value == true);
+
+            if (synced) {
+              debugPrint('Immediate sync succeeded for session $sessionId page $page');
+              return;
+            } else {
+              debugPrint('Immediate sync did not mark page synced for session $sessionId (attempt $attempt)');
+            }
+          } catch (e) {
+            debugPrint('Immediate sync attempt $attempt failed: $e');
+          }
+
+          if (attempt < maxRetries) {
+            // Exponential backoff: wait a bit before next try
+            await Future.delayed(Duration(seconds: attempt * 2));
+          } else {
+            // Last attempt failed — ensure operation is queued for background processing
+            try {
+              final pageDataToQueue = pageData;
+              await SyncService.instance.queueSyncOperation('sync_village_page', {
+                'session_id': sessionId,
+                'page': page,
+                'data': pageDataToQueue,
+              });
+              debugPrint('Queued sync_village_page for session $sessionId page $page after $maxRetries attempts');
+            } catch (e) {
+              debugPrint('Failed to queue sync operation after retries: $e');
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Background sync trigger error: $e');
+      }
+    });
   }
 
   Future<String> _saveFileLocally(XFile file, String shineCode, String pageType) async {

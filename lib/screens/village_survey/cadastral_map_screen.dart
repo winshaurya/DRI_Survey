@@ -138,9 +138,6 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
             // Header removed (Govt/Platform labels stripped)
             SizedBox(height: 12),
 
-              ),
-            ),
-            
             Container(
               padding: EdgeInsets.all(20),
               child: Form(

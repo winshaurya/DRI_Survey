@@ -19,6 +19,36 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _seedClubsController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingSeedData();
+  }
+
+  Future<void> _loadExistingSeedData() async {
+    try {
+      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final sessionId = databaseService.currentSessionId;
+      if (sessionId == null) return;
+
+      final rows = await databaseService.getData('village_seed_clubs', sessionId);
+      if (rows.isNotEmpty) {
+        final row = rows.first;
+        final total = row['total_clubs'];
+        if (total != null) {
+          // Accept num or string types
+          if (total is num) {
+            _seedClubsController.text = total.toInt().toString();
+          } else {
+            _seedClubsController.text = total.toString();
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading seed clubs data: $e');
+    }
+  }
+
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;

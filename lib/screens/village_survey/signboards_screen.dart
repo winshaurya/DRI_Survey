@@ -104,8 +104,7 @@ class _SignboardsScreenState extends State<SignboardsScreen> {
               ),
             ),
           ),
-        ),
-        ),
+          ),
 
         // Main Content
         Expanded(

@@ -1334,6 +1334,7 @@ CREATE TABLE IF NOT EXISTS village_social_maps (
 
     map_type TEXT,
     map_data TEXT,
+    
     remarks TEXT,
     topography_file_link TEXT,
     enterprise_file_link TEXT,
@@ -1446,6 +1447,7 @@ CREATE TABLE IF NOT EXISTS village_map_points (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
     session_id TEXT NOT NULL REFERENCES village_survey_sessions(session_id) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
+    updated_at TEXT DEFAULT NOW()::TEXT,
 
     latitude DECIMAL(10,8),
     longitude DECIMAL(11,8),

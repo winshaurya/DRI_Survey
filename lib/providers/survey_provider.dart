@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dri_survey/services/database_service.dart';
 import 'package:dri_survey/services/supabase_service.dart';
 import 'package:dri_survey/services/sync_service.dart';
+import 'package:dri_survey/services/family_sync_service.dart';
 import 'package:dri_survey/services/form_history_service.dart';
 
 class SurveyState {
@@ -49,6 +50,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
   final DatabaseService _databaseService = DatabaseService();
   final SupabaseService _supabaseService = SupabaseService.instance;
   final SyncService _syncService = SyncService.instance;
+  final FamilySyncService _familySyncService = FamilySyncService.instance;
   final FormHistoryService _historyService = FormHistoryService();
 
   @override
@@ -173,14 +175,14 @@ class SurveyNotifier extends Notifier<SurveyState> {
     try {
       print('💾 saveCurrentPageData: Saving page ${state.currentPage} for phone ${state.phoneNumber}');
       print('📊 Survey data keys: ${state.surveyData.keys.toList()}');
-      
-      // Save data based on current page
+
+      // Save data based on current page locally first (immediate)
       await _savePageData(state.currentPage, state.surveyData);
 
-      // Also trigger partial survey sync to ensure progress is saved
-      await syncPartialSurvey();
-      
-      print('✅ saveCurrentPageData: Successfully saved page ${state.currentPage}');
+      // Trigger background sync (non-blocking)
+      syncPartialSurvey();
+
+      print('✅ saveCurrentPageData: Successfully saved page ${state.currentPage} locally');
     } catch (e) {
       print('❌ saveCurrentPageData: Error saving page data: $e');
     }
@@ -721,7 +723,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'location_timestamp': data['location_timestamp'],
           'updated_at': DateTime.now().toIso8601String(),
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 1: // Family details page
         await _replaceTable('family_members');
@@ -755,7 +756,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
         } else {
           print('❌ _savePageData: No family_members data found');
         }
-        await _syncPageDataToSupabase(page, data);
         break;
       case 2: // Social Consciousness 1
       case 3: // Social Consciousness 2
@@ -780,7 +780,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
             'language': data['language'],
           });
         }
-        await _syncPageDataToSupabase(page, data);
         break;
       case 5: // Land Holding
         print('🌾 _savePageData: Saving land holding data');
@@ -802,7 +801,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'other_fruit_trees_count': data['other_fruit_trees_count'] ?? (data['other_fruit_trees'] == true || data['other_fruit_trees'] == 1 ? 1 : 0),
           'other_orchard_plants': data['other_orchard_plants'],
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 6: // Irrigation
         await _replaceTable('irrigation_facilities');
@@ -810,7 +808,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'phone_number': state.phoneNumber,
           ...data,
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 7: // Crop Productivity
         await _replaceTable('crop_productivity');
@@ -832,9 +829,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
             });
           }
         }
-        await _syncPageDataToSupabase(page, {
-          'crop_productivity': cropList ?? [],
-        });
         break;
       case 8: // Fertilizer Usage
         await _replaceTable('fertilizer_usage');
@@ -842,7 +836,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'phone_number': state.phoneNumber,
           ...data,
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 9: // Animals
         await _replaceTable('animals');
@@ -861,7 +854,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
             });
           }
         }
-        await _syncPageDataToSupabase(page, data);
         break;
       case 10: // Agricultural Equipment
         await _replaceTable('agricultural_equipment');
@@ -869,7 +861,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'phone_number': state.phoneNumber,
           ...data,
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 11: // Entertainment Facilities
         await _replaceTable('entertainment_facilities');
@@ -877,7 +868,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'phone_number': state.phoneNumber,
           ...data,
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 12: // Transport Facilities
         await _replaceTable('transport_facilities');
@@ -885,7 +875,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'phone_number': state.phoneNumber,
           ...data,
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 13: // Water Sources
         await _replaceTable('drinking_water_sources');
@@ -893,7 +882,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'phone_number': state.phoneNumber,
           ...data,
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 14: // Medical Treatment
         await _replaceTable('medical_treatment');
@@ -901,7 +889,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'phone_number': state.phoneNumber,
           ...data,
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 15: // Disputes
         await _replaceTable('disputes');
@@ -909,7 +896,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'phone_number': state.phoneNumber,
           ...data,
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 16: // House Conditions
         await _replaceTable('house_conditions');
@@ -963,23 +949,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           });
         }
 
-        await _syncPageDataToSupabase(page, {
-          'house_conditions': houseConditionsData,
-          'house_facilities': houseFacilitiesData,
-          'tulsi_plants': data['tulsi_plants'] != null
-              ? {
-                  'has_plants': data['tulsi_plants'],
-                  'plant_count': data['tulsi_plant_count'],
-                }
-              : null,
-          'nutritional_garden': data['nutritional_garden'] != null
-              ? {
-                  'has_garden': data['nutritional_garden'],
-                  'garden_size': data['nutritional_garden_size'],
-                  'vegetables_grown': data['nutritional_garden_vegetables'],
-                }
-              : null,
-        });
         break;
       case 17: // Diseases
         await _replaceTable('diseases');
@@ -1001,9 +970,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
             });
           }
         }
-        await _syncPageDataToSupabase(page, {
-          'diseases': diseaseList ?? [],
-        });
         break;
       case 18: // Government schemes
         await _replaceTable('aadhaar_scheme_members');
@@ -1264,7 +1230,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           }
         }
 
-        await _syncPageDataToSupabase(page, data);
         break;
       case 19: // Folklore Medicine
         await _replaceTable('folklore_medicine');
@@ -1276,7 +1241,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
             });
           }
         }
-        await _syncPageDataToSupabase(page, data);
         break;
       case 20: // Health Programme Implemented
         await _replaceTable('health_programmes');
@@ -1289,7 +1253,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'family_planning_awareness': data['family_planning_awareness'],
           'contraceptive_applied': data['contraceptive_applied'],
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 21: // Children data
         await _replaceTable('children_data');
@@ -1345,16 +1308,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
             }
           }
         }
-        await _syncPageDataToSupabase(page, {
-          'children_data': {
-            'births_last_3_years': data['births_last_3_years'],
-            'infant_deaths_last_3_years': data['infant_deaths_last_3_years'],
-            'malnourished_children': data['malnourished_children'],
-          },
-          'malnourished_children_data': data['malnourished_children_data'] ?? [],
-          'child_diseases': childDiseases,
-          'malnutrition_data': malnutritionRows,
-        });
         break;
       case 22: // Migration
         await _replaceTable('migration_data');
@@ -1368,7 +1321,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'destination': data['destination'],
           'migrated_members_json': jsonEncode(migratedMembers),
         });
-        await _syncPageDataToSupabase(page, data);
         break;
       case 23: // Training
         await _replaceTable('training_data');
@@ -1414,7 +1366,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
             });
           }
         }
-        await _syncPageDataToSupabase(page, data);
         break;
       case 24: // VB Gram beneficiaries
         await _replaceTable('vb_gram');
@@ -1440,10 +1391,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
             });
           }
         }
-        await _syncPageDataToSupabase(page, {
-          'vb_gram': data['vb_gram'],
-          'vb_gram_members': (data['vb_gram']?['members']) ?? [],
-        });
         break;
       case 25: // PM Kisan beneficiaries
         await _replaceTable('pm_kisan_nidhi');
@@ -1470,10 +1417,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
             });
           }
         }
-        await _syncPageDataToSupabase(page, {
-          'pm_kisan_nidhi': data['pm_kisan_nidhi'],
-          'pm_kisan_members': (data['pm_kisan_nidhi']?['members']) ?? [],
-        });
         break;
       case 26: // PM Kisan Samman Nidhi
         await _replaceTable('pm_kisan_samman_nidhi');
@@ -1500,37 +1443,21 @@ class SurveyNotifier extends Notifier<SurveyState> {
             });
           }
         }
-        await _syncPageDataToSupabase(page, {
-          'pm_kisan_samman_nidhi': data['pm_kisan_samman_nidhi'],
-          'pm_kisan_samman_members': (data['pm_kisan_samman_nidhi']?['members']) ?? [],
-        });
         break;
       case 27: // Kisan Credit Card
         if (data['kisan_credit_card'] != null) {
           await _upsertMergedScheme(state.phoneNumber!, 'kisan_credit_card', Map<String, dynamic>.from(data['kisan_credit_card']));
         }
-        final mergedKisan = await _databaseService.getData('merged_govt_schemes', state.phoneNumber!);
-        await _syncPageDataToSupabase(page, {
-          'merged_govt_schemes': mergedKisan.isNotEmpty ? mergedKisan.first : null,
-        });
         break;
       case 28: // Swachh Bharat
         if (data['swachh_bharat'] != null) {
           await _upsertMergedScheme(state.phoneNumber!, 'swachh_bharat', Map<String, dynamic>.from(data['swachh_bharat']));
         }
-        final mergedSwachh = await _databaseService.getData('merged_govt_schemes', state.phoneNumber!);
-        await _syncPageDataToSupabase(page, {
-          'merged_govt_schemes': mergedSwachh.isNotEmpty ? mergedSwachh.first : null,
-        });
         break;
       case 29: // Fasal Bima
         if (data['fasal_bima'] != null) {
           await _upsertMergedScheme(state.phoneNumber!, 'fasal_bima', Map<String, dynamic>.from(data['fasal_bima']));
         }
-        final mergedFasal = await _databaseService.getData('merged_govt_schemes', state.phoneNumber!);
-        await _syncPageDataToSupabase(page, {
-          'merged_govt_schemes': mergedFasal.isNotEmpty ? mergedFasal.first : null,
-        });
         break;
       case 30: // Bank accounts
         await _replaceTable('bank_accounts');
@@ -1576,9 +1503,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
             'incorrect_details': account['incorrect_details'],
           });
         }
-        await _syncPageDataToSupabase(page, {
-          'bank_accounts': accounts,
-        });
         break;
     }
   }
@@ -1627,8 +1551,8 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
   Future<void> nextPage() async {
     if (state.currentPage < state.totalPages - 1) {
-      // Save current page data before moving to next
-      await saveCurrentPageData();
+      // Save current page data before moving to next (non-blocking)
+      saveCurrentPageData();
       // Update the survey session timestamp
       if (state.phoneNumber != null) {
         await _databaseService.saveData('survey_sessions', {
@@ -1648,8 +1572,8 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
   Future<void> jumpToPage(int page) async {
     if (page >= 0 && page < state.totalPages) {
-      // Save current page data before jumping
-      await saveCurrentPageData();
+      // Save current page data before jumping (non-blocking)
+      saveCurrentPageData();
       // Update the survey session timestamp
       if (state.phoneNumber != null) {
         await _databaseService.saveData('survey_sessions', {
@@ -1689,18 +1613,16 @@ class SurveyNotifier extends Notifier<SurveyState> {
     state = state.copyWith(isLoading: loading);
   }
 
-  Future<void> syncPartialSurvey() async {
-    if (state.phoneNumber != null && await _supabaseService.isOnline()) {
-      try {
-        // Sync current page data to Supabase
-        await _syncService.syncFamilyPageData(
-          state.phoneNumber!,
-          state.currentPage,
-          state.surveyData,
-        );
-      } catch (e) {
+  void syncPartialSurvey() {
+    if (state.phoneNumber != null) {
+      // Start background sync (non-blocking)
+      _familySyncService.savePageData(
+        phoneNumber: state.phoneNumber!,
+        page: state.currentPage,
+        pageData: state.surveyData,
+      ).catchError((e) {
         print('Error syncing partial survey: $e');
-      }
+      });
     }
   }
 
@@ -1774,22 +1696,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
     }
   }
 
-  Future<void> _syncPageDataToSupabase(int page, Map<String, dynamic> data) async {
-    if (state.phoneNumber == null) {
-      print('❌ _syncPageDataToSupabase: phoneNumber is null');
-      return;
-    }
 
-    print('🔄 _syncPageDataToSupabase: Syncing page $page for ${state.phoneNumber}');
-    await _databaseService.markFamilyPageCompleted(state.phoneNumber!, page);
-
-    // Sync immediately if possible, otherwise queue fallback
-    await _syncService.syncFamilyPageData(
-      state.phoneNumber!,
-      page,
-      data,
-    );
-  }
 
   /// Update existing surveys with correct surveyor email after authentication
   Future<void> updateExistingSurveyEmails() async {
