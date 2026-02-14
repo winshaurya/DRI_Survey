@@ -197,8 +197,8 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                                   phoneNumber: phoneNumber,
                                 );
                               }
-                              // Save current page data locally (immediate, non-blocking)
-                              surveyNotifier.saveCurrentPageData();
+                              // Save current page data and wait for completion before navigating
+                              await surveyNotifier.saveCurrentPageData();
                               _jumpToPage(index + 1);
                             } else {
                               // Complete survey

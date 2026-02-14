@@ -5,6 +5,9 @@ import '../../components/logo_widget.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/survey_provider.dart';
+import '../../services/database_service.dart';
+import '../../services/supabase_service.dart';
+import 'package:uuid/uuid.dart';
 import '../family_survey/widgets/side_navigation.dart';
 
 class LandingScreen extends ConsumerWidget {
@@ -133,7 +136,26 @@ class LandingScreen extends ConsumerWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          // Start a NEW village survey: create and persist a fresh session
+                          try {
+                            final sessionId = const Uuid().v4();
+                            DatabaseService().currentSessionId = sessionId;
+
+                            final surveyorEmail = SupabaseService.instance.currentUser?.email;
+                            final sessionData = {
+                              'session_id': sessionId,
+                              'status': 'in_progress',
+                              if (surveyorEmail != null) 'surveyor_email': surveyorEmail,
+                              'created_at': DateTime.now().toIso8601String(),
+                              'updated_at': DateTime.now().toIso8601String(),
+                            };
+
+                            await DatabaseService().createVillageSurveySession(sessionData);
+                          } catch (e) {
+                            debugPrint('Failed to create village session on landing: $e');
+                          }
+
                           Navigator.pushNamed(context, '/village-survey');
                         },
                         style: ElevatedButton.styleFrom(

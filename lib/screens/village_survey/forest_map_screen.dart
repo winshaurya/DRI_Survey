@@ -24,6 +24,32 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
   TextEditingController conservationStatusController = TextEditingController();
   TextEditingController remarksController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    // Load existing forest map row if editing
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+        final sessionId = databaseService.currentSessionId;
+        if (sessionId == null) return;
+
+        final rows = await databaseService.getVillageData('village_forest_maps', sessionId);
+        if (rows.isNotEmpty) {
+          final row = rows.first;
+          forestAreaController.text = (row['forest_area'] ?? '') as String;
+          forestTypesController.text = (row['forest_types'] ?? '') as String;
+          forestResourcesController.text = (row['forest_resources'] ?? '') as String;
+          conservationStatusController.text = (row['conservation_status'] ?? '') as String;
+          remarksController.text = (row['remarks'] ?? '') as String;
+          setState(() {});
+        }
+      } catch (e) {
+        debugPrint('Error loading forest map data: $e');
+      }
+    });
+  }
+
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final syncService = SyncService.instance;

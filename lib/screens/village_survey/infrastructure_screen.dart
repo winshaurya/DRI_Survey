@@ -39,6 +39,42 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
   String? _selectedApproachCondition;
   String? _selectedInternalCondition;
 
+  @override
+  void initState() {
+    super.initState();
+    // Load saved infrastructure data for edit flows
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+        final sessionId = databaseService.currentSessionId;
+        if (sessionId == null) return;
+
+        final rows = await databaseService.getVillageData('village_infrastructure', sessionId);
+        if (rows.isNotEmpty) {
+          final row = rows.first;
+          setState(() {
+            _hasApproachRoads = (row['approach_roads_available'] ?? 0) == 1;
+            _numApproachRoads = (row['num_approach_roads'] ?? '').toString();
+            _approachCondition = row['approach_condition'] ?? '';
+            approachRoadsController.text = _numApproachRoads;
+            approachRemarksController.text = row['approach_remarks'] ?? '';
+
+            _hasInternalLanes = (row['internal_lanes_available'] ?? 0) == 1;
+            _numInternalLanes = (row['num_internal_lanes'] ?? '').toString();
+            _internalCondition = row['internal_condition'] ?? '';
+            internalLanesController.text = _numInternalLanes;
+            internalRemarksController.text = row['internal_remarks'] ?? '';
+
+            _selectedApproachCondition = _approachCondition.isNotEmpty ? _approachCondition : null;
+            _selectedInternalCondition = _internalCondition.isNotEmpty ? _internalCondition : null;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading infrastructure data: $e');
+      }
+    });
+  }
+
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;

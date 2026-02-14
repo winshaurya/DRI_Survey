@@ -216,8 +216,8 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
               'Family members that have already received training',
               Icons.school,
               Colors.orange,
-              _addTrainingTaken,
-              'Add Family Member',
+              null,
+              '',
             ),
           ),
           const SizedBox(height: 16),
@@ -226,6 +226,19 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
           ...List.generate(
             _trainingsTaken.length,
             (index) => _buildTrainingTakenCard(index, _trainingsTaken[index]),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: ElevatedButton.icon(
+              onPressed: _addTrainingTaken,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Family Member'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            ),
           ),
 
           const SizedBox(height: 32),
@@ -250,8 +263,8 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
               'Family members part of SHG',
               Icons.groups,
               Colors.purple,
-              _addShgMember,
-              'Add Another Family Member',
+              null,
+              '',
             ),
           ),
           const SizedBox(height: 16),
@@ -260,6 +273,19 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
           ...List.generate(
             _shgMembers.length,
             (index) => _buildShgCard(index, _shgMembers[index]),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: ElevatedButton.icon(
+              onPressed: _addShgMember,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Another Family Member'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            ),
           ),
 
           const SizedBox(height: 32),
@@ -274,13 +300,25 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
               'Family members part of FPO',
               Icons.store,
               Colors.teal,
-              _addFpoMember,
-              'Add Another Family Member',
+              null,
+              '',
             ),
           ),
           const SizedBox(height: 16),
           ..._fpoMembers.asMap().entries.map((entry) => _buildFpoCard(entry.key, entry.value)),
-          
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: ElevatedButton.icon(
+              onPressed: _addFpoMember,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Another Family Member'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            ),
+          ),
           const SizedBox(height: 60), // Bottom padding
         ],
       ),
@@ -299,7 +337,7 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
     );
   }
 
-  Widget _buildSectionHeader(String title, String subtitle, IconData icon, Color color, VoidCallback onAdd, String addLabel) {
+  Widget _buildSectionHeader(String title, String subtitle, IconData icon, Color color, VoidCallback? onAdd, String addLabel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -332,16 +370,6 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
           ],
         ),
         const SizedBox(height: 12),
-        ElevatedButton.icon(
-          onPressed: onAdd,
-          icon: const Icon(Icons.add, size: 18),
-          label: Text(addLabel),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          ),
-        ),
       ],
     );
   }

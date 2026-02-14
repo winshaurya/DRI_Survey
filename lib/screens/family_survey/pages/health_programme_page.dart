@@ -96,14 +96,23 @@ class _HealthProgrammePageState extends ConsumerState<HealthProgrammePage> {
   }
 
   void _updateData() {
+    // Trim text inputs and provide debug info so we can confirm UI -> provider flow.
+    final trimmedBalance = _balanceDosesSchedule?.trim();
+
     final data = {
       'vaccination_pregnancy': _pregnancyVaccination,
       'child_vaccination': _childVaccination,
       'vaccination_schedule': _vaccinationSchedule,
-      'balance_doses_schedule': _balanceDosesSchedule,
+      'balance_doses_schedule': trimmedBalance,
       'family_planning_awareness': _familyPlanningAwareness,
       'contraceptive_applied': _contraceptiveApplied,
-    };
+    } ..removeWhere((k, v) => v == null);
+
+    // Debug/log so runtime can confirm collection from UI
+    // (will appear in console when running the app)
+    // ignore: avoid_print
+    print('📝 HealthProgrammePage._updateData -> $data');
+
     widget.onDataChanged(data);
   }
 

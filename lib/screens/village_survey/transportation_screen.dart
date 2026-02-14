@@ -25,6 +25,32 @@ class _TransportationScreenState extends State<TransportationScreen> {
     'Pick-up/Truck': TextEditingController(),
   };
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+        final sessionId = databaseService.currentSessionId;
+        if (sessionId == null) return;
+
+        final rows = await databaseService.getVillageData('village_transport_facilities', sessionId);
+        if (rows.isNotEmpty) {
+          final row = rows.first;
+          vehicles['Tractor']?.text = (row['tractor_count'] ?? '').toString();
+          vehicles['Car/Jeep']?.text = (row['car_jeep_count'] ?? '').toString();
+          vehicles['Motorcycle/Scooter']?.text = (row['motorcycle_scooter_count'] ?? '').toString();
+          vehicles['Cycle']?.text = (row['cycle_count'] ?? '').toString();
+          vehicles['E-rickshaw']?.text = (row['e_rickshaw_count'] ?? '').toString();
+          vehicles['Pick-up/Truck']?.text = (row['pickup_truck_count'] ?? '').toString();
+          setState(() {});
+        }
+      } catch (e) {
+        debugPrint('Error loading transport data: $e');
+      }
+    });
+  }
+
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;

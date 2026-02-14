@@ -108,6 +108,11 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
         markIfLink('Venn Diagram', 'venn_file_link');
         markIfLink('Transect Map', 'transect_file_link');
         markIfLink('Cadastral Map', 'cadastral_file_link');
+
+        // Also prefill remarks if previously saved
+        try {
+          _remarksController.text = (socialMap['remarks'] ?? '') as String;
+        } catch (_) {}
       });
     } catch (e) {
       debugPrint('Error loading existing uploads: $e');

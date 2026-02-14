@@ -21,6 +21,29 @@ class _SignboardsScreenState extends State<SignboardsScreen> {
   final _infoBoardsController = TextEditingController();
   final _wallWritingController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+        final sessionId = databaseService.currentSessionId;
+        if (sessionId == null) return;
+
+        final rows = await databaseService.getVillageData('village_signboards', sessionId);
+        if (rows.isNotEmpty) {
+          final row = rows.first;
+          _signboardsController.text = (row['signboards'] ?? '') as String;
+          _infoBoardsController.text = (row['info_boards'] ?? '') as String;
+          _wallWritingController.text = (row['wall_writing'] ?? '') as String;
+          setState(() {});
+        }
+      } catch (e) {
+        debugPrint('Error loading signboards data: $e');
+      }
+    });
+  }
+
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;

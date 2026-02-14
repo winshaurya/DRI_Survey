@@ -103,6 +103,11 @@ class _HouseConditionsPageState extends State<HouseConditionsPage> {
       'toilet_in_use': _toiletInUse,
       'toilet_condition': _toiletCondition,
     };
+
+    // Debug: confirm page emits values when controls change
+    // ignore: avoid_print
+    print('📝 HouseConditionsPage._updateData -> ${data.entries.where((e) => e.value != null && e.value.toString().isNotEmpty).map((e) => e.key).toList()}');
+
     widget.onDataChanged(data);
   }
 

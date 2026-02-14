@@ -152,7 +152,7 @@ class _FamilySchemeDataWidgetState extends State<FamilySchemeDataWidget> {
     final primaryColor = widget.color ?? theme.colorScheme.primary;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -256,6 +256,7 @@ class _FamilySchemeDataWidgetState extends State<FamilySchemeDataWidget> {
               ),
             ),
              const SizedBox(height: 50),
+             const SizedBox(height: 40),
           ]
         ],
       ),

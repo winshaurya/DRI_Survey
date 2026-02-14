@@ -23,7 +23,7 @@ class MigrationPage extends ConsumerStatefulWidget {
 class _MigrationPageState extends ConsumerState<MigrationPage> {
   List<Map<String, dynamic>> _migratedMembers = [];
   List<String> _familyMemberNames = [];
-  bool _noMigration = false;
+  // Removed _noMigration variable
 
   @override
   void initState() {
@@ -62,7 +62,7 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
   }
 
   void _initializeData() {
-    _noMigration = widget.pageData['no_migration'] ?? false;
+    // Removed _noMigration initialization
     final existingData = widget.pageData['migrated_members'] as List<dynamic>?;
     if (existingData != null) {
       _migratedMembers = existingData.map((item) => Map<String, dynamic>.from(item)).toList();
@@ -71,8 +71,8 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
 
   void _updateData() {
     final data = {
-      'no_migration': _noMigration,
       'migrated_members': _migratedMembers,
+      'family_members_migrated': _migratedMembers.length,
     };
     widget.onDataChanged(data);
   }
@@ -128,72 +128,29 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
           ),
           const SizedBox(height: 24),
 
-          // No Migration Checkbox
-          FadeInLeft(
-            delay: const Duration(milliseconds: 200),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CheckboxListTile(
-                title: const Text(
-                  'No Family Member has Migrated',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: const Text('All family members live and work in the village'),
-                secondary: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.green[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.home, color: Colors.green),
-                ),
-                value: _noMigration,
-                onChanged: (value) {
-                  setState(() {
-                    _noMigration = value ?? false;
-                    if (_noMigration) {
-                      _migratedMembers.clear();
-                    }
-                  });
-                  _updateData();
-                },
-                activeColor: Colors.green,
+          ..._migratedMembers.asMap().entries.map((entry) {
+            final index = entry.key;
+            final member = entry.value;
+            return FadeInUp(
+              delay: Duration(milliseconds: 100 * (index + 1)),
+              child: _buildMemberCard(index, member),
+            );
+          }),
+
+          FadeInUp(
+            delay: const Duration(milliseconds: 300),
+            child: ElevatedButton.icon(
+              onPressed: _addMigratedMember,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Family Member Migration Details'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 24),
-
-          if (!_noMigration) ...[
-            ..._migratedMembers.asMap().entries.map((entry) {
-              final index = entry.key;
-              final member = entry.value;
-              return FadeInUp(
-                delay: Duration(milliseconds: 100 * (index + 1)),
-                child: _buildMemberCard(index, member),
-              );
-            }),
-
-            FadeInUp(
-              delay: const Duration(milliseconds: 300),
-              child: ElevatedButton.icon(
-                onPressed: _addMigratedMember,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Family Member Migration Details'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );

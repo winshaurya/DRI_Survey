@@ -35,7 +35,11 @@ class _FamilyDetailsPageState extends State<FamilyDetailsPage> {
   List<Map<String, dynamic>> _initializeMembers() {
     final existing = widget.pageData['family_members'];
     if (existing != null && existing is List && existing.isNotEmpty) {
-      return List<Map<String, dynamic>>.from(existing);
+      // Deep-copy maps from any read-only query results (e.g., sqflite QueryRow)
+      return existing.map<Map<String, dynamic>>((e) {
+        if (e is Map<String, dynamic>) return Map<String, dynamic>.from(e);
+        return Map<String, dynamic>.from(Map.of(e as Map));
+      }).toList();
     }
     return [_createEmptyMember(1)];
   }

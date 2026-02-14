@@ -29,12 +29,45 @@ class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize drainage types map
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Initialize drainage types map and load saved values (if editing existing session)
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final l10n = AppLocalizations.of(context)!;
       final options = _getDrainageOptions(l10n);
+
+      // Default map (all false)
+      Map<String, bool> initialMap = {for (var option in options) option: false};
+
+      try {
+        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+        final sessionId = databaseService.currentSessionId;
+
+        if (sessionId != null) {
+          final existing = await databaseService.getVillageData('village_drainage_waste', sessionId);
+          if (existing.isNotEmpty) {
+            final row = existing.first;
+
+            // Map DB columns to localized option keys
+            initialMap[options[0]] = (row['earthen_drain'] ?? 0) == 1;
+            initialMap[options[1]] = (row['masonry_drain'] ?? 0) == 1;
+            initialMap[options[2]] = (row['covered_drain'] ?? 0) == 1;
+            initialMap[options[3]] = (row['open_channel'] ?? 0) == 1;
+            initialMap[options[4]] = (row['no_drainage_system'] ?? 0) == 1;
+
+            _hasWasteCollection = (row['waste_collected_regularly'] ?? 0) == 1;
+            _hasWasteSegregation = (row['waste_segregated'] ?? 0) == 1;
+
+            drainIntoController.text = row['drainage_destination'] ?? '';
+            drainageRemarksController.text = row['drainage_remarks'] ?? '';
+            wasteRemarksController.text = row['waste_remarks'] ?? '';
+          }
+        }
+      } catch (e) {
+        // ignore — UI will show defaults
+        debugPrint('Error loading existing drainage data: $e');
+      }
+
       setState(() {
-        _selectedDrainageTypes = {for (var option in options) option: false};
+        _selectedDrainageTypes = initialMap;
       });
     });
   }

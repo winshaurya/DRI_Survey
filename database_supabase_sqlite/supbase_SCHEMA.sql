@@ -437,6 +437,7 @@ CREATE TABLE IF NOT EXISTS aadhaar_info (
     total_members INTEGER,
     UNIQUE(phone_number)
 );
+-- Columns: id, phone_number, created_at, has_aadhaar, total_members
 
 CREATE TABLE IF NOT EXISTS aadhaar_scheme_members (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
@@ -450,6 +451,7 @@ CREATE TABLE IF NOT EXISTS aadhaar_scheme_members (
     benefits_received TEXT,
     created_at TEXT DEFAULT NOW()::TEXT
 );
+-- Columns: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at
 
 CREATE TABLE IF NOT EXISTS ayushman_card (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,

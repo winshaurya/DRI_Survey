@@ -128,10 +128,25 @@ class _FolkloreMedicinePageState extends ConsumerState<FolkloreMedicinePage> {
   }
 
   void _updateData() {
-    final data = {
-      'folklore_medicines': _folkloreMedicines,
-    };
-    widget.onDataChanged(data);
+    // Include any in-progress (not-yet-added) entry so "Next"/auto-save
+    // persists what the user typed even if they didn't press Add.
+    final hasCurrentEntry =
+        _selectedFamilyMember != null ||
+        _plantLocalNameController.text.trim().isNotEmpty ||
+        _plantBotanicalNameController.text.trim().isNotEmpty ||
+        _usesController.text.trim().isNotEmpty;
+
+    final List<Map<String, dynamic>> list = List.from(_folkloreMedicines);
+    if (hasCurrentEntry) {
+      list.add({
+        'person_name': _selectedFamilyMember,
+        'plant_local_name': _plantLocalNameController.text.trim(),
+        'plant_botanical_name': _plantBotanicalNameController.text.trim(),
+        'uses': _usesController.text.trim(),
+      });
+    }
+
+    widget.onDataChanged({'folklore_medicines': list});
   }
 
   @override

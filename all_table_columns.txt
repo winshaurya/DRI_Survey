@@ -1,0 +1,56 @@
+aadhaar_info: id, phone_number, created_at, has_aadhaar, total_members
+aadhaar_scheme_members: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at
+agricultural_equipment: id, phone_number, created_at, tractor, tractor_condition, thresher, thresher_condition, seed_drill, seed_drill_condition, sprayer, sprayer_condition, duster, duster_condition, diesel_engine, diesel_engine_condition, other_equipment
+animals: id, phone_number, created_at, sr_no, animal_type, number_of_animals, breed, production_per_animal, quantity_sold
+ayushman_card: id, phone_number, has_card, total_members, created_at
+ayushman_scheme_members: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at
+bank_accounts: id, phone_number, sr_no, member_name, account_number, bank_name, ifsc_code, branch_name, account_type, has_account, details_correct, incorrect_details, created_at
+child_diseases: id, phone_number, child_id, disease_name, sr_no, created_at
+children_data: id, phone_number, births_last_3_years, infant_deaths_last_3_years, malnourished_children, created_at
+crop_productivity: id, phone_number, created_at, sr_no, crop_name, area_hectares, productivity_quintal_per_hectare, total_production_quintal, quantity_consumed_quintal, quantity_sold_quintal
+diseases: id, phone_number, created_at, sr_no, family_member_name, disease_name, suffering_since, treatment_taken, treatment_from_when, treatment_from_where, treatment_taken_from
+disputes: id, phone_number, created_at, family_disputes, family_registered, family_period, revenue_disputes, revenue_registered, revenue_period, criminal_disputes, criminal_registered, criminal_period, other_disputes, other_description, other_registered, other_period
+drinking_water_sources: id, phone_number, created_at, hand_pumps, hand_pumps_distance, hand_pumps_quality, well, well_distance, well_quality, tubewell, tubewell_distance, tubewell_quality, nal_jaal, nal_jaal_quality, other_source, other_distance, other_sources_quality
+entertainment_facilities: id, phone_number, created_at, smart_mobile, smart_mobile_count, analog_mobile, analog_mobile_count, television, radio, games, other_entertainment, other_specify
+family_id: id, phone_number, has_id, total_members, created_at
+family_id_scheme_members: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at
+family_members: id, phone_number, created_at, updated_at, is_deleted, sr_no, name, fathers_name, mothers_name, relationship_with_head, age, sex, physically_fit, physically_fit_cause, educational_qualification, inclination_self_employment, occupation, days_employed, income, awareness_about_village, participate_gram_sabha, insured, insurance_company
+family_survey_sessions: phone_number, surveyor_email, created_at, updated_at, village_name, village_number, panchayat, block, tehsil, district, postal_address, pin_code, shine_code, latitude, longitude, location_accuracy, location_timestamp, survey_date, surveyor_name, status, device_info, app_version, created_by, updated_by, is_deleted, last_synced_at, current_version, last_edited_at, page_completion_status, sync_pending
+fertilizer_usage: id, phone_number, created_at, urea_fertilizer, organic_fertilizer, fertilizer_types, fertilizer_expenditure
+folklore_medicine: id, phone_number, person_name, plant_local_name, plant_botanical_name, uses, created_at
+fpo_members: id, phone_number, member_name, fpo_name, purpose, agency, share_capital, created_at
+handicapped_allowance: id, phone_number, has_allowance, total_members, created_at
+handicapped_scheme_members: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at
+health_programmes: id, phone_number, vaccination_pregnancy, child_vaccination, vaccination_schedule, balance_doses_schedule, family_planning_awareness, contraceptive_applied, created_at
+house_conditions: id, phone_number, created_at, katcha, pakka, katcha_pakka, hut, toilet_in_use, toilet_condition
+house_facilities: id, phone_number, created_at, toilet, toilet_in_use, drainage, soak_pit, cattle_shed, compost_pit, nadep, lpg_gas, biogas, solar_cooking, electric_connection, nutritional_garden_available, tulsi_plants_available
+irrigation_facilities: id, phone_number, created_at, primary_source, canal, tube_well, river, pond, well, hand_pump, submersible, rainwater_harvesting, check_dam, other_sources
+land_holding: id, phone_number, created_at, irrigated_area, cultivable_area, unirrigated_area, barren_land, mango_trees, guava_trees, lemon_trees, pomegranate_trees, other_fruit_trees_name, other_fruit_trees_count
+malnourished_children_data: id, phone_number, child_id, child_name, height, weight, created_at
+malnutrition_data: id, phone_number, child_name, age, weight, height, created_at
+medical_treatment: id, phone_number, created_at, allopathic, ayurvedic, homeopathy, traditional, other_treatment, preferred_treatment
+merged_govt_schemes: id, phone_number, scheme_data, created_at
+migration_data: id, phone_number, family_members_migrated, reason, duration, destination, created_at
+nutritional_garden: id, phone_number, has_garden, garden_size, vegetables_grown, created_at
+pension_allowance: id, phone_number, has_pension, total_members, created_at
+pension_scheme_members: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at
+pm_kisan_members: id, phone_number, sr_no, member_name, account_number, benefits_received, created_at, name_included, details_correct, incorrect_details, received, days
+pm_kisan_nidhi: id, phone_number, is_beneficiary, total_members, created_at
+pm_kisan_samman_members: id, phone_number, sr_no, member_name, account_number, benefits_received, name_included, details_correct, incorrect_details, received, days, created_at
+pm_kisan_samman_nidhi: id, phone_number, is_beneficiary, total_members, created_at
+ration_card: id, phone_number, has_card, card_type, total_members, created_at
+ration_scheme_members: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at
+samagra_id: id, phone_number, has_id, family_id, total_children, created_at
+samagra_scheme_members: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at
+shg_members: id, phone_number, member_name, shg_name, purpose, agency, position, monthly_saving, created_at
+social_consciousness: id, phone_number, created_at, clothes_frequency, clothes_other_specify, food_waste_exists, food_waste_amount, waste_disposal, waste_disposal_other, separate_waste, compost_pit, recycle_used_items, led_lights, turn_off_devices, fix_leaks, avoid_plastics, family_prayers, family_meditation, meditation_members, family_yoga, yoga_members, community_activities, spiritual_discourses, discourses_members, personal_happiness, family_happiness, happiness_family_who, financial_problems, family_disputes, illness_issues, unhappiness_reason, addiction_smoke, addiction_drink, addiction_gutka, addiction_gamble, addiction_tobacco, addiction_details
+training_data: id, phone_number, member_name, training_topic, training_duration, training_date, status, created_at
+transport_facilities: id, phone_number, created_at
+tribal_card: id, phone_number, has_card, total_members, created_at
+tribal_questions: id, phone_number, created_at, dance_name, deity_name, festival_name, language
+tribal_scheme_members: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at
+tulsi_plants: id, phone_number, has_plants, plant_count, created_at
+vb_gram: id, phone_number, is_member, total_members, created_at
+vb_gram_members: id, phone_number, sr_no, member_name, name_included, details_correct, incorrect_details, received, days, membership_details, created_at
+widow_allowance: id, phone_number, has_allowance, total_members, created_at
+widow_scheme_members: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at

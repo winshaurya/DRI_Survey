@@ -48,13 +48,47 @@ class LocationService {
 
   static Future<Map<String, dynamic>?> getCompleteLocationData() async {
     try {
-      if (!await checkLocationPermission()) return null;
+      // Check location permission first
+      if (!await checkLocationPermission()) {
+        print('Location permission denied or location services disabled');
+        return null;
+      }
 
-      LocationData locationData = await _location.getLocation();
+      // Set location settings for better accuracy
+      await _location.changeSettings(
+        accuracy: LocationAccuracy.high,
+        interval: 5000, // Update every 5 seconds
+        distanceFilter: 10, // Update when moved 10 meters
+      );
 
-      return {
-        'latitude': locationData.latitude,
-        'longitude': locationData.longitude,
+      // Get location with timeout
+      LocationData locationData;
+      try {
+        locationData = await _location.getLocation().timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            print('Location request timed out');
+            throw Exception('Location request timed out');
+          },
+        );
+      } catch (e) {
+        print('Error getting location: $e');
+        return null;
+      }
+
+      if (locationData == null) {
+        print('Location data is null');
+        return null;
+      }
+
+      if (locationData.latitude == null || locationData.longitude == null) {
+        print('Location coordinates are null: lat=${locationData.latitude}, lng=${locationData.longitude}');
+        return null;
+      }
+
+      final result = {
+        'latitude': locationData.latitude!,
+        'longitude': locationData.longitude!,
         'accuracy': locationData.accuracy ?? 0.0,
         'timestamp': DateTime.now().toIso8601String(),
         'village': '', // Will be filled by reverse geocoding if implemented
@@ -64,7 +98,12 @@ class LocationService {
         'postalCode': '', // Will be filled by reverse geocoding if implemented
         'country': 'India', // Default for India
       };
+
+      print('Successfully captured location: ${result['latitude']}, ${result['longitude']}');
+      return result;
+
     } catch (e) {
+      print('Critical error in getCompleteLocationData: $e');
       return null;
     }
   }

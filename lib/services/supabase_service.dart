@@ -11,9 +11,66 @@ class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
   static SupabaseService get instance => _instance;
 
-  SupabaseService._internal();
+  SupabaseService._internal() {
+    _initializePersistentSession();
+  }
 
   SupabaseClient get client => Supabase.instance.client;
+
+  // Persistent session management
+  static const String _jwtKey = 'supabase_jwt';
+  static const String _refreshTokenKey = 'supabase_refresh_token';
+  static const String _expiresAtKey = 'supabase_expires_at';
+
+  Future<void> _initializePersistentSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jwt = prefs.getString(_jwtKey);
+      final refreshToken = prefs.getString(_refreshTokenKey);
+      final expiresAtStr = prefs.getString(_expiresAtKey);
+
+      if (jwt != null && refreshToken != null && expiresAtStr != null) {
+        final expiresAt = DateTime.parse(expiresAtStr);
+        if (expiresAt.isAfter(DateTime.now())) {
+          // Restore session
+          await Supabase.instance.client.auth.setSession(jwt);
+          debugPrint('Restored persistent Supabase session');
+        } else {
+          // Clear expired session
+          await _clearStoredSession();
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to restore persistent session: $e');
+    }
+  }
+
+  Future<void> _saveSession() async {
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_jwtKey, session.accessToken);
+        await prefs.setString(_refreshTokenKey, session.refreshToken ?? '');
+        await prefs.setString(_expiresAtKey, session.expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(session.expiresAt! * 1000).toIso8601String() : '');
+        debugPrint('Saved persistent Supabase session');
+      }
+    } catch (e) {
+      debugPrint('Failed to save session: $e');
+    }
+  }
+
+  Future<void> _clearStoredSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_jwtKey);
+      await prefs.remove(_refreshTokenKey);
+      await prefs.remove(_expiresAtKey);
+      debugPrint('Cleared stored Supabase session');
+    } catch (e) {
+      debugPrint('Failed to clear stored session: $e');
+    }
+  }
 
   // Retry configuration
   static const int _maxRetryAttempts = 4;
@@ -291,8 +348,21 @@ class SupabaseService {
 
     for (final table in tableNames) {
       try {
+        // Try to select a stable natural key column if available to avoid
+        // assuming an `id` column exists. Prefer `phone_number`, then
+        // `session_id`, then `id`, finally fallback to `*`.
+        final cols = await _getRemoteTableColumns(table);
+        String selectCol = '*';
+        if (cols.contains('phone_number')) {
+          selectCol = 'phone_number';
+        } else if (cols.contains('session_id')) {
+          selectCol = 'session_id';
+        } else if (cols.contains('id')) {
+          selectCol = 'id';
+        }
+
         await _withRetry(
-          () => client.from(table).select('id').limit(1),
+          () => client.from(table).select(selectCol).limit(1),
           operation: 'schema check $table',
         );
       } catch (e) {
@@ -1355,14 +1425,21 @@ class SupabaseService {
   // Get survey statistics for dashboard
   Future<Map<String, dynamic>> getSurveyStatistics() async {
     try {
+      // Use a stable column to count surveys. `phone_number` is the primary
+      // key for family_survey_sessions in the Supabase schema; fall back to
+      // `id` if not present.
+      final cols = await _getRemoteTableColumns('family_survey_sessions');
+      final countSelect = cols.contains('phone_number') ? 'phone_number' : (cols.contains('id') ? 'id' : '*');
+
       final surveyCount = await _withRetry(
-        () => client.from('family_survey_sessions').select('id'),
+        () => client.from('family_survey_sessions').select(countSelect),
         operation: 'stats total surveys',
       ).then((data) => data.length);
+
       final todaySurveys = await _withRetry(
         () => client
             .from('family_survey_sessions')
-            .select('id')
+            .select(countSelect)
             .gte('created_at', DateTime.now().toIso8601String().split('T')[0]),
         operation: 'stats today surveys',
       ).then((data) => data.length);

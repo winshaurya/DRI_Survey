@@ -21,9 +21,15 @@ class DatabaseHelper {
   /// Generic insert method for village survey screens
   Future<int> insert(String tableName, Map<String, dynamic> data) async {
     final db = await database;
+    // Filter data to only known columns to avoid INSERT errors on older DB schemas
+    final columns = await _getTableColumns(db, tableName);
+    final filteredData = Map<String, dynamic>.fromEntries(
+      data.entries.where((e) => columns.contains(e.key)),
+    );
+
     return await db.insert(
       tableName,
-      data,
+      filteredData,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
@@ -53,6 +59,18 @@ class DatabaseHelper {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<Set<String>> _getTableColumns(Database db, String tableName) async {
+    try {
+      final info = await db.rawQuery('PRAGMA table_info($tableName)');
+      return info
+          .map((row) => row['name']?.toString())
+          .whereType<String>()
+          .toSet();
+    } catch (e) {
+      return <String>{};
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -1109,6 +1127,7 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         latitude REAL,
         longitude REAL,
         category TEXT,

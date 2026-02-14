@@ -25,6 +25,7 @@ class LocationPage extends StatefulWidget {
 class _LocationPageState extends State<LocationPage> {
   bool _isLoadingLocation = false;
   bool _locationFetched = false;
+  String? _locationError;
 
   // Form controllers for auto-fill functionality
   final TextEditingController villageNameController = TextEditingController();
@@ -123,6 +124,11 @@ class _LocationPageState extends State<LocationPage> {
     await _getCurrentLocation();
 
     // Automatically fetch and save location data without user interaction
+    setState(() {
+      _isLoadingLocation = true;
+      _locationError = null;
+    });
+
     try {
       final locationData = await LocationService.getCompleteLocationData();
 
@@ -158,12 +164,31 @@ class _LocationPageState extends State<LocationPage> {
           }
 
           _locationFetched = true;
+          _locationError = null;
         });
 
         widget.onDataChanged(widget.pageData);
+      } else {
+        // Location data is null - this means location services failed
+        if (mounted) {
+          setState(() {
+            _locationError = 'Unable to get location. Please check location permissions and GPS settings.';
+          });
+        }
       }
     } catch (e) {
-      // Silently handle error - location will be fetched manually if needed
+      // Handle error with user feedback
+      if (mounted) {
+        setState(() {
+          _locationError = 'Location error: ${e.toString()}';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+      }
     }
   }
 
@@ -349,6 +374,29 @@ class _LocationPageState extends State<LocationPage> {
                 Text(
                   l10n.locationDetectedSuccessfully,
                   style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+
+        if (_locationError != null)
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 16, top: 16),
+            decoration: BoxDecoration(
+              color: Colors.red[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error, color: Colors.red[700]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _locationError!,
+                    style: TextStyle(color: Colors.red[700], fontWeight: FontWeight.w500),
+                  ),
                 ),
               ],
             ),

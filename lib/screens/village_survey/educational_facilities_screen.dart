@@ -29,6 +29,37 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
   final TextEditingController otherFacilityNameController = TextEditingController();
   final TextEditingController otherFacilityCountController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+
+    // Load saved values when editing an existing village session
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+        final sessionId = databaseService.currentSessionId;
+        if (sessionId == null) return;
+
+        final existing = await databaseService.getVillageData('village_educational_facilities', sessionId);
+        if (existing.isNotEmpty) {
+          final row = existing.first;
+          primarySchoolsController.text = (row['primary_schools'] ?? '').toString();
+          middleSchoolsController.text = (row['middle_schools'] ?? '').toString();
+          secondarySchoolsController.text = (row['secondary_schools'] ?? '').toString();
+          higherSecondarySchoolsController.text = (row['higher_secondary_schools'] ?? '').toString();
+          collegesController.text = (row['colleges'] ?? '').toString();
+          numAnganwadiController.text = (row['anganwadi_centers'] ?? '').toString();
+          skillDevelopmentCentersController.text = (row['skill_development_centers'] ?? '').toString();
+          numShikshaGuaranteeController.text = (row['shiksha_guarantee_centers'] ?? '').toString();
+          otherFacilityNameController.text = (row['other_facility_name'] ?? '') as String;
+          otherFacilityCountController.text = (row['other_facility_count'] ?? '').toString();
+        }
+      } catch (e) {
+        debugPrint('Error loading educational_facilities data: $e');
+      }
+    });
+  }
+
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;

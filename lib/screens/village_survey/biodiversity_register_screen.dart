@@ -57,6 +57,21 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
             _currentSessionId = sessionId;
             _shineCode = session['shine_code'] as String?;
           });
+
+          // Load any existing biodiversity row and populate controllers
+          try {
+            final existing = await _databaseService.getVillageData('village_biodiversity_register', sessionId);
+            if (existing.isNotEmpty) {
+              final row = existing.first;
+              statusController.text = (row['status'] ?? '') as String;
+              detailsController.text = (row['details'] ?? '') as String;
+              componentsController.text = (row['components'] ?? '') as String;
+              knowledgeController.text = (row['knowledge'] ?? '') as String;
+            }
+          } catch (e) {
+            debugPrint('Error loading biodiversity row: $e');
+          }
+
           _loadExistingUploads();
         }
       }

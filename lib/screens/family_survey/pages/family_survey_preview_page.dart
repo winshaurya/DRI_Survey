@@ -39,6 +39,16 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   Future<void> _loadAllSurveyData() async {
     setState(() => _isLoading = true);
 
+    // If preview is embedded in the active survey flow, prefer the in-memory surveyData
+    // passed by the caller so freshly-entered (unsaved) values are visible immediately.
+    if (widget.embedInSurveyFlow && widget.surveyData != null && widget.surveyData!.isNotEmpty) {
+      setState(() {
+        _surveyData = _normalizeSurveyDataForPreview(widget.surveyData!);
+        _isLoading = false;
+      });
+      return;
+    }
+
     try {
       print('Loading survey data from database');
 
@@ -1047,16 +1057,9 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildDataRow('Primary Source', irrigation['primary_source']),
         _buildDataRow('Canal', irrigation['canal']),
         _buildDataRow('Tube Well', irrigation['tube_well']),
-        _buildDataRow('River', irrigation['river']),
         _buildDataRow('Pond', irrigation['pond']),
-        _buildDataRow('Well', irrigation['well']),
-        _buildDataRow('Hand Pump', irrigation['hand_pump']),
-        _buildDataRow('Submersible', irrigation['submersible']),
-        _buildDataRow('Rainwater Harvesting', irrigation['rainwater_harvesting']),
-        _buildDataRow('Check Dam', irrigation['check_dam']),
         _buildDataRow('Other Sources', irrigation['other_sources']),
       ],
     );
@@ -1110,7 +1113,6 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
         _buildDataRow('Urea Fertilizer', fertilizer['urea_fertilizer']),
         _buildDataRow('Organic Fertilizer', fertilizer['organic_fertilizer']),
         _buildDataRow('Fertilizer Types', fertilizer['fertilizer_types']),
-        _buildDataRow('Fertilizer Expenditure (Rs.)', fertilizer['fertilizer_expenditure']),
       ],
     );
   }
@@ -1155,26 +1157,25 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildEquipment() {
-    final equipment = _surveyData['equipment'] as List<dynamic>? ?? [];
+    final equipment = _surveyData['equipment'] as Map<String, dynamic>? ?? {};
     
-    if (equipment.isNotEmpty && equipment.first is Map) {
-      final eq = equipment.first as Map<String, dynamic>;
+    if (equipment.isNotEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDataRow('Tractor', eq['tractor']),
-          _buildDataRow('Tractor Condition', eq['tractor_condition']),
-          _buildDataRow('Thresher', eq['thresher']),
-          _buildDataRow('Thresher Condition', eq['thresher_condition']),
-          _buildDataRow('Seed Drill', eq['seed_drill']),
-          _buildDataRow('Seed Drill Condition', eq['seed_drill_condition']),
-          _buildDataRow('Sprayer', eq['sprayer']),
-          _buildDataRow('Sprayer Condition', eq['sprayer_condition']),
-          _buildDataRow('Duster', eq['duster']),
-          _buildDataRow('Duster Condition', eq['duster_condition']),
-          _buildDataRow('Diesel Engine', eq['diesel_engine']),
-          _buildDataRow('Diesel Engine Condition', eq['diesel_engine_condition']),
-          _buildDataRow('Other Equipment', eq['other_equipment']),
+          _buildDataRow('Tractor', equipment['tractor']),
+          _buildDataRow('Tractor Condition', equipment['tractor_condition']),
+          _buildDataRow('Thresher', equipment['thresher']),
+          _buildDataRow('Thresher Condition', equipment['thresher_condition']),
+          _buildDataRow('Seed Drill', equipment['seed_drill']),
+          _buildDataRow('Seed Drill Condition', equipment['seed_drill_condition']),
+          _buildDataRow('Sprayer', equipment['sprayer']),
+          _buildDataRow('Sprayer Condition', equipment['sprayer_condition']),
+          _buildDataRow('Duster', equipment['duster']),
+          _buildDataRow('Duster Condition', equipment['duster_condition']),
+          _buildDataRow('Diesel Engine', equipment['diesel_engine']),
+          _buildDataRow('Diesel Engine Condition', equipment['diesel_engine_condition']),
+          _buildDataRow('Other Equipment', equipment['other_equipment']),
         ],
       );
     }

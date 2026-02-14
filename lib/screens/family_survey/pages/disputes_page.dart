@@ -119,6 +119,12 @@ class _DisputesPageState extends State<DisputesPage> {
       'other_registered': _otherRegistered,
       'other_period': _otherPeriod,
     };
+
+    // Debug: confirm page is emitting collected values
+    // (Left intentionally lightweight; remove if noisy)
+    // ignore: avoid_print
+    print('📝 DisputesPage._updateData -> keys: ${data.keys.where((k) => data[k] != null && data[k].toString().isNotEmpty).toList()}');
+
     widget.onDataChanged(data);
   }
 
@@ -169,7 +175,7 @@ class _DisputesPageState extends State<DisputesPage> {
                         BoxShadow(
                           color: iconColor.withOpacity(0.3),
                           blurRadius: 8,
-                          offset: const Offset(0, 4),
+offset: const Offset(0, 1.6),
                         ),
                       ],
                     ),

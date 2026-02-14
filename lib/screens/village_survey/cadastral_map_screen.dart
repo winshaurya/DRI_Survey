@@ -53,6 +53,36 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
     });
   }
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+        final sessionId = databaseService.currentSessionId;
+        if (sessionId == null) return;
+
+        final rows = await databaseService.getVillageData('village_cadastral_maps', sessionId);
+        if (rows.isNotEmpty) {
+          final row = rows.first;
+          setState(() {
+            hasCadastralMap = (row['has_cadastral_map'] ?? 0) == 1;
+            mapDetailsController.text = (row['map_details'] ?? '') as String;
+            availabilityStatusController.text = (row['availability_status'] ?? '') as String;
+            final imagePath = row['image_path'] as String?;
+            if (imagePath != null && imagePath.isNotEmpty) {
+              try {
+                _selectedImage = File(imagePath);
+              } catch (_) {}
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading cadastral map data: $e');
+      }
+    });
+  }
+
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final syncService = SyncService.instance;

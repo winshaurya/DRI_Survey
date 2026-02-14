@@ -400,6 +400,11 @@ class VillageSurveyNotifier extends Notifier<VillageSurveyState> {
         'completed',
       );
 
+      // Clear in-memory current session id to avoid accidental reuse when starting a new survey
+      try {
+        DatabaseService().currentSessionId = null;
+      } catch (_) {}
+
       // Update status in Supabase directly (like family surveys do)
       if (await _supabaseService.isOnline()) {
         try {

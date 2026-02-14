@@ -25,6 +25,33 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
   bool? _hasRiver;
   bool? _hasWell;
 
+  @override
+  void initState() {
+    super.initState();
+    // Load saved values when editing an existing session
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+        final sessionId = databaseService.currentSessionId;
+        if (sessionId == null) return;
+
+        final rows = await databaseService.getVillageData('village_irrigation_facilities', sessionId);
+        if (rows.isNotEmpty) {
+          final row = rows.first;
+          setState(() {
+            _hasCanal = (row['has_canal'] ?? 0) == 1;
+            _hasTubeWell = (row['has_tube_well'] ?? 0) == 1;
+            _hasPonds = (row['has_ponds'] ?? 0) == 1;
+            _hasRiver = (row['has_river'] ?? 0) == 1;
+            _hasWell = (row['has_well'] ?? 0) == 1;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading irrigation facilities: $e');
+      }
+    });
+  }
+
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;

@@ -22,7 +22,7 @@ class SurveyProgressBar extends StatelessWidget {
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
             blurRadius: 4,
-            offset: const Offset(0, 2),
+offset: const Offset(0, 0.8),
           ),
         ],
       ),

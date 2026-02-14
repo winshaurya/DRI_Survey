@@ -239,14 +239,15 @@ class _VillageFormScreenState extends ConsumerState<VillageFormScreen> {
       await provider_package.Provider.of<DatabaseService>(context, listen: false)
           .markVillagePageCompleted(currentSessionId, 0);
 
-      // Sync immediately to Supabase
+      // Sync immediately to Supabase (do not block UI). Fire-and-forget with timeout.
       try {
-        await provider_package.Provider.of<SyncService>(context, listen: false)
-            .syncVillagePageData(currentSessionId, 0, formData);
-        debugPrint('✅ Village survey session $currentSessionId synced successfully');
+        unawaited(
+          provider_package.Provider.of<SyncService>(context, listen: false)
+              .syncVillagePageData(currentSessionId, 0, formData)
+              .timeout(const Duration(seconds: 6)),
+        );
       } catch (e) {
-        debugPrint('❌ Failed to sync village survey session $currentSessionId: $e');
-        // Don't fail the form submission, just log the error
+        debugPrint('❌ Failed to start sync for village survey session $currentSessionId: $e');
       }
 
       if (mounted) {
@@ -430,6 +431,11 @@ class _VillageFormScreenState extends ConsumerState<VillageFormScreen> {
       _latitude = null;
       _longitude = null;
     });
+
+    // Also create a fresh in-memory current session so reset acts like "start new"
+    try {
+      DatabaseService().currentSessionId = const Uuid().v4();
+    } catch (_) {}
   }
 
   void _onShineVillageSelected(ShineVillage shineVillage) {

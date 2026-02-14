@@ -108,7 +108,7 @@ class _SurveyPageState extends ConsumerState<SurveyPage> {
                     BoxShadow(
                       color: Colors.black.withOpacity(0.1),
                       blurRadius: 8,
-                      offset: const Offset(0, -2),
+offset: const Offset(0, -0.8),
                     ),
                   ],
                 ),

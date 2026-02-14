@@ -33,6 +33,32 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
     {'category': 'Special Features', 'controller': TextEditingController(), 'icon': Icons.star},
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+        final sessionId = databaseService.currentSessionId;
+        if (sessionId == null) return;
+
+        final rows = await databaseService.getVillageData('village_survey_details', sessionId);
+        if (rows.isNotEmpty) {
+          final row = rows.first;
+          for (final item in surveyCategories) {
+            final key = (item['category'] as String).toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+            final controller = item['controller'] as TextEditingController;
+            final dbKey = '${key}_details';
+            controller.text = (row[dbKey] ?? '') as String;
+          }
+          setState(() {});
+        }
+      } catch (e) {
+        debugPrint('Error loading survey details: $e');
+      }
+    });
+  }
+
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;

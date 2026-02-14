@@ -19,7 +19,7 @@ class IrrigationPage extends StatefulWidget {
 class _IrrigationPageState extends State<IrrigationPage> {
   late bool _canal;
   late bool _tubeWell;
-  late bool _ponds;
+    late bool _ponds;
   late bool _otherFacilities;
 
   String? _otherIrrigationSpecify;
@@ -76,7 +76,7 @@ class _IrrigationPageState extends State<IrrigationPage> {
     final l10n = AppLocalizations.of(context)!;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -295,6 +295,7 @@ class _IrrigationPageState extends State<IrrigationPage> {
               ),
             ),
           ),
+          const SizedBox(height: 40),
         ],
       ),
     );

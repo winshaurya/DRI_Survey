@@ -51,6 +51,59 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
   bool _hasElectricalConnection = false;
   bool _hasDrinkingWaterSource = true; // Always true - drinking water source is always available
 
+  @override
+  void initState() {
+    super.initState();
+    // Load saved infrastructure details when editing an existing session
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final databaseService = Provider.of<DatabaseService>(context, listen: false);
+        final sessionId = databaseService.currentSessionId;
+        if (sessionId == null) return;
+
+        final rows = await databaseService.getVillageData('village_infrastructure_details', sessionId);
+        if (rows.isNotEmpty) {
+          final row = rows.first;
+          setState(() {
+            _hasPrimarySchool = (row['has_primary_school'] ?? 0) == 1;
+            primarySchoolDistanceController.text = (row['primary_school_distance'] ?? '').toString();
+            _hasJuniorSchool = (row['has_junior_school'] ?? 0) == 1;
+            juniorSchoolDistanceController.text = (row['junior_school_distance'] ?? '').toString();
+            _hasHighSchool = (row['has_high_school'] ?? 0) == 1;
+            highSchoolDistanceController.text = (row['high_school_distance'] ?? '').toString();
+            _hasIntermediateSchool = (row['has_intermediate_school'] ?? 0) == 1;
+            intermediateSchoolDistanceController.text = (row['intermediate_school_distance'] ?? '').toString();
+
+            otherEducationalFacilityController.text = (row['other_education_facilities'] ?? '') as String;
+            boysStudentsController.text = (row['boys_students_count'] ?? '').toString();
+            girlsStudentsController.text = (row['girls_students_count'] ?? '').toString();
+            _hasPlayground = (row['has_playground'] ?? 0) == 1;
+            playgroundRemarksController.text = (row['playground_remarks'] ?? '') as String;
+            _hasPanchayatBhavan = (row['has_panchayat_bhavan'] ?? 0) == 1;
+            panchayatRemarksController.text = (row['panchayat_remarks'] ?? '') as String;
+            _hasShardaKendra = (row['has_sharda_kendra'] ?? 0) == 1;
+            shardaKendraDistanceController.text = (row['sharda_kendra_distance'] ?? '') as String;
+            _hasPostOffice = (row['has_post_office'] ?? 0) == 1;
+            postOfficeDistanceController.text = (row['post_office_distance'] ?? '') as String;
+            _hasHealthFacility = (row['has_health_facility'] ?? 0) == 1;
+            healthFacilityDistanceController.text = (row['health_facility_distance'] ?? '') as String;
+            _hasPrimaryHealthCentre = (row['has_primary_health_centre'] ?? 0) == 1;
+            _hasBank = (row['has_bank'] ?? 0) == 1;
+            bankDistanceController.text = (row['bank_distance'] ?? '') as String;
+            _hasElectricalConnection = (row['has_electrical_connection'] ?? 0) == 1;
+            numWellsController.text = (row['num_wells'] ?? '').toString();
+            numPondsController.text = (row['num_ponds'] ?? '').toString();
+            numHandPumpsController.text = (row['num_hand_pumps'] ?? '').toString();
+            numTubeWellsController.text = (row['num_tube_wells'] ?? '').toString();
+            numTapWaterController.text = (row['num_tap_water'] ?? '').toString();
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading infrastructure availability data: $e');
+      }
+    });
+  }
+
   Future<void> _submitForm() async {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;
