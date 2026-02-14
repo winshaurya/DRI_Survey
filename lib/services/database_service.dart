@@ -417,21 +417,28 @@ static Database? _database;
   }
 
   // Create village survey session
+  /// Creates a new village survey session, ensuring DB is ready and required fields are present.
   Future<void> createVillageSurveySession(Map<String, dynamic> sessionData) async {
     final db = await database;
-    await db.insert(
-      'village_survey_sessions',
-      {
-        ...sessionData,
-        'created_at': sessionData['created_at'] ?? DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-    
-    // Set current session ID
-    if (sessionData.containsKey('session_id')) {
-      _currentSessionId = sessionData['session_id'];
+    final now = DateTime.now().toIso8601String();
+    final data = {
+      ...sessionData,
+      'created_at': sessionData['created_at'] ?? now,
+      'updated_at': now,
+    };
+    if (data['session_id'] == null || (data['session_id'] as String).isEmpty) {
+      throw Exception('session_id is required for village survey session');
+    }
+    try {
+      await db.insert(
+        'village_survey_sessions',
+        data,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      _currentSessionId = data['session_id'];
+    } catch (e) {
+      // Surface DB errors for troubleshooting
+      rethrow;
     }
   }
 
@@ -450,10 +457,13 @@ static Database? _database;
   }
 
   // Insert or update village survey data
+  /// Insert or update a record for a village survey table. Ensures DB is ready, required fields present, and errors are surfaced.
   Future<void> insertOrUpdate(String tableName, Map<String, dynamic> data, String sessionId) async {
     final db = await database;
     final columns = await _getTableColumns(db, tableName);
-
+    if (sessionId.isEmpty) {
+      throw Exception('session_id is required for $tableName');
+    }
     // Check if record exists
     final existing = await db.query(
       tableName,
@@ -461,35 +471,37 @@ static Database? _database;
       whereArgs: [sessionId],
       limit: 1,
     );
-
+    final now = DateTime.now().toIso8601String();
     final dataWithTimestamp = <String, dynamic>{
       ...data,
       'session_id': sessionId,
     };
-
     if (columns.contains('updated_at')) {
-      dataWithTimestamp['updated_at'] = DateTime.now().toIso8601String();
+      dataWithTimestamp['updated_at'] = now;
     }
-
-    // Filter to known columns only to prevent unknown-column errors
+    // Filter to known columns only
     final filteredData = Map<String, dynamic>.fromEntries(
       dataWithTimestamp.entries.where((e) => columns.contains(e.key))
     );
-
-    if (existing.isEmpty) {
-      // Insert new
-      if (columns.contains('created_at')) {
-        filteredData['created_at'] = DateTime.now().toIso8601String();
+    try {
+      if (existing.isEmpty) {
+        // Insert new
+        if (columns.contains('created_at')) {
+          filteredData['created_at'] = now;
+        }
+        await db.insert(tableName, filteredData);
+      } else {
+        // Update existing
+        await db.update(
+          tableName,
+          filteredData,
+          where: 'session_id = ?',
+          whereArgs: [sessionId],
+        );
       }
-      await db.insert(tableName, filteredData);
-    } else {
-      // Update existing
-      await db.update(
-        tableName,
-        filteredData,
-        where: 'session_id = ?',
-        whereArgs: [sessionId],
-      );
+    } catch (e) {
+      // Surface DB errors for troubleshooting
+      rethrow;
     }
   }
 

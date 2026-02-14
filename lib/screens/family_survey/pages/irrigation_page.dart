@@ -72,7 +72,6 @@ class _IrrigationPageState extends State<IrrigationPage> {
 
   @override
   Widget build(BuildContext context) {
-    // ignore: unused_local_variable
     final l10n = AppLocalizations.of(context)!;
 
     return SingleChildScrollView(

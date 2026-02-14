@@ -59,8 +59,6 @@ class _SocialConsciousnessPage2State extends State<SocialConsciousnessPage2> {
 
   @override
   Widget build(BuildContext context) {
-    // ignore: unused_local_variable
-    final l10n = AppLocalizations.of(context);
 
     // Helper to get value from pageData
     String? getString(String key) => widget.pageData[key] as String?;

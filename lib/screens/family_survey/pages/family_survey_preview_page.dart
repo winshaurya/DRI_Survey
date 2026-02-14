@@ -1884,7 +1884,7 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
       await DatabaseService().updateSurveyStatus(widget.phoneNumber, 'completed');
       
       // Sync to Supabase
-      final notifier = ref.read(surveyProvider.notifier);
+      final SurveyNotifier notifier = ref.read(surveyProvider.notifier);
       await notifier.completeSurvey();
 
       if (mounted) {

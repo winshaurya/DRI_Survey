@@ -230,10 +230,6 @@ class ExcelService {
     }
   }
 
-  String _safeSheetName(String name) {
-    final sanitized = name.replaceAll(RegExp(r'[^A-Za-z0-9_\-]'), '_');
-    return sanitized.length > 31 ? sanitized.substring(0, 31) : sanitized;
-  }
 
   Future<Map<String, dynamic>> fetchCompleteSurveyData(String phoneNumber) async {
     final data = <String, dynamic>{};

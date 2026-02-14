@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/auth_io.dart' as auth;
-import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -12,7 +10,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'database_service.dart';
 import 'sync_service.dart';
@@ -322,7 +319,6 @@ class FileUploadService {
     final shineCode = upload['village_smile_code'];
     final pageType = upload['page_type'];
     final component = upload['component'];
-    final fileType = upload['file_type'];
 
     // Update status to uploading
     await _updateUploadStatus(uploadId, 'uploading');

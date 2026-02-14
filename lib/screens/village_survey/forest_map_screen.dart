@@ -187,7 +187,7 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Color(0xFF800080).withOpacity(0.3)),
+border: Border.all(color: Color(0xFF800080).withValues(alpha: 0.3)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

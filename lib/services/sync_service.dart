@@ -556,8 +556,6 @@ class SyncService {
           'shg_members': await _databaseService.getData('shg_members', phoneNumber),
           'fpo_members': await _databaseService.getData('fpo_members', phoneNumber),
         };
-        final land = await _databaseService.getData('land_holding', phoneNumber);
-        return land.isNotEmpty ? Map<String, dynamic>.from(land.first) : {};
       case 6:
         final irrigation = await _databaseService.getData('irrigation_facilities', phoneNumber);
         return irrigation.isNotEmpty ? Map<String, dynamic>.from(irrigation.first) : {};

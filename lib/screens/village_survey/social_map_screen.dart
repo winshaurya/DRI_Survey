@@ -20,7 +20,6 @@ class SocialMapScreen extends StatefulWidget {
 
 class _SocialMapScreenState extends State<SocialMapScreen> {
   final _formKey = GlobalKey<FormState>();
-  final ImagePicker _picker = ImagePicker();
   final TextEditingController _remarksController = TextEditingController();
   final FileUploadService _fileUploadService = FileUploadService.instance;
 
@@ -197,10 +196,6 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
     }
   }
 
-  // Deprecated: used _pickFile instead
-  Future<void> _pickImage(String component) async {
-      await _pickFile(component);
-  }
 
   void _removeImage(String component) {
     setState(() {

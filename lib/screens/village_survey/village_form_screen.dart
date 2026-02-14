@@ -1,3 +1,7 @@
+// Village Survey Main Form Screen
+// Handles creation and editing of village survey sessions.
+// Data is saved locally and synced to Supabase.
+// This file contains form logic, location fetching, and session management.
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -18,6 +22,8 @@ import '../../providers/village_survey_provider.dart';
 import '../family_survey/widgets/side_navigation.dart';
 import 'infrastructure_screen.dart';
 
+/// Main entry point for the village survey form.
+/// Handles user input, location, and session data.
 class VillageFormScreen extends ConsumerStatefulWidget {
   const VillageFormScreen({super.key});
 
@@ -26,7 +32,7 @@ class VillageFormScreen extends ConsumerStatefulWidget {
 }
 
 class _VillageFormScreenState extends ConsumerState<VillageFormScreen> {
-  // Form controllers
+  // --- Form controllers for each field ---
   final TextEditingController villageNameController = TextEditingController();
   final TextEditingController villageCodeController = TextEditingController();
   final TextEditingController blockController = TextEditingController();
@@ -36,24 +42,25 @@ class _VillageFormScreenState extends ConsumerState<VillageFormScreen> {
   final TextEditingController shineCodeController = TextEditingController();
   final TextEditingController praTeamController = TextEditingController();
 
-  // Location Data
+  // --- Location Data ---
   double? _latitude;
   double? _longitude;
   double? _accuracy;
   String? _locationTimestamp;
 
+  // --- State and District Selection ---
   String selectedState = '';
   String selectedDistrict = '';
   bool _isLoadingLocation = false;
   bool _locationFetched = false;
 
-  // Map state
+  // --- Map state for location picker ---
   MapController _mapController = MapController();
   LatLng _currentLocation = LatLng(28.6139, 77.2090); // Default to Delhi
   Location _location = Location();
   bool _locationLoaded = false;
 
-  // State/district options (loaded from static map)
+  // --- State/district options (loaded from static map) ---
   Map<String, List<String>> stateDistrictData = {};
   List<String> availableDistricts = [];
   List<String> stateOptions = [];
@@ -63,18 +70,20 @@ class _VillageFormScreenState extends ConsumerState<VillageFormScreen> {
     super.initState();
     _loadStateDistrictData();
 
-    // Check for existing session first
+    // On widget load, check if a session already exists and load it.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForExistingSession();
     });
 
+    // Initialize location services for GPS data.
     _initializeLocation();
   }
 
+  /// Checks if a village survey session already exists in the local database.
+  /// If found, loads the session data into the form controllers.
   Future<void> _checkForExistingSession() async {
     final databaseService = provider_package.Provider.of<DatabaseService>(context, listen: false);
     final sessionId = databaseService.currentSessionId;
-    
     if (sessionId != null) {
       try {
         final db = await databaseService.database;
@@ -83,7 +92,6 @@ class _VillageFormScreenState extends ConsumerState<VillageFormScreen> {
           where: 'session_id = ?',
           whereArgs: [sessionId],
         );
-        
         if (sessions.isNotEmpty) {
           final session = sessions.first;
           setState(() {
@@ -94,13 +102,11 @@ class _VillageFormScreenState extends ConsumerState<VillageFormScreen> {
             tehsilController.text = session['tehsil'] ?? '';
             ldgCodeController.text = session['ldg_code'] ?? '';
             shineCodeController.text = session['shine_code'] ?? '';
-            
             selectedState = session['state'] ?? '';
             if (selectedState.isNotEmpty) {
               availableDistricts = Set<String>.from(stateDistrictData[selectedState] ?? []).toList()..sort();
               selectedDistrict = session['district'] ?? '';
             }
-
             _latitude = session['latitude'];
             _longitude = session['longitude'];
             if (_latitude != null && _longitude != null) {
@@ -110,6 +116,7 @@ class _VillageFormScreenState extends ConsumerState<VillageFormScreen> {
           });
         }
       } catch (e) {
+        // Debug print left for troubleshooting session load issues.
         debugPrint('Error loading existing session: $e');
       }
     }
@@ -664,9 +671,9 @@ class _VillageFormScreenState extends ConsumerState<VillageFormScreen> {
                   margin: EdgeInsets.only(bottom: 12),
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
+                    color: Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                    border: Border.all(color: Colors.green.withOpacity(0.3)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,

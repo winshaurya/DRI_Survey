@@ -1,5 +1,8 @@
+
 import React from 'react';
 import LineChart from '../components/charts/LineChart';
+import Confetti from 'react-canvas-confetti';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function Dashboard(){
   return (
@@ -81,8 +84,83 @@ export default function Dashboard() {
               <p className="muted">Schema not available — set `SUPABASE_SERVICE_ROLE_KEY` in Vercel env.</p>
             )}
           </div>
+
+          <div className="panel" style={{ marginTop: 12 }}>
+            <h3>Admin completeness (service role)</h3>
+            <AdminCompletenessPanel />
+          </div>
         </aside>
       </main>
     </div>
   )
+}
+
+function AdminCompletenessPanel() {
+  const [surveyType, setSurveyType] = React.useState<'family' | 'village'>('family');
+  const [identifierKey, setIdentifierKey] = React.useState('phone_number');
+  const [identifierValue, setIdentifierValue] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [result, setResult] = React.useState<any>(null);
+  const [showConfetti, setShowConfetti] = React.useState(false);
+
+  async function runAdmin() {
+    setLoading(true);
+    setShowConfetti(false);
+    try {
+      const payload: any = { surveyType, identifierKey, identifierValue, sampleLimit: 5, maxRows: 2000 };
+      const res = await fetch('/api/admin/completeness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      setResult(json);
+      if (!json.error) {
+        setShowConfetti(true);
+        toast.success('Admin scan complete!');
+        setTimeout(() => setShowConfetti(false), 2200);
+      }
+    } catch (err) {
+      console.error(err);
+      setResult({ error: 'request failed' });
+      toast.error('Scan failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <Toaster position="top-center" />
+      {showConfetti && (
+        <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: 180, pointerEvents: 'none', zIndex: 20 }}>
+          <Confetti width={400} height={180} recycle={false} numberOfPieces={120} />
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <select value={surveyType} onChange={e => setSurveyType(e.target.value as any)}>
+          <option value="family">family</option>
+          <option value="village">village</option>
+        </select>
+        <input value={identifierKey} onChange={e => setIdentifierKey(e.target.value)} style={{ width: 140 }} />
+        <input placeholder="identifier value" value={identifierValue} onChange={e => setIdentifierValue(e.target.value)} />
+        <button onClick={runAdmin} disabled={loading}>{loading ? 'Scanning…' : 'Run admin scan'}</button>
+      </div>
+
+      {result && (
+        <div style={{ marginTop: 8 }}>
+          {result.error ? (
+            <div className="muted">{String(result.error)}</div>
+          ) : (
+            <div>
+              <div>
+                <strong>Tables:</strong> {result.totalTables} — <strong>Columns:</strong> {result.totalColumns} — <strong>Filled:</strong> {result.columnsFilled}
+              </div>
+              <pre style={{ maxHeight: 220, overflow: 'auto' }}>{JSON.stringify(result.tables ?? result, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

@@ -45,20 +45,6 @@ class SupabaseService {
     }
   }
 
-  Future<void> _saveSession() async {
-    try {
-      final session = Supabase.instance.client.auth.currentSession;
-      if (session != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_jwtKey, session.accessToken);
-        await prefs.setString(_refreshTokenKey, session.refreshToken ?? '');
-        await prefs.setString(_expiresAtKey, session.expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(session.expiresAt! * 1000).toIso8601String() : '');
-        debugPrint('Saved persistent Supabase session');
-      }
-    } catch (e) {
-      debugPrint('Failed to save session: $e');
-    }
-  }
 
   Future<void> _clearStoredSession() async {
     try {
@@ -263,13 +249,6 @@ class SupabaseService {
       for (final item in data) {
         if (item is Map<String, dynamic>) {
           filteredList.add(Map<String, dynamic>.fromEntries(item.entries.where((e) => columns.contains(e.key))));
-        } else if (item is Map) {
-          final casted = <String, dynamic>{};
-          for (final entry in item.entries) {
-            final key = entry.key.toString();
-            if (columns.contains(key)) casted[key] = entry.value;
-          }
-          filteredList.add(_normalizeMap(casted));
         }
       }
       return filteredList;
@@ -662,8 +641,6 @@ class SupabaseService {
       case 30:
         await _syncBankAccounts(phoneNumber, data['bank_accounts']);
         break;
-      default:
-        break;
     }
   }
 
@@ -872,11 +849,6 @@ class SupabaseService {
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
     await _upsertWithRetry('diseases', rows);
-  }
-
-  Future<void> _syncGovernmentSchemes(String phoneNumber, Map<String, dynamic> surveyData) async {
-    // Legacy sequential method - kept for compatibility
-    await _syncGovernmentSchemesParallel(phoneNumber, surveyData, {});
   }
 
   // Parallel sync for government schemes with error tracking
@@ -1218,21 +1190,6 @@ class SupabaseService {
     await _upsertWithRetry('pm_kisan_samman_members', rows);
   }
 
-  Future<void> _syncKisanCreditCard(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('kisan_credit_card', _normalizeMap({...data, 'phone_number': phoneNumber}));
-  }
-
-  Future<void> _syncSwachhBharat(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('swachh_bharat', _normalizeMap({...data, 'phone_number': phoneNumber}));
-  }
-
-  Future<void> _syncFasalBima(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('fasal_bima', _normalizeMap({...data, 'phone_number': phoneNumber}));
-  }
-
   Future<void> _syncMergedGovtSchemes(String phoneNumber, Map<String, dynamic>? data) async {
     if (data == null || data.isEmpty) return;
     final schemeData = data['scheme_data'] ?? (data is Map<String, dynamic> ? data : null);
@@ -1295,133 +1252,6 @@ class SupabaseService {
   }
 
   // Village survey helper methods
-  Future<void> _syncVillagePopulation(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_population', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageFarmFamilies(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_farm_families', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageDrainageWaste(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_drainage_waste', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageHousing(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_housing', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageAgriculturalImplements(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_agricultural_implements', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageCropProductivity(String sessionId, List<dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    final rows = _normalizeList(
-      data.map((item) => {...item, 'session_id': sessionId}).toList(),
-    );
-    await _upsertWithRetry('village_crop_productivity', rows);
-  }
-
-  Future<void> _syncVillageAnimals(String sessionId, List<dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    final rows = _normalizeList(
-      data.map((item) => {...item, 'session_id': sessionId}).toList(),
-    );
-    await _upsertWithRetry('village_animals', rows);
-  }
-
-  Future<void> _syncVillageIrrigationFacilities(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_irrigation_facilities', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageDrinkingWater(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_drinking_water', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageTransport(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_transport', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageEntertainment(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_entertainment', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageMedicalTreatment(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_medical_treatment', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageDisputes(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_disputes', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageEducationalFacilities(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_educational_facilities', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageSocialConsciousness(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_social_consciousness', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageChildrenData(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_children_data', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageMalnutritionData(String sessionId, List<dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    final rows = _normalizeList(
-      data.map((item) => {...item, 'session_id': sessionId}).toList(),
-    );
-    await _upsertWithRetry('village_malnutrition_data', rows);
-  }
-
-  Future<void> _syncVillageBplFamilies(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_bpl_families', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageKitchenGardens(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_kitchen_gardens', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageSeedClubs(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_seed_clubs', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageBiodiversityRegister(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_biodiversity_register', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
-  Future<void> _syncVillageTraditionalOccupations(String sessionId, List<dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    final rows = _normalizeList(
-      data.map((item) => {...item, 'session_id': sessionId}).toList(),
-    );
-    await _upsertWithRetry('village_traditional_occupations', rows);
-  }
-
-  Future<void> _syncVillageUnemployment(String sessionId, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('village_unemployment', _normalizeMap({...data, 'session_id': sessionId}));
-  }
-
   // Get survey statistics for dashboard
   Future<Map<String, dynamic>> getSurveyStatistics() async {
     try {

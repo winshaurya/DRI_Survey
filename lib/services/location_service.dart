@@ -76,10 +76,6 @@ class LocationService {
         return null;
       }
 
-      if (locationData == null) {
-        print('Location data is null');
-        return null;
-      }
 
       if (locationData.latitude == null || locationData.longitude == null) {
         print('Location coordinates are null: lat=${locationData.latitude}, lng=${locationData.longitude}');
