@@ -295,14 +295,14 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
       if (childDiseases.isNotEmpty) allData['child_diseases'] = childDiseases;
 
       setState(() {
-        _surveyData = allData;
+        _surveyData = _normalizeSurveyDataForPreview(allData);
         _isLoading = false;
       });
     } catch (e) {
       print('Error loading survey data: $e');
       setState(() => _isLoading = false);
-    }
   }
+}
 
   Map<String, dynamic> _normalizeSurveyDataForPreview(Map<String, dynamic> raw) {
     final data = Map<String, dynamic>.from(raw);
@@ -316,7 +316,13 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
     }
 
     List<dynamic> listify(dynamic value) {
-      if (value is List) return List<dynamic>.from(value);
+      if (value is List) {
+        return value.map((e) {
+          if (e is Map<String, dynamic>) return Map<String, dynamic>.from(e);
+          if (e is Map) return e.map((k, v) => MapEntry(k.toString(), v));
+          return e;
+        }).toList();
+      }
       return [];
     }
 
@@ -1053,7 +1059,12 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildIrrigation() {
-    final irrigation = _surveyData['irrigation'] as Map<String, dynamic>? ?? {};
+    final irrigationRaw = _surveyData['irrigation'];
+    final irrigation = irrigationRaw is Map<String, dynamic>
+        ? irrigationRaw
+        : (irrigationRaw is List && irrigationRaw.isNotEmpty && irrigationRaw.first is Map<String, dynamic>
+            ? irrigationRaw.first as Map<String, dynamic>
+            : {});
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1106,7 +1117,12 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildFertilizer() {
-    final fertilizer = _surveyData['fertilizer'] as Map<String, dynamic>? ?? {};
+    final fertilizerRaw = _surveyData['fertilizer'];
+    final fertilizer = fertilizerRaw is Map<String, dynamic>
+        ? fertilizerRaw
+        : (fertilizerRaw is List && fertilizerRaw.isNotEmpty && fertilizerRaw.first is Map<String, dynamic>
+            ? fertilizerRaw.first as Map<String, dynamic>
+            : {});
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1157,7 +1173,12 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildEquipment() {
-    final equipment = _surveyData['equipment'] as Map<String, dynamic>? ?? {};
+    final equipmentRaw = _surveyData['equipment'];
+    final equipment = equipmentRaw is Map<String, dynamic>
+        ? equipmentRaw
+        : (equipmentRaw is List && equipmentRaw.isNotEmpty && equipmentRaw.first is Map<String, dynamic>
+            ? equipmentRaw.first as Map<String, dynamic>
+            : {});
     
     if (equipment.isNotEmpty) {
       return Column(
@@ -1184,7 +1205,12 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildEntertainment() {
-    final ent = _surveyData['entertainment'] as Map<String, dynamic>? ?? {};
+    final entRaw = _surveyData['entertainment'];
+    final ent = entRaw is Map<String, dynamic>
+        ? entRaw
+        : (entRaw is List && entRaw.isNotEmpty && entRaw.first is Map<String, dynamic>
+            ? entRaw.first as Map<String, dynamic>
+            : {});
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1202,7 +1228,12 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildTransport() {
-    final transport = _surveyData['transport'] as Map<String, dynamic>? ?? {};
+    final transportRaw = _surveyData['transport'];
+    final transport = transportRaw is Map<String, dynamic>
+        ? transportRaw
+        : (transportRaw is List && transportRaw.isNotEmpty && transportRaw.first is Map<String, dynamic>
+            ? transportRaw.first as Map<String, dynamic>
+            : {});
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1869,12 +1900,12 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
     );
   }
 
-  void _editSurvey() {
+ void _editSurvey() {
     // Navigate to survey screen in edit mode
     Navigator.pushNamed(
       context,
       '/survey',
-      arguments: {'continueSessionId': widget.phoneNumber},
+     arguments: {'continueSessionId': widget.phoneNumber},
     );
   }
 

@@ -39,7 +39,6 @@ class SyncService {
   late final FileUploadService _fileUploadService;
 
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
-  Timer? _syncTimer;
   bool _isOnline = false;
   bool _connectivityInitialized = false;
 
@@ -190,36 +189,16 @@ class SyncService {
         _isOnline = result != ConnectivityResult.none;
 
         if (!wasOnline && _isOnline) {
-          // Network came back online, start syncing
-          _startPeriodicSync();
+          // Network came back online, process queued operations
           _processSyncQueue();
-          _syncPendingFamilyPages();
-          _syncPendingVillagePages();
-        } else if (wasOnline && !_isOnline) {
-          // Network went offline, stop periodic sync
-          _stopPeriodicSync();
         }
       },
     );
 
     // Start syncing if initially online
     if (_isOnline) {
-      _startPeriodicSync();
-      _syncPendingFamilyPages();
-      _syncPendingVillagePages();
+      // Sync operations are now handled by explicit page-by-page sync calls
     }
-  }
-
-  void _startPeriodicSync() {
-    _syncTimer?.cancel();
-    _syncTimer = Timer.periodic(const Duration(minutes: 5), (_) {
-      _performBackgroundSync();
-    });
-  }
-
-  void _stopPeriodicSync() {
-    _syncTimer?.cancel();
-    _syncTimer = null;
   }
 
   void _emitProgress(SyncProgress progress) {
@@ -402,145 +381,6 @@ class SyncService {
 
   List<String> getErrorsForSurvey(String phoneNumber) =>
       List<String>.from(_syncErrors[phoneNumber] ?? const []);
-
-  Future<void> _performBackgroundSync() async {
-    _ensureConnectivityMonitoringInitialized();
-    if (!_isOnline || _isProcessingQueue) return;
-
-    try {
-      await _syncPendingFamilyPages();
-      await _syncPendingVillagePages();
-
-      // Sync all pending surveys
-      final pendingSurveys = await _getPendingSurveys();
-      _emitProgress(SyncProgress(
-        stage: 'family_sync',
-        current: 0,
-        total: pendingSurveys.length,
-        message: 'Syncing family surveys',
-      ));
-      for (final survey in pendingSurveys) {
-        final idx = pendingSurveys.indexOf(survey) + 1;
-        _emitProgress(SyncProgress(
-          stage: 'family_sync',
-          current: idx,
-          total: pendingSurveys.length,
-          surveyId: survey['phone_number']?.toString(),
-          message: 'Syncing family survey $idx of ${pendingSurveys.length}',
-        ));
-        await _syncSurveyToSupabase(survey);
-      }
-
-      // Sync all pending village surveys
-      final pendingVillageSurveys = await _getPendingVillageSurveys();
-      _emitProgress(SyncProgress(
-        stage: 'village_sync',
-        current: 0,
-        total: pendingVillageSurveys.length,
-        message: 'Syncing village surveys',
-      ));
-      for (final survey in pendingVillageSurveys) {
-        final idx = pendingVillageSurveys.indexOf(survey) + 1;
-        _emitProgress(SyncProgress(
-          stage: 'village_sync',
-          current: idx,
-          total: pendingVillageSurveys.length,
-          surveyId: survey['session_id']?.toString(),
-          message: 'Syncing village survey $idx of ${pendingVillageSurveys.length}',
-        ));
-        await _syncVillageSurveyToSupabase(survey);
-      }
-
-      // Process pending file uploads
-      await _fileUploadService.processPendingUploads();
-
-      // Process any queued sync operations
-      await _processSyncQueue();
-
-      _emitProgress(const SyncProgress(stage: 'complete', message: 'Background sync completed'));
-
-    } catch (e) {
-      final msg = 'Background sync failed: $e';
-      _emitProgress(SyncProgress(stage: 'error', message: msg, isError: true));
-      _escalateError(msg, persistent: true);
-    }
-  }
-
-  Future<void> _syncPendingFamilyPages() async {
-    if (!_isOnline || _supabaseService.currentUser == null) return;
-
-    final pendingSurveys = await _databaseService.getIncompleteFamilySurveys();
-    for (final survey in pendingSurveys) {
-      final phoneNumber = survey['phone_number']?.toString();
-      if (phoneNumber == null || phoneNumber.isEmpty) continue;
-
-      final status = await _databaseService.getFamilyPageStatus(phoneNumber);
-      final pageStatus = status['page_completion_status'] as Map<String, dynamic>? ?? {};
-
-      for (final entry in pageStatus.entries) {
-        final page = int.tryParse(entry.key);
-        if (page == null) continue;
-        final value = entry.value;
-        final completed = value is Map ? value['completed'] == true : value == true;
-        final synced = value is Map ? value['synced'] == true : false;
-        if (!completed || synced) continue;
-
-        final pageData = await _collectFamilyPageDataFromDb(phoneNumber, page);
-        if (pageData.isEmpty) continue;
-
-        try {
-          await _supabaseService.syncFamilyPageToSupabase(phoneNumber, page, pageData);
-          await _databaseService.markFamilyPageSynced(phoneNumber, page);
-        } catch (e) {
-          final errMsg = 'Failed to sync pending family page $page for $phoneNumber: $e';
-          _escalateError(errMsg, persistent: true);
-          await queueSyncOperation('sync_family_page', {
-            'phone_number': phoneNumber,
-            'page': page,
-            'data': pageData,
-          });
-        }
-      }
-    }
-  }
-
-  Future<void> _syncPendingVillagePages() async {
-    if (!_isOnline || _supabaseService.currentUser == null) return;
-
-    final pendingSurveys = await _databaseService.getIncompleteVillageSurveys();
-    for (final survey in pendingSurveys) {
-      final sessionId = survey['session_id']?.toString();
-      if (sessionId == null || sessionId.isEmpty) continue;
-
-      final status = await _databaseService.getVillagePageStatus(sessionId);
-      final pageStatus = status['page_completion_status'] as Map<String, dynamic>? ?? {};
-
-      for (final entry in pageStatus.entries) {
-        final page = int.tryParse(entry.key);
-        if (page == null) continue;
-        final value = entry.value;
-        final completed = value is Map ? value['completed'] == true : value == true;
-        final synced = value is Map ? value['synced'] == true : false;
-        if (!completed || synced) continue;
-
-        final pageData = await _collectVillagePageDataFromDb(sessionId, page);
-        if (pageData.isEmpty) continue;
-
-        try {
-          await _supabaseService.syncVillagePageToSupabase(sessionId, page, pageData);
-          await _databaseService.markVillagePageSynced(sessionId, page);
-        } catch (e) {
-          final errMsg = 'Failed to sync pending village page $page for $sessionId: $e';
-          _escalateError(errMsg, persistent: true);
-          await queueSyncOperation('sync_village_page', {
-            'session_id': sessionId,
-            'page': page,
-            'data': pageData,
-          });
-        }
-      }
-    }
-  }
 
   Future<Map<String, dynamic>> _collectFamilyPageDataFromDb(String phoneNumber, int page) async {
     switch (page) {
@@ -769,7 +609,7 @@ class SyncService {
       final response = await _supabaseService.client
           .from('family_survey_sessions')
           .select('phone_number')
-          .eq('phone_number', phoneNumber)
+          .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber)
           .limit(1);
 
       return response.isNotEmpty;
@@ -795,163 +635,6 @@ class SyncService {
       _escalateError('Error checking village survey existence in Supabase: $e');
       return false;
     }
-  }
-
-  Future<void> _syncSurveyToSupabase(Map<String, dynamic> survey) async {
-    _ensureConnectivityMonitoringInitialized();
-    if (!_isOnline) return;
-
-    final phoneNumber = survey['phone_number'];
-    _syncErrors[phoneNumber] = [];
-    _tableSyncStatus[phoneNumber] = {};
-
-    _emitProgress(SyncProgress(
-      stage: 'survey_sync',
-      surveyId: phoneNumber?.toString(),
-      message: 'Preparing survey for sync',
-    ));
-
-    await _withSyncLock('family:$phoneNumber', () async {
-      try {
-      if (_supabaseService.currentUser == null) {
-        final error = 'Not authenticated with Supabase';
-        _syncErrors[phoneNumber]!.add(error);
-        _emitProgress(SyncProgress(
-          stage: 'survey_sync',
-          surveyId: phoneNumber?.toString(),
-          message: error,
-          isError: true,
-        ));
-        _escalateError(error, persistent: true);
-        await _markSurveyAsFailed(phoneNumber, ['AUTH_REQUIRED']);
-        return;
-      }
-
-      // Validate Supabase schema before syncing
-      final schemaIssues = await _checkSchemaWithCache(_requiredFamilyTables, 'family');
-      if (schemaIssues.isNotEmpty) {
-        final error = 'Supabase schema mismatch or permissions issue';
-        _syncErrors[phoneNumber]!.add(error);
-        schemaIssues.forEach((table, issue) {
-          _syncErrors[phoneNumber]!.add('Schema issue: $table -> $issue');
-        });
-        _emitProgress(SyncProgress(
-          stage: 'survey_sync',
-          surveyId: phoneNumber?.toString(),
-          message: error,
-          isError: true,
-        ));
-        _escalateError(error + ': ' + schemaIssues.toString(), persistent: true);
-        await _markSurveyAsFailed(phoneNumber, schemaIssues.keys.toList());
-        return;
-      }
-
-      // CRITICAL FIX: Validate local save BEFORE syncing to cloud
-      final localSessionData = await _databaseService.getSurveySession(phoneNumber);
-      if (localSessionData == null) {
-        final error = 'Survey not found locally';
-        _syncErrors[phoneNumber]!.add(error);
-        _escalateError('⚠ $phoneNumber - $error. Skipping cloud sync.', persistent: true);
-        return;
-      }
-
-      final localUpdatedAt = localSessionData['updated_at']?.toString();
-      final remoteNewer = await _isRemoteNewerFamily(phoneNumber, localUpdatedAt);
-      if (remoteNewer) {
-        await _markSurveyAsFailed(phoneNumber, ['REMOTE_NEWER']);
-        return;
-      }
-
-      // Collect all survey data (complete dataset for full sync)
-      _emitProgress(SyncProgress(
-        stage: 'survey_sync',
-        surveyId: phoneNumber?.toString(),
-        message: 'Collecting survey data',
-      ));
-      final surveyData = await _collectCompleteSurveyDataWithTracking(phoneNumber);
-
-      // Verify critical data exists before syncing
-      if (surveyData.isEmpty || surveyData['phone_number'] == null) {
-        final error = 'Survey data incomplete';
-        _syncErrors[phoneNumber]!.add(error);
-        _escalateError('✗ $phoneNumber - $error. Not syncing.', persistent: true);
-        return;
-      }
-
-      // Validate data completeness before sync
-      final validationErrors = _validateSurveyCompleteness(surveyData);
-      if (validationErrors.isNotEmpty) {
-        _syncErrors[phoneNumber]!.addAll(validationErrors);
-        _escalateError('⚠ $phoneNumber has ${validationErrors.length} validation issues: ${validationErrors.join(", ")}', persistent: true);
-        final criticalErrors = validationErrors.where(_isCriticalValidationError).toList();
-        if (criticalErrors.isNotEmpty) {
-          _emitProgress(SyncProgress(
-            stage: 'survey_sync',
-            surveyId: phoneNumber?.toString(),
-            message: 'Critical validation errors: ${criticalErrors.join('; ')}',
-            isError: true,
-          ));
-          _escalateError('Critical validation errors: ${criticalErrors.join('; ')}', persistent: true);
-          await _markSurveyAsFailed(phoneNumber, ['VALIDATION_FAILED']);
-          return;
-        }
-      }
-
-      // Sync to Supabase with complete data and error tracking
-      _emitProgress(SyncProgress(
-        stage: 'survey_sync',
-        surveyId: phoneNumber?.toString(),
-        message: 'Syncing survey tables',
-      ));
-      await _supabaseService.syncFamilySurveyToSupabaseWithTracking(
-        phoneNumber, 
-        surveyData,
-        _tableSyncStatus[phoneNumber]!,
-      );
-
-      // Check if sync was truly complete
-      final failedTables = _tableSyncStatus[phoneNumber]!.entries
-          .where((e) => !e.value)
-          .map((e) => e.key)
-          .toList();
-
-      if (failedTables.isEmpty && _syncErrors[phoneNumber]!.isEmpty) {
-        // Mark as synced only if ALL tables succeeded
-        await _markSurveyAsSynced(phoneNumber);
-        await _updateSyncMetadata(phoneNumber, surveyData);
-        // Optionally notify user of success
-        _emitProgress(SyncProgress(
-          stage: 'survey_sync',
-          surveyId: phoneNumber?.toString(),
-          message: 'Survey synced successfully',
-        ));
-      } else {
-        // Partial sync - mark as failed
-        await _markSurveyAsFailed(phoneNumber, failedTables);
-        _escalateError('⚠ PARTIAL SYNC: $phoneNumber - ${failedTables.length} tables failed: ${failedTables.join(", ")}', persistent: true);
-        _emitProgress(SyncProgress(
-          stage: 'survey_sync',
-          surveyId: phoneNumber?.toString(),
-          message: 'Partial sync: ${failedTables.length} tables failed',
-          isError: true,
-        ));
-      }
-
-      } catch (e, stackTrace) {
-        final error = 'Sync exception: $e';
-        _syncErrors[phoneNumber]!.add(error);
-        _escalateError('✗ Failed to sync survey $phoneNumber: $e', persistent: true);
-        _emitProgress(SyncProgress(
-          stage: 'survey_sync',
-          surveyId: phoneNumber?.toString(),
-          message: error,
-          isError: true,
-        ));
-        // Mark survey as failed and queue for retry
-        await _markSurveyAsFailed(phoneNumber, ['SYNC_EXCEPTION']);
-        await queueSyncOperation('sync_survey', survey);
-      }
-    });
   }
 
   Future<void> _syncVillageSurveyToSupabase(Map<String, dynamic> survey) async {
@@ -1250,6 +933,7 @@ class SyncService {
   /// Collect survey data with error tracking
   Future<Map<String, dynamic>> _collectCompleteSurveyDataWithTracking(String phoneNumber) async {
     final surveyData = <String, dynamic>{};
+    _syncErrors.putIfAbsent(phoneNumber, () => <String>[]);
     final errors = _syncErrors[phoneNumber]!;
 
     // Get session data
@@ -1350,6 +1034,7 @@ class SyncService {
   /// Collect government schemes with error tracking
   Future<Map<String, dynamic>> _collectGovernmentSchemesDataWithTracking(String phoneNumber) async {
     final schemesData = <String, dynamic>{};
+    _syncErrors.putIfAbsent(phoneNumber, () => <String>[]);
     final errors = _syncErrors[phoneNumber]!;
 
     final schemeInfoTables = <String>{
@@ -1585,9 +1270,6 @@ class SyncService {
     final data = operation['data'];
 
     switch (opType) {
-      case 'sync_survey':
-        await _syncSurveyToSupabase(data);
-        break;
       case 'sync_village_survey':
         await _syncVillageSurveyToSupabase(data);
         break;
@@ -1657,7 +1339,7 @@ class SyncService {
       final remote = await _supabaseService.client
           .from('family_survey_sessions')
           .select('updated_at')
-          .eq('phone_number', phoneNumber)
+          .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber)
           .limit(1);
       if (remote.isEmpty) return false;
       final remoteUpdatedAt = remote.first['updated_at']?.toString();
@@ -1686,19 +1368,6 @@ class SyncService {
   }
 
   // Public methods
-  Future<void> syncSurveyImmediately(String phoneNumber) async {
-    _ensureConnectivityMonitoringInitialized();
-    if (!_isOnline) {
-      await queueSyncOperation('sync_survey', {'phone_number': phoneNumber});
-      return;
-    }
-
-    final survey = await _databaseService.getSurveySession(phoneNumber);
-    if (survey != null) {
-      await _syncSurveyToSupabase(survey);
-    }
-  }
-
   Future<void> syncVillageSurveyImmediately(String sessionId) async {
      _ensureConnectivityMonitoringInitialized();
      if (!_isOnline) {
@@ -1710,19 +1379,6 @@ class SyncService {
     if (survey != null) {
       await _syncVillageSurveyToSupabase(survey);
     }
-  }
-
-  Future<void> forceSyncAllPendingData() async {
-    _ensureConnectivityMonitoringInitialized();
-    if (!_isOnline) return;
-
-    // Check authentication before syncing
-    if (_supabaseService.currentUser == null) {
-      _escalateError('Authentication required. Please sign in with Google to sync data.', persistent: true);
-      throw Exception('Authentication required for syncing. Please sign in first.');
-    }
-
-    await _performBackgroundSync();
   }
 
   Future<bool> get isOnline async {
@@ -1748,9 +1404,157 @@ class SyncService {
   // Get current queue status
   List<Map<String, dynamic>> get syncQueue => List.unmodifiable(_syncQueue);
 
+  /// Sync all pending pages for all families with progress tracking
+  /// Returns progress updates showing "x/y pages synced"
+  Future<void> syncAllPendingPages({
+    Function(int, int)? onProgress, // (syncedCount, totalCount)
+    Function(String)? onError,
+  }) async {
+    _ensureConnectivityMonitoringInitialized();
+    if (!_isOnline) {
+      onError?.call('No internet connection. Sync will be queued for when connection is restored.');
+      return;
+    }
+
+    // Check authentication
+    if (_supabaseService.currentUser == null) {
+      onError?.call('Authentication required. Please sign in with Google to sync data.');
+      throw Exception('Authentication required for syncing. Please sign in first.');
+    }
+
+    try {
+      // Get all pending pages
+      final pendingPages = await _databaseService.getAllPendingPages();
+      
+      // Collect actual page data for each pending page
+      final pagesWithData = <Map<String, dynamic>>[];
+      for (final pageInfo in pendingPages) {
+        final phoneNumber = pageInfo['phone_number'] as String;
+        final page = pageInfo['page'] as int;
+        
+        final pageData = await _collectFamilyPageDataFromDb(phoneNumber, page);
+        if (pageData.isNotEmpty) {
+          pagesWithData.add({
+            'phone_number': phoneNumber,
+            'page': page,
+            'data': pageData,
+          });
+        }
+      }
+      if (pendingPages.isEmpty) {
+        onProgress?.call(0, 0); // No pages to sync
+        return;
+      }
+
+      final totalPages = pagesWithData.length;
+      int syncedCount = 0;
+
+      // Group pages by phone number for batch processing
+      final pagesByPhone = <String, List<Map<String, dynamic>>>{};
+      for (final page in pagesWithData) {
+        final phoneNumber = page['phone_number'] as String;
+        pagesByPhone.putIfAbsent(phoneNumber, () => []).add(page);
+      }
+
+      // Process each family's pages in batches
+      for (final entry in pagesByPhone.entries) {
+        final phoneNumber = entry.key;
+        final familyPages = entry.value;
+
+        try {
+          await syncPageBatch(phoneNumber, familyPages, onPageSynced: (page, result) {
+            final Map<String, dynamic> r = result is Map ? Map<String, dynamic>.from(result) : {};
+            final ok = r['success'] == true;
+            if (ok) {
+              syncedCount++;
+              onProgress?.call(syncedCount, totalPages);
+            } else {
+              onError?.call('Failed to sync page $page for $phoneNumber: ${r['error'] ?? 'unknown'}');
+            }
+          });
+        } catch (e) {
+          onError?.call('Failed to sync pages for $phoneNumber: $e');
+        }
+      }
+
+    } catch (e) {
+      onError?.call('Sync failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Sync a batch of pages for a specific family
+  Future<void> syncPageBatch(
+    String phoneNumber,
+    List<Map<String, dynamic>> pageDataList, {
+    Function(int, dynamic)? onPageSynced,
+  }) async {
+    // Check if pages actually need syncing (delta sync)
+    final pagesToSync = <Map<String, dynamic>>[];
+    for (final pageData in pageDataList) {
+      final page = pageData['page'] as int;
+      final data = pageData['data'] as Map<String, dynamic>;
+
+      if (await _pageNeedsSync(phoneNumber, page, data)) {
+        pagesToSync.add(pageData);
+      }
+    }
+
+    if (pagesToSync.isEmpty) {
+      return; // All pages are up to date
+    }
+
+    // Perform batch sync
+    final results = await _supabaseService.syncPageBatch(
+      phoneNumber,
+      pagesToSync,
+      onPageSynced: onPageSynced,
+    );
+
+    // Update local sync status
+    for (final entry in results.entries) {
+      final page = entry.key as int;
+      final Map<String, dynamic> resultMap = entry.value is Map ? Map<String, dynamic>.from(entry.value as Map) : {};
+      final success = resultMap['success'] == true;
+
+      if (success) {
+        await _databaseService.updatePageSyncStatus(phoneNumber, page, 'synced');
+        await _databaseService.updatePageLastSyncedAt(phoneNumber, page);
+        final pageData = pageDataList.firstWhere((p) => (p['page'] is int ? p['page'] as int : int.tryParse(p['page'].toString()) ?? -1) == page)['data'];
+        await _databaseService.updatePageDataHash(phoneNumber, page, _calculateDataHash(pageData));
+      } else {
+        await _databaseService.updatePageSyncStatus(phoneNumber, page, 'failed');
+      }
+    }
+  }
+
+  /// Check if a page needs syncing based on data hash comparison
+  Future<bool> _pageNeedsSync(String phoneNumber, int page, Map<String, dynamic> data) async {
+    final currentHash = await _databaseService.getPageDataHash(phoneNumber, page);
+    final newHash = _calculateDataHash(data);
+
+    return currentHash != newHash;
+  }
+
+  /// Get sync progress summary
+  Future<Map<String, dynamic>> getSyncProgressSummary() async {
+    final totalPages = await _databaseService.getTotalPagesCount();
+    final syncedPages = await _databaseService.getTotalSyncedPagesCount();
+    final pendingPages = await _databaseService.getAllPendingPages().then((pages) => pages.length);
+
+    return {
+      'total_pages': totalPages,
+      'synced_pages': syncedPages,
+      'pending_pages': pendingPages,
+      'progress_percentage': totalPages > 0 ? (syncedPages / totalPages * 100).round() : 0,
+    };
+  }
+
   // Cleanup
   void dispose() {
     _connectivitySubscription?.cancel();
-    _syncTimer?.cancel();
+    try {
+      if (!_progressController.isClosed) _progressController.close();
+    } catch (_) {}
   }
 }

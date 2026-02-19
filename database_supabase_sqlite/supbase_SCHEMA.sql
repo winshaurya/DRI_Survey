@@ -15,7 +15,7 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 -- FAMILY SURVEY SESSIONS TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS family_survey_sessions (
-    phone_number TEXT PRIMARY KEY,
+    phone_number INTEGER PRIMARY KEY,
     surveyor_email TEXT NOT NULL,
     created_at TEXT DEFAULT NOW()::TEXT,
     updated_at TEXT DEFAULT NOW()::TEXT,
@@ -57,8 +57,7 @@ CREATE INDEX IF NOT EXISTS idx_family_sessions_status ON family_survey_sessions(
 -- FAMILY MEMBERS TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS family_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
     updated_at TEXT DEFAULT NOW()::TEXT,
     is_deleted INTEGER DEFAULT 0,
@@ -91,8 +90,7 @@ CREATE INDEX IF NOT EXISTS idx_family_members_phone ON family_members(phone_numb
 -- LAND HOLDING TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS land_holding (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     irrigated_area DECIMAL(8,2),
@@ -113,8 +111,7 @@ CREATE TABLE IF NOT EXISTS land_holding (
 -- IRRIGATION FACILITIES TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS irrigation_facilities (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     primary_source TEXT,
@@ -136,8 +133,7 @@ CREATE TABLE IF NOT EXISTS irrigation_facilities (
 -- CROP PRODUCTIVITY TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS crop_productivity (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     sr_no INTEGER NOT NULL,
@@ -148,31 +144,27 @@ CREATE TABLE IF NOT EXISTS crop_productivity (
     quantity_consumed_quintal DECIMAL(10,2),
     quantity_sold_quintal DECIMAL(10,2),
 
-    UNIQUE(phone_number, sr_no)
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 -- ===========================================
 -- FERTILIZER USAGE TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS fertilizer_usage (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     urea_fertilizer TEXT,
     organic_fertilizer TEXT,
     fertilizer_types TEXT,
-    fertilizer_expenditure DECIMAL(10,2),
-
-    UNIQUE(phone_number)
+    fertilizer_expenditure DECIMAL(10,2)
 );
 
 -- ===========================================
 -- ANIMALS TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS animals (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     sr_no INTEGER NOT NULL,
@@ -182,15 +174,14 @@ CREATE TABLE IF NOT EXISTS animals (
     production_per_animal DECIMAL(8,2),
     quantity_sold DECIMAL(10,2),
 
-    UNIQUE(phone_number, sr_no)
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 -- ===========================================
 -- AGRICULTURAL EQUIPMENT TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS agricultural_equipment (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     tractor TEXT,
@@ -205,17 +196,14 @@ CREATE TABLE IF NOT EXISTS agricultural_equipment (
     duster_condition TEXT,
     diesel_engine TEXT,
     diesel_engine_condition TEXT,
-    other_equipment TEXT,
-
-    UNIQUE(phone_number)
+    other_equipment TEXT
 );
 
 -- ===========================================
 -- ENTERTAINMENT FACILITIES TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS entertainment_facilities (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     smart_mobile TEXT,
@@ -226,17 +214,14 @@ CREATE TABLE IF NOT EXISTS entertainment_facilities (
     radio TEXT,
     games TEXT,
     other_entertainment TEXT,
-    other_specify TEXT,
-
-    UNIQUE(phone_number)
+    other_specify TEXT
 );
 
 -- ===========================================
 -- TRANSPORT FACILITIES TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS transport_facilities (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     car_jeep TEXT,
@@ -244,17 +229,14 @@ CREATE TABLE IF NOT EXISTS transport_facilities (
     e_rickshaw TEXT,
     cycle TEXT,
     pickup_truck TEXT,
-    bullock_cart TEXT,
-
-    UNIQUE(phone_number)
+    bullock_cart TEXT
 );
 
 -- ===========================================
 -- DRINKING WATER SOURCES TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS drinking_water_sources (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     hand_pumps TEXT,
@@ -279,8 +261,7 @@ CREATE TABLE IF NOT EXISTS drinking_water_sources (
 -- MEDICAL TREATMENT TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS medical_treatment (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     allopathic TEXT,
@@ -297,8 +278,7 @@ CREATE TABLE IF NOT EXISTS medical_treatment (
 -- DISPUTES TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS disputes (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     family_disputes TEXT,
@@ -322,8 +302,7 @@ CREATE TABLE IF NOT EXISTS disputes (
 -- HOUSE CONDITIONS TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS house_conditions (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     katcha TEXT,
@@ -340,8 +319,7 @@ CREATE TABLE IF NOT EXISTS house_conditions (
 -- HOUSE FACILITIES TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS house_facilities (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     toilet TEXT,
@@ -365,8 +343,7 @@ CREATE TABLE IF NOT EXISTS house_facilities (
 -- DISEASES TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS diseases (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     sr_no INTEGER,
@@ -383,8 +360,7 @@ CREATE TABLE IF NOT EXISTS diseases (
 -- SOCIAL CONSCIOUSNESS TABLE
 -- ===========================================
 CREATE TABLE IF NOT EXISTS social_consciousness (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
 
     clothes_frequency TEXT,
@@ -430,8 +406,7 @@ CREATE TABLE IF NOT EXISTS social_consciousness (
 -- ===========================================
 
 CREATE TABLE IF NOT EXISTS aadhaar_info (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     created_at TEXT DEFAULT NOW()::TEXT,
     has_aadhaar TEXT,
     total_members INTEGER,
@@ -440,8 +415,7 @@ CREATE TABLE IF NOT EXISTS aadhaar_info (
 -- Columns: id, phone_number, created_at, has_aadhaar, total_members
 
 CREATE TABLE IF NOT EXISTS aadhaar_scheme_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     family_member_name TEXT,
     have_card TEXT,
@@ -449,13 +423,13 @@ CREATE TABLE IF NOT EXISTS aadhaar_scheme_members (
     details_correct TEXT,
     what_incorrect TEXT,
     benefits_received TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 -- Columns: id, phone_number, sr_no, family_member_name, have_card, card_number, details_correct, what_incorrect, benefits_received, created_at
 
 CREATE TABLE IF NOT EXISTS ayushman_card (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     has_card TEXT,
     total_members INTEGER,
     created_at TEXT DEFAULT NOW()::TEXT,
@@ -463,8 +437,7 @@ CREATE TABLE IF NOT EXISTS ayushman_card (
 );
 
 CREATE TABLE IF NOT EXISTS ayushman_scheme_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     family_member_name TEXT,
     have_card TEXT,
@@ -472,20 +445,18 @@ CREATE TABLE IF NOT EXISTS ayushman_scheme_members (
     details_correct TEXT,
     what_incorrect TEXT,
     benefits_received TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS family_id (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     has_id TEXT,
     total_members INTEGER,
-    created_at TEXT DEFAULT NOW()::TEXT,
-    UNIQUE(phone_number)
+    created_at TEXT DEFAULT NOW()::TEXT
 );
 
 CREATE TABLE IF NOT EXISTS family_id_scheme_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
     phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     family_member_name TEXT,
@@ -494,12 +465,12 @@ CREATE TABLE IF NOT EXISTS family_id_scheme_members (
     details_correct TEXT,
     what_incorrect TEXT,
     benefits_received TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS ration_card (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     has_card TEXT,
     card_type TEXT,
     total_members INTEGER,
@@ -508,8 +479,7 @@ CREATE TABLE IF NOT EXISTS ration_card (
 );
 
 CREATE TABLE IF NOT EXISTS ration_scheme_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     family_member_name TEXT,
     have_card TEXT,
@@ -517,12 +487,12 @@ CREATE TABLE IF NOT EXISTS ration_scheme_members (
     details_correct TEXT,
     what_incorrect TEXT,
     benefits_received TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS samagra_id (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     has_id TEXT,
     family_id TEXT,
     total_children INTEGER,
@@ -531,8 +501,7 @@ CREATE TABLE IF NOT EXISTS samagra_id (
 );
 
 CREATE TABLE IF NOT EXISTS samagra_scheme_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     family_member_name TEXT,
     have_card TEXT,
@@ -544,8 +513,7 @@ CREATE TABLE IF NOT EXISTS samagra_scheme_members (
 );
 
 CREATE TABLE IF NOT EXISTS tribal_card (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     has_card TEXT,
     total_members INTEGER,
     created_at TEXT DEFAULT NOW()::TEXT,
@@ -553,8 +521,7 @@ CREATE TABLE IF NOT EXISTS tribal_card (
 );
 
 CREATE TABLE IF NOT EXISTS tribal_scheme_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     family_member_name TEXT,
     have_card TEXT,
@@ -562,12 +529,12 @@ CREATE TABLE IF NOT EXISTS tribal_scheme_members (
     details_correct TEXT,
     what_incorrect TEXT,
     benefits_received TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS handicapped_allowance (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     has_allowance TEXT,
     total_members INTEGER,
     created_at TEXT DEFAULT NOW()::TEXT,
@@ -575,8 +542,7 @@ CREATE TABLE IF NOT EXISTS handicapped_allowance (
 );
 
 CREATE TABLE IF NOT EXISTS handicapped_scheme_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     family_member_name TEXT,
     have_card TEXT,
@@ -584,12 +550,12 @@ CREATE TABLE IF NOT EXISTS handicapped_scheme_members (
     details_correct TEXT,
     what_incorrect TEXT,
     benefits_received TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS pension_allowance (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     has_pension TEXT,
     total_members INTEGER,
     created_at TEXT DEFAULT NOW()::TEXT,
@@ -597,8 +563,7 @@ CREATE TABLE IF NOT EXISTS pension_allowance (
 );
 
 CREATE TABLE IF NOT EXISTS pension_scheme_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     family_member_name TEXT,
     have_card TEXT,
@@ -606,12 +571,12 @@ CREATE TABLE IF NOT EXISTS pension_scheme_members (
     details_correct TEXT,
     what_incorrect TEXT,
     benefits_received TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS widow_allowance (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     has_allowance TEXT,
     total_members INTEGER,
     created_at TEXT DEFAULT NOW()::TEXT,
@@ -619,8 +584,7 @@ CREATE TABLE IF NOT EXISTS widow_allowance (
 );
 
 CREATE TABLE IF NOT EXISTS widow_scheme_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     family_member_name TEXT,
     have_card TEXT,
@@ -628,12 +592,12 @@ CREATE TABLE IF NOT EXISTS widow_scheme_members (
     details_correct TEXT,
     what_incorrect TEXT,
     benefits_received TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS vb_gram (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     is_member TEXT,
     total_members INTEGER,
     created_at TEXT DEFAULT NOW()::TEXT,
@@ -641,8 +605,7 @@ CREATE TABLE IF NOT EXISTS vb_gram (
 );
 
 CREATE TABLE IF NOT EXISTS vb_gram_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     member_name TEXT,
     name_included INTEGER,
@@ -651,12 +614,12 @@ CREATE TABLE IF NOT EXISTS vb_gram_members (
     received INTEGER,
     days TEXT,
     membership_details TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS pm_kisan_nidhi (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     is_beneficiary TEXT,
     total_members INTEGER,
     created_at TEXT DEFAULT NOW()::TEXT,
@@ -664,8 +627,7 @@ CREATE TABLE IF NOT EXISTS pm_kisan_nidhi (
 );
 
 CREATE TABLE IF NOT EXISTS pm_kisan_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     member_name TEXT,
     account_number TEXT,
@@ -675,12 +637,12 @@ CREATE TABLE IF NOT EXISTS pm_kisan_members (
     incorrect_details TEXT,
     received INTEGER,
     days TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS pm_kisan_samman_nidhi (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     is_beneficiary TEXT,
     total_members INTEGER,
     created_at TEXT DEFAULT NOW()::TEXT,
@@ -688,8 +650,7 @@ CREATE TABLE IF NOT EXISTS pm_kisan_samman_nidhi (
 );
 
 CREATE TABLE IF NOT EXISTS pm_kisan_samman_members (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     member_name TEXT,
     account_number TEXT,
@@ -699,12 +660,12 @@ CREATE TABLE IF NOT EXISTS pm_kisan_samman_members (
     incorrect_details TEXT,
     received INTEGER,
     days TEXT,
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS tribal_questions (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     deity_name TEXT,
     festival_name TEXT,
     dance_name TEXT,
@@ -714,8 +675,7 @@ CREATE TABLE IF NOT EXISTS tribal_questions (
 );
 
 CREATE TABLE IF NOT EXISTS merged_govt_schemes (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     scheme_data TEXT,
     created_at TEXT DEFAULT NOW()::TEXT,
     UNIQUE(phone_number)
@@ -801,7 +761,7 @@ CREATE TABLE IF NOT EXISTS fpo_members (
 
 CREATE TABLE IF NOT EXISTS bank_accounts (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    phone_number TEXT NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number INTEGER NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
     sr_no INTEGER,
     member_name TEXT,
     account_number TEXT,

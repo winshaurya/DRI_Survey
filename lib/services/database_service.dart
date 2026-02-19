@@ -16,10 +16,15 @@ static Database? _database;
     return _database!;
   }
 
-  Future<void> close() async {
-    if (_database != null) {
-      await _database!.close();
-      _database = null;
+  Future<Set<String>> _getTableColumns(Database db, String tableName) async {
+    try {
+      final info = await db.rawQuery('PRAGMA table_info($tableName)');
+      return info
+          .map((row) => row['name']?.toString())
+          .whereType<String>()
+          .toSet();
+    } catch (e) {
+      return <String>{};
     }
   }
 
@@ -35,10 +40,11 @@ static Database? _database;
 
   Future<void> deleteSurveySession(String phoneNumber) async {
     final db = await database;
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
     await db.delete(
       'family_survey_sessions',
       where: 'phone_number = ?',
-      whereArgs: [phoneNumber],
+      whereArgs: [pk],
     );
   }
 
@@ -63,12 +69,37 @@ static Database? _database;
 
   Future<Map<String, dynamic>?> getSurveySession(String phoneNumber) async {
     final db = await database;
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
     final results = await db.query(
       'family_survey_sessions',
       where: 'phone_number = ?',
-      whereArgs: [phoneNumber],
+      whereArgs: [pk],
     );
     return results.isNotEmpty ? results.first : null;
+  }
+
+  Future<void> updateSurveySession(String phoneNumber, Map<String, dynamic> data) async {
+    final db = await database;
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
+    await db.update(
+      'family_survey_sessions',
+      {
+        ...data,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'phone_number = ?',
+      whereArgs: [pk],
+    );
+  }
+
+  Future<void> updatePageStatus(String phoneNumber, int page, bool completed) async {
+    await _updatePageStatus(
+      tableName: 'family_survey_sessions',
+      keyColumn: 'phone_number',
+      keyValue: phoneNumber,
+      page: page,
+      completed: completed,
+    );
   }
 
   Future<void> updateSurveyStatus(String phoneNumber, String status) async {
@@ -80,13 +111,14 @@ static Database? _database;
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'phone_number = ?',
-      whereArgs: [phoneNumber],
+      whereArgs: [int.tryParse(phoneNumber) ?? phoneNumber],
     );
   }
 
   Future<void> updateSurveySyncStatus(String phoneNumber, String syncStatus) async {
     final db = await database;
     // Update family_survey_sessions with sync status
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
     await db.update(
       'family_survey_sessions',
       {
@@ -95,7 +127,7 @@ static Database? _database;
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'phone_number = ?',
-      whereArgs: [phoneNumber],
+      whereArgs: [pk],
     );
   }
 
@@ -214,19 +246,21 @@ static Database? _database;
 
   Future<void> deleteByPhone(String tableName, String phoneNumber) async {
     final db = await database;
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
     await db.delete(
       tableName,
       where: 'phone_number = ?',
-      whereArgs: [phoneNumber],
+      whereArgs: [pk],
     );
   }
 
   Future<List<Map<String, dynamic>>> getData(String tableName, String phoneNumber) async {
     final db = await database;
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
     return await db.query(
       tableName,
       where: 'phone_number = ?',
-      whereArgs: [phoneNumber],
+      whereArgs: [pk],
     );
   }
 
@@ -458,31 +492,52 @@ static Database? _database;
 
   // Insert or update village survey data
   /// Insert or update a record for a village survey table. Ensures DB is ready, required fields present, and errors are surfaced.
-  Future<void> insertOrUpdate(String tableName, Map<String, dynamic> data, String sessionId) async {
+  Future<void> insertOrUpdate(String tableName, Map<String, dynamic> data, String keyValue) async {
     final db = await database;
     final columns = await _getTableColumns(db, tableName);
-    if (sessionId.isEmpty) {
-      throw Exception('session_id is required for $tableName');
+    if (keyValue.isEmpty) {
+      throw Exception('key value is required for $tableName');
     }
-    // Check if record exists
+
+    // Determine primary lookup column for this table (phone_number for family, session_id for village)
+    String keyColumn;
+    if (columns.contains('phone_number')) {
+      keyColumn = 'phone_number';
+    } else if (columns.contains('session_id')) {
+      keyColumn = 'session_id';
+    } else {
+      throw Exception('No recognized key column for $tableName (expected phone_number or session_id)');
+    }
+
+    // Use composite key when table has sr_no and caller provided it
+    final bool hasSr = columns.contains('sr_no');
+    final bool dataHasSr = data is Map<String, dynamic> && data.containsKey('sr_no');
+
+    final String existenceWhere = hasSr && dataHasSr ? '$keyColumn = ? AND sr_no = ?' : '$keyColumn = ?';
+    final List<dynamic> existenceArgs = hasSr && dataHasSr ? [keyValue, data['sr_no']] : [keyValue];
+
+    // Check if record exists using computed where-clause
     final existing = await db.query(
       tableName,
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
+      where: existenceWhere,
+      whereArgs: existenceArgs,
       limit: 1,
     );
+
     final now = DateTime.now().toIso8601String();
     final dataWithTimestamp = <String, dynamic>{
       ...data,
-      'session_id': sessionId,
+      keyColumn: keyValue,
     };
     if (columns.contains('updated_at')) {
       dataWithTimestamp['updated_at'] = now;
     }
+
     // Filter to known columns only
     final filteredData = Map<String, dynamic>.fromEntries(
-      dataWithTimestamp.entries.where((e) => columns.contains(e.key))
+      dataWithTimestamp.entries.where((e) => columns.contains(e.key)),
     );
+
     try {
       if (existing.isEmpty) {
         // Insert new
@@ -491,12 +546,12 @@ static Database? _database;
         }
         await db.insert(tableName, filteredData);
       } else {
-        // Update existing
+        // Update existing using same composite where if applicable
         await db.update(
           tableName,
           filteredData,
-          where: 'session_id = ?',
-          whereArgs: [sessionId],
+          where: existenceWhere,
+          whereArgs: existenceArgs,
         );
       }
     } catch (e) {
@@ -505,11 +560,241 @@ static Database? _database;
     }
   }
 
-  Future<Set<String>> _getTableColumns(Database db, String tableName) async {
-    final info = await db.rawQuery('PRAGMA table_info($tableName)');
-    return info
-        .map((row) => row['name']?.toString())
-        .whereType<String>()
-        .toSet();
+  // ===========================================
+  // PAGE-LEVEL SYNC STATUS MANAGEMENT
+  // ===========================================
+
+  Future<void> updatePageSyncStatus(String phoneNumber, int pageIndex, String status) async {
+    final db = await database;
+    final currentStatus = await _getPageSyncStatusMap(phoneNumber);
+    currentStatus['page_$pageIndex'] = status;
+
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
+    await db.update(
+      'family_survey_sessions',
+      {'page_sync_status': jsonEncode(currentStatus)},
+      where: 'phone_number = ?',
+      whereArgs: [pk],
+    );
+  }
+
+  Future<String?> getPageSyncStatus(String phoneNumber, int pageIndex) async {
+    final statusMap = await _getPageSyncStatusMap(phoneNumber);
+    return statusMap['page_$pageIndex'];
+  }
+
+  Future<Map<String, String>> _getPageSyncStatusMap(String phoneNumber) async {
+    final db = await database;
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
+    final results = await db.query(
+      'family_survey_sessions',
+      columns: ['page_sync_status'],
+      where: 'phone_number = ?',
+      whereArgs: [pk],
+    );
+
+    if (results.isEmpty) return {};
+
+    final rawStatus = results.first['page_sync_status'] as String?;
+    if (rawStatus == null || rawStatus.isEmpty) return {};
+
+    try {
+      final decoded = jsonDecode(rawStatus) as Map<String, dynamic>;
+      return decoded.map((key, value) => MapEntry(key, value.toString()));
+    } catch (e) {
+      return {};
+    }
+  }
+
+  Future<List<int>> getPendingPages(String phoneNumber) async {
+    final statusMap = await _getPageSyncStatusMap(phoneNumber);
+    final pendingPages = <int>[];
+
+    for (int i = 0; i < 32; i++) {
+      final status = statusMap['page_$i'];
+      if (status == null || status == 'pending' || status == 'failed') {
+        pendingPages.add(i);
+      }
+    }
+
+    return pendingPages;
+  }
+
+  Future<int> getSyncedPagesCount(String phoneNumber) async {
+    final statusMap = await _getPageSyncStatusMap(phoneNumber);
+    int count = 0;
+
+    for (int i = 0; i < 32; i++) {
+      if (statusMap['page_$i'] == 'synced') {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  // ===========================================
+  // DATA HASH MANAGEMENT FOR DELTA SYNC
+  // ===========================================
+
+  Future<void> updatePageDataHash(String phoneNumber, int pageIndex, String hash) async {
+    final db = await database;
+    final currentHashes = await _getPageDataHashesMap(phoneNumber);
+    currentHashes['page_$pageIndex'] = hash;
+
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
+    await db.update(
+      'family_survey_sessions',
+      {'page_data_hashes': jsonEncode(currentHashes)},
+      where: 'phone_number = ?',
+      whereArgs: [pk],
+    );
+  }
+
+  Future<String?> getPageDataHash(String phoneNumber, int pageIndex) async {
+    final hashesMap = await _getPageDataHashesMap(phoneNumber);
+    return hashesMap['page_$pageIndex'];
+  }
+
+  Future<Map<String, String>> _getPageDataHashesMap(String phoneNumber) async {
+    final db = await database;
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
+    final results = await db.query(
+      'family_survey_sessions',
+      columns: ['page_data_hashes'],
+      where: 'phone_number = ?',
+      whereArgs: [pk],
+    );
+
+    if (results.isEmpty) return {};
+
+    final rawHashes = results.first['page_data_hashes'] as String?;
+    if (rawHashes == null || rawHashes.isEmpty) return {};
+
+    try {
+      final decoded = jsonDecode(rawHashes) as Map<String, dynamic>;
+      return decoded.map((key, value) => MapEntry(key, value.toString()));
+    } catch (e) {
+      return {};
+    }
+  }
+
+  // ===========================================
+  // SYNC TIMESTAMP MANAGEMENT
+  // ===========================================
+
+  Future<void> updatePageLastSyncedAt(String phoneNumber, int pageIndex) async {
+    final db = await database;
+    final currentTimestamps = await _getPageLastSyncedAtMap(phoneNumber);
+    currentTimestamps['page_$pageIndex'] = DateTime.now().toIso8601String();
+
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
+    await db.update(
+      'family_survey_sessions',
+      {'page_last_synced_at': jsonEncode(currentTimestamps)},
+      where: 'phone_number = ?',
+      whereArgs: [pk],
+    );
+  }
+
+  Future<String?> getPageLastSyncedAt(String phoneNumber, int pageIndex) async {
+    final timestampsMap = await _getPageLastSyncedAtMap(phoneNumber);
+    return timestampsMap['page_$pageIndex'];
+  }
+
+  Future<Map<String, String>> _getPageLastSyncedAtMap(String phoneNumber) async {
+    final db = await database;
+    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
+    final results = await db.query(
+      'family_survey_sessions',
+      columns: ['page_last_synced_at'],
+      where: 'phone_number = ?',
+      whereArgs: [pk],
+    );
+
+    if (results.isEmpty) return {};
+
+    final rawTimestamps = results.first['page_last_synced_at'] as String?;
+    if (rawTimestamps == null || rawTimestamps.isEmpty) return {};
+
+    try {
+      final decoded = jsonDecode(rawTimestamps) as Map<String, dynamic>;
+      return decoded.map((key, value) => MapEntry(key, value.toString()));
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /// Get total count of all pages across all surveys
+  Future<int> getTotalPagesCount() async {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT COUNT(*) as total
+      FROM (
+        SELECT json_extract(page_sync_status, '\$.page_count') as page_count
+        FROM family_survey_sessions
+        WHERE page_sync_status IS NOT NULL
+      )
+    ''');
+
+    int total = 0;
+    for (final result in results) {
+      final pageCount = result['total'] as int? ?? 0;
+      total += pageCount;
+    }
+    return total;
+  }
+
+  /// Get count of synced pages across all families
+  Future<int> getTotalSyncedPagesCount() async {
+    final db = await database;
+    final results = await db.query('family_survey_sessions');
+
+    int totalSynced = 0;
+    for (final row in results) {
+      final phoneNumber = row['phone_number'] as String;
+      totalSynced += await getSyncedPagesCount(phoneNumber);
+    }
+    return totalSynced;
+  }
+
+  /// Get list of all pending pages that need syncing across all families
+  Future<List<Map<String, dynamic>>> getAllPendingPages() async {
+    final db = await database;
+    final results = await db.query('family_survey_sessions');
+
+    final pendingPages = <Map<String, dynamic>>[];
+
+    for (final row in results) {
+      final phoneNumber = row['phone_number'] as String;
+      final pageSyncStatusRaw = row['page_sync_status'] as String?;
+
+      if (pageSyncStatusRaw != null) {
+        try {
+          final pageSyncStatus = jsonDecode(pageSyncStatusRaw) as Map<String, dynamic>;
+          final pageCount = pageSyncStatus['page_count'] as int? ?? 0;
+
+          for (int page = 1; page <= pageCount; page++) {
+            final pageKey = 'page_$page';
+            final status = pageSyncStatus[pageKey] as String?;
+
+            if (status != 'synced') {
+              // Get page data using the sync service method
+              // For now, return basic info and let sync service handle data collection
+              pendingPages.add({
+                'phone_number': phoneNumber,
+                'page': page,
+                'data': {}, // Will be populated by sync service
+              });
+            }
+          }
+        } catch (e) {
+          // Skip malformed data
+          continue;
+        }
+      }
+    }
+
+    return pendingPages;
   }
 }

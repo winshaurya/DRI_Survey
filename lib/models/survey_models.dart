@@ -114,7 +114,7 @@ class Survey extends Equatable {
 // Family Member Model
 class FamilyMember extends Equatable {
   final String? id;
-  final String phoneNumber;
+  final int phoneNumber;
   final String? name;
   final String? fathersName;
   final String? mothersName;
@@ -158,9 +158,12 @@ class FamilyMember extends Equatable {
   });
 
   factory FamilyMember.fromMap(Map<String, dynamic> map) {
+    final rawPhone = map['phone_number'];
+    final intPhone = rawPhone is int ? rawPhone : int.tryParse(rawPhone?.toString() ?? '') ?? 0;
+
     return FamilyMember(
       id: map['id'],
-      phoneNumber: map['phone_number'],
+      phoneNumber: intPhone,
       name: map['name'],
       fathersName: map['fathers_name'],
       mothersName: map['mothers_name'],

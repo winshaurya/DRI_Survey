@@ -27,11 +27,12 @@ class FormHistoryService {
       final currentVersion = await _getNextVersionNumber(sessionId, formType);
 
       // Prepare history data
+      final editor = editedBy ?? _supabaseService.currentUser?.email ?? 'unknown';
       final historyData = {
         'session_id': sessionId,
         'version': currentVersion,
         'created_at': now,
-        'edited_by': editedBy,
+        'edited_by': editor,
         'edit_reason': editReason,
         'is_auto_save': isAutoSave ? 1 : 0,
         'form_data': jsonEncode(formData),

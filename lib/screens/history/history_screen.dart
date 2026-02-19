@@ -57,6 +57,29 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
     }
   }
 
+  Future<Map<String, dynamic>> _getSyncProgress(String phoneNumber) async {
+    try {
+      final databaseService = DatabaseService();
+      final totalPages = await databaseService.getTotalPagesCount();
+      final syncedPages = await databaseService.getSyncedPagesCount(phoneNumber);
+      final pendingPages = await databaseService.getPendingPages(phoneNumber).then((pages) => pages.length);
+
+      return {
+        'total_pages': totalPages,
+        'synced_pages': syncedPages,
+        'pending_pages': pendingPages,
+        'progress_percentage': totalPages > 0 ? ((syncedPages / totalPages) * 100).round() : 0,
+      };
+    } catch (e) {
+      return {
+        'total_pages': 0,
+        'synced_pages': 0,
+        'pending_pages': 0,
+        'progress_percentage': 0,
+      };
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -224,23 +247,72 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
     );
 
     try {
-      await syncService.forceSyncAllPendingData();
+      int syncedCount = 0;
+      int totalPages = 0;
+
+      // Use the new page-by-page sync with progress tracking
+      await syncService.syncAllPendingPages(
+        onProgress: (currentSynced, currentTotal) {
+          syncedCount = currentSynced;
+          totalPages = currentTotal;
+
+          // Update the snackbar with progress
+          messenger.hideCurrentSnackBar();
+          messenger.showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                      value: totalPages > 0 ? syncedCount / totalPages : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text('$syncedCount/$totalPages pages synced'),
+                ],
+              ),
+              duration: const Duration(seconds: 30),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        },
+        onError: (error) {
+          messenger.hideCurrentSnackBar();
+          messenger.showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('Sync error: $error')),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        },
+      );
 
       // Reload sessions to reflect updated sync status
       await _loadSessions();
 
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 8),
-              Text('Sync completed successfully'),
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 8),
+              Text('Sync completed: $syncedCount/$totalPages pages synced'),
             ],
           ),
           backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
+          duration: const Duration(seconds: 3),
         ),
       );
     } catch (e) {
@@ -442,6 +514,68 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
                 ],
               ),
               const Divider(height: 24),
+              // Sync Progress Section
+              if (type == 'family') // Only show for family surveys for now
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _getSyncProgress(phoneNumber),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Row(
+                        children: [
+                          Icon(Icons.sync, size: 14, color: Colors.grey.shade500),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Checking sync status...',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                          ),
+                        ],
+                      );
+                    }
+
+                    final progress = snapshot.data ?? {
+                      'synced_pages': 0,
+                      'total_pages': 0,
+                      'progress_percentage': 0,
+                    };
+
+                    final syncedPages = progress['synced_pages'] as int;
+                    final totalPages = progress['total_pages'] as int;
+                    final percentage = progress['progress_percentage'] as int;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              syncedPages == totalPages ? Icons.cloud_done : Icons.cloud_upload,
+                              size: 14,
+                              color: syncedPages == totalPages ? Colors.green : Colors.blue,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$syncedPages/$totalPages pages synced',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: syncedPages == totalPages ? Colors.green : Colors.blue,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        LinearProgressIndicator(
+                          value: totalPages > 0 ? syncedPages / totalPages : 0,
+                          backgroundColor: Colors.grey.shade200,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            syncedPages == totalPages ? Colors.green : Colors.blue,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

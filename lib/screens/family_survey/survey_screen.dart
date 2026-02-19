@@ -139,7 +139,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
               SurveyProgressIndicator(
                 currentPage: surveyState.currentPage,
                 totalPages: surveyState.totalPages,
-                onPageSelected: _jumpToPage,
+                onPageSelected: (i) => _jumpToPage(i),
                 pageNames: pageNames,
               ),
             
@@ -154,7 +154,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                     SurveyProgressIndicator(
                       currentPage: surveyState.currentPage,
                       totalPages: surveyState.totalPages,
-                      onPageSelected: _jumpToPage,
+                      onPageSelected: (i) => _jumpToPage(i),
                       pageNames: pageNames,
                     ),
 
@@ -196,18 +196,20 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                                   surveyorName: pageData?['surveyor_name'],
                                   phoneNumber: phoneNumber,
                                 );
+
+                                // Extra-safety: ensure the freshly initialized session is persisted immediately
+                                await surveyNotifier.saveCurrentPageData();
                               }
-                              // Save current page data and wait for completion before navigating
-                              await surveyNotifier.saveCurrentPageData();
-                              _jumpToPage(index + 1);
+                              // Jump (centralized save + navigation)
+                              await _jumpToPage(index + 1);
                             } else {
                               // Complete survey
                               _showCompletionDialog();
                             }
                           },
                           onPrevious: index > 0
-                              ? () {
-                                  _jumpToPage(index - 1);
+                              ? () async {
+                                  await _jumpToPage(index - 1);
                                 }
                               : null,
                         );
@@ -265,13 +267,20 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     return result ?? false;
   }
 
-  void _jumpToPage(int pageIndex) {
+  Future<void> _jumpToPage(int pageIndex) async {
     final surveyNotifier = ref.read(surveyProvider.notifier);
-    
-    if (pageIndex >= 0 && pageIndex < surveyNotifier.state.totalPages) {
-      _pageController.jumpToPage(pageIndex);
-      surveyNotifier.jumpToPage(pageIndex);
-    }
+
+    if (pageIndex < 0 || pageIndex >= surveyNotifier.state.totalPages) return;
+
+    // Always save current page data before navigating (await per your preference)
+    await surveyNotifier.saveCurrentPageData();
+
+    // Jump the PageView (instant) and keep provider state in sync
+    _pageController.jumpToPage(pageIndex);
+    surveyNotifier.jumpToPage(pageIndex);
+
+    // Load data for target page after navigation
+    await surveyNotifier.loadPageData(pageIndex);
   }
 
   void _showCompletionDialog() async {
@@ -495,26 +504,18 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
 
     if (pageIndex == currentPage) return;
 
-    // Save current page data asynchronously before navigating
-    surveyNotifier.saveCurrentPageData();
+    // Save current page data and wait for completion before navigating
+    await surveyNotifier.saveCurrentPageData();
 
-    // Navigate to the selected page
-    _pageController.animateToPage(
+    // Animate the PageView to the target page and ensure provider state stays in sync
+    await _pageController.animateToPage(
       pageIndex,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
 
-    // Update the survey state
-    if (pageIndex > currentPage) {
-      for (int i = currentPage; i < pageIndex; i++) {
-        surveyNotifier.nextPage();
-      }
-    } else {
-      for (int i = currentPage; i > pageIndex; i--) {
-        surveyNotifier.previousPage();
-      }
-    }
+    // Update provider to reflect the new page index (single authoritative call)
+    surveyNotifier.jumpToPage(pageIndex);
 
     // Load data for the new page
     await surveyNotifier.loadPageData(pageIndex);

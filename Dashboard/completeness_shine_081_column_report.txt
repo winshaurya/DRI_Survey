@@ -1,0 +1,496 @@
+CREATE TABLE
+TRUNCATE TABLE
+INSERT 0 1
+          analysis_type          | total_tables | tables_with_data | tables_empty | completeness_percentage 
+---------------------------------+--------------+------------------+--------------+-------------------------
+ VILLAGE TABLE EXISTENCE SUMMARY |           33 |               10 |           23 |                   30.30
+(1 row)
+
+       table_name        | total_rows | session_id_filled | surveyor_email_filled | village_name_filled | village_code_filled | state_filled | district_filled | block_filled | panchayat_filled | tehsil_filled | shine_code_filled | status_filled 
+-------------------------+------------+-------------------+-----------------------+---------------------+---------------------+--------------+-----------------+--------------+------------------+---------------+-------------------+---------------
+ village_survey_sessions |          1 |                 1 |                     1 |                   1 |                   0 |            1 |               1 |            1 |                1 |             1 |                 1 |             1
+(1 row)
+
+     table_name     | total_rows | total_population_filled | male_population_filled | female_population_filled | children_0_5_filled | children_6_14_filled | youth_15_24_filled | adults_25_59_filled | seniors_60_plus_filled | sc_population_filled | st_population_filled | obc_population_filled | general_population_filled | working_population_filled | unemployed_population_filled 
+--------------------+------------+-------------------------+------------------------+--------------------------+---------------------+----------------------+--------------------+---------------------+------------------------+----------------------+----------------------+-----------------------+---------------------------+---------------------------+------------------------------
+ village_population |          0 |                         |                        |                          |                     |                      |                    |                     |                        |                      |                      |                       |                           |                           |                             
+(1 row)
+
+   table_name    | total_rows | katcha_houses_filled | pakka_houses_filled | katcha_pakka_houses_filled | hut_houses_filled | houses_with_toilet_filled | functional_toilets_filled | houses_with_drainage_filled | houses_with_soak_pit_filled | houses_with_cattle_shed_filled | houses_with_compost_pit_filled | houses_with_nadep_filled | houses_with_lpg_filled | houses_with_biogas_filled | houses_with_solar_filled | houses_with_electricity_filled 
+-----------------+------------+----------------------+---------------------+----------------------------+-------------------+---------------------------+---------------------------+-----------------------------+-----------------------------+--------------------------------+--------------------------------+--------------------------+------------------------+---------------------------+--------------------------+--------------------------------
+ village_housing |          0 |                      |                     |                            |                   |                           |                           |                             |                             |                                |                                |                          |                        |                           |                          |                               
+(1 row)
+
+           table_name            | total_rows | tractor_available_filled | thresher_available_filled | seed_drill_available_filled | sprayer_available_filled | duster_available_filled | diesel_engine_available_filled | other_implements_filled 
+---------------------------------+------------+--------------------------+---------------------------+-----------------------------+--------------------------+-------------------------+--------------------------------+-------------------------
+ village_agricultural_implements |          0 |                          |                           |                             |                          |                         |                                |                        
+(1 row)
+
+        table_name         | total_rows | sr_no_filled | crop_name_filled | area_hectares_filled | productivity_filled | total_production_filled | quantity_consumed_filled | quantity_sold_filled 
+---------------------------+------------+--------------+------------------+----------------------+---------------------+-------------------------+--------------------------+----------------------
+ village_crop_productivity |          0 |              |                  |                      |                     |                         |                          |                     
+(1 row)
+
+   table_name    | total_rows | sr_no_filled | animal_type_filled | total_count_filled | breed_filled 
+-----------------+------------+--------------+--------------------+--------------------+--------------
+ village_animals |          0 |              |                    |                    |             
+(1 row)
+
+          table_name           | total_rows | has_canal_filled | has_tube_well_filled | has_ponds_filled | has_river_filled | has_well_filled | other_sources_filled 
+-------------------------------+------------+------------------+----------------------+------------------+------------------+-----------------+----------------------
+ village_irrigation_facilities |          0 |                  |                      |                  |                  |                 |                     
+(1 row)
+
+       table_name       | total_rows | hand_pumps_available_filled | hand_pumps_count_filled | wells_available_filled | wells_count_filled | tube_wells_available_filled | tube_wells_count_filled | nal_jal_available_filled | other_sources_filled 
+------------------------+------------+-----------------------------+-------------------------+------------------------+--------------------+-----------------------------+-------------------------+--------------------------+----------------------
+ village_drinking_water |          0 |                             |                         |                        |                    |                             |                         |                          |                     
+(1 row)
+
+    table_name     | total_rows | cars_available_filled | motorcycles_available_filled | e_rickshaws_available_filled | cycles_available_filled | pickup_trucks_available_filled | bullock_carts_available_filled 
+-------------------+------------+-----------------------+------------------------------+------------------------------+-------------------------+--------------------------------+--------------------------------
+ village_transport |          0 |                       |                              |                              |                         |                                |                               
+(1 row)
+
+      table_name       | total_rows | smart_mobiles_available_filled | smart_mobiles_count_filled | analog_mobiles_available_filled | analog_mobiles_count_filled | televisions_available_filled | televisions_count_filled | radios_available_filled | radios_count_filled | games_available_filled | other_entertainment_filled 
+-----------------------+------------+--------------------------------+----------------------------+---------------------------------+-----------------------------+------------------------------+--------------------------+-------------------------+---------------------+------------------------+----------------------------
+ village_entertainment |          0 |                                |                            |                                 |                             |                              |                          |                         |                     |                        |                           
+(1 row)
+
+        table_name         | total_rows | allopathic_available_filled | ayurvedic_available_filled | homeopathy_available_filled | traditional_available_filled | other_treatment_filled | preference_order_filled 
+---------------------------+------------+-----------------------------+----------------------------+-----------------------------+------------------------------+------------------------+-------------------------
+ village_medical_treatment |          0 |                             |                            |                             |                              |                        |                        
+(1 row)
+
+    table_name    | total_rows | family_disputes_filled | family_registered_filled | family_period_filled | revenue_disputes_filled | revenue_registered_filled | revenue_period_filled | criminal_disputes_filled | criminal_registered_filled | criminal_period_filled | other_disputes_filled | other_description_filled | other_registered_filled | other_period_filled 
+------------------+------------+------------------------+--------------------------+----------------------+-------------------------+---------------------------+-----------------------+--------------------------+----------------------------+------------------------+-----------------------+--------------------------+-------------------------+---------------------
+ village_disputes |          0 |                        |                          |                      |                         |                           |                       |                          |                            |                        |                       |                          |                         |                    
+(1 row)
+
+           table_name           | total_rows | primary_schools_filled | middle_schools_filled | secondary_schools_filled | higher_secondary_schools_filled | anganwadi_centers_filled | skill_development_centers_filled | shiksha_guarantee_centers_filled | other_facility_name_filled | other_facility_count_filled 
+--------------------------------+------------+------------------------+-----------------------+--------------------------+---------------------------------+--------------------------+----------------------------------+----------------------------------+----------------------------+-----------------------------
+ village_educational_facilities |          1 |                      1 |                     1 |                        1 |                               1 |                        1 |                                1 |                                1 |                          1 |                           1
+(1 row)
+
+          table_name          | total_rows | clothing_purchase_frequency_filled | food_waste_level_filled | food_waste_amount_filled | waste_disposal_method_filled | waste_segregation_filled | compost_pit_available_filled | toilet_available_filled | toilet_functional_filled | toilet_soak_pit_filled | led_lights_used_filled | devices_turned_off_filled | water_leaks_fixed_filled | plastic_avoidance_filled | family_puja_filled | family_meditation_filled | meditation_participants_filled | family_yoga_filled | yoga_participants_filled | community_activities_filled | activity_types_filled | shram_sadhana_filled | shram_participants_filled | spiritual_discourses_filled | discourse_participants_filled | family_happiness_filled | happy_members_filled | happiness_reasons_filled | smoking_prevalence_filled | drinking_prevalence_filled | gudka_prevalence_filled | gambling_prevalence_filled | tobacco_prevalence_filled | saving_habit_filled | saving_percentage_filled 
+------------------------------+------------+------------------------------------+-------------------------+--------------------------+------------------------------+--------------------------+------------------------------+-------------------------+--------------------------+------------------------+------------------------+---------------------------+--------------------------+--------------------------+--------------------+--------------------------+--------------------------------+--------------------+--------------------------+-----------------------------+-----------------------+----------------------+---------------------------+-----------------------------+-------------------------------+-------------------------+----------------------+--------------------------+---------------------------+----------------------------+-------------------------+----------------------------+---------------------------+---------------------+--------------------------
+ village_social_consciousness |          0 |                                    |                         |                          |                              |                          |                              |                         |                          |                        |                        |                           |                          |                          |                    |                          |                                |                    |                          |                             |                       |                      |                           |                             |                               |                         |                      |                          |                           |                            |                         |                            |                           |                     |                         
+(1 row)
+
+      table_name       | total_rows | births_last_3_years_filled | infant_deaths_last_3_years_filled | malnourished_children_filled | children_in_school_filled 
+-----------------------+------------+----------------------------+-----------------------------------+------------------------------+---------------------------
+ village_children_data |          0 |                            |                                   |                              |                          
+(1 row)
+
+          table_name           | total_rows | register_maintained_filled | status_filled | details_filled | components_filled | knowledge_filled 
+-------------------------------+------------+----------------------------+---------------+----------------+-------------------+------------------
+ village_biodiversity_register |          1 |                          1 |             1 |              1 |                 1 |                1
+(1 row)
+
+       table_name       | total_rows | earthen_drain_filled | masonry_drain_filled | covered_drain_filled | open_channel_filled | no_drainage_system_filled | drainage_destination_filled | drainage_remarks_filled | waste_collected_regularly_filled | waste_segregated_filled | waste_remarks_filled 
+------------------------+------------+----------------------+----------------------+----------------------+---------------------+---------------------------+-----------------------------+-------------------------+----------------------------------+-------------------------+----------------------
+ village_drainage_waste |          0 |                      |                      |                      |                     |                           |                             |                         |                                  |                         |                     
+(1 row)
+
+      table_name      | total_rows | unemployed_youth_filled | unemployed_adults_filled | total_unemployed_filled 
+----------------------+------------+-------------------------+--------------------------+-------------------------
+ village_unemployment |          0 |                         |                          |                        
+(1 row)
+
+CREATE TABLE
+DO
+           table_name            |           column_name            
+---------------------------------+----------------------------------
+ village_agricultural_implements | created_at
+ village_agricultural_implements | diesel_engine_available
+ village_agricultural_implements | duster_available
+ village_agricultural_implements | other_implements
+ village_agricultural_implements | seed_drill_available
+ village_agricultural_implements | session_id
+ village_agricultural_implements | sprayer_available
+ village_agricultural_implements | thresher_available
+ village_agricultural_implements | tractor_available
+ village_animals                 | animal_type
+ village_animals                 | breed
+ village_animals                 | created_at
+ village_animals                 | session_id
+ village_animals                 | sr_no
+ village_animals                 | total_count
+ village_bpl_families            | bpl_families_received_mgnrega
+ village_bpl_families            | bpl_families_with_job_cards
+ village_bpl_families            | created_at
+ village_bpl_families            | session_id
+ village_bpl_families            | total_bpl_families
+ village_cadastral_maps          | availability_status
+ village_cadastral_maps          | created_at
+ village_cadastral_maps          | has_cadastral_map
+ village_cadastral_maps          | image_path
+ village_cadastral_maps          | map_details
+ village_cadastral_maps          | session_id
+ village_children_data           | births_last_3_years
+ village_children_data           | children_in_school
+ village_children_data           | created_at
+ village_children_data           | infant_deaths_last_3_years
+ village_children_data           | malnourished_adults
+ village_children_data           | malnourished_children
+ village_children_data           | session_id
+ village_children_data           | total_children
+ village_crop_productivity       | area_hectares
+ village_crop_productivity       | created_at
+ village_crop_productivity       | crop_name
+ village_crop_productivity       | productivity_quintal_per_hectare
+ village_crop_productivity       | quantity_consumed_quintal
+ village_crop_productivity       | quantity_sold_quintal
+ village_crop_productivity       | session_id
+ village_crop_productivity       | sr_no
+ village_crop_productivity       | total_production_quintal
+ village_disputes                | created_at
+ village_disputes                | criminal_disputes
+ village_disputes                | criminal_period
+ village_disputes                | criminal_registered
+ village_disputes                | family_disputes
+ village_disputes                | family_period
+ village_disputes                | family_registered
+ village_disputes                | other_description
+ village_disputes                | other_disputes
+ village_disputes                | other_period
+ village_disputes                | other_registered
+ village_disputes                | revenue_disputes
+ village_disputes                | revenue_period
+ village_disputes                | revenue_registered
+ village_disputes                | session_id
+ village_drainage_waste          | covered_drain
+ village_drainage_waste          | created_at
+ village_drainage_waste          | drainage_destination
+ village_drainage_waste          | drainage_remarks
+ village_drainage_waste          | drainage_system_available
+ village_drainage_waste          | earthen_drain
+ village_drainage_waste          | masonry_drain
+ village_drainage_waste          | no_drainage_system
+ village_drainage_waste          | open_channel
+ village_drainage_waste          | session_id
+ village_drainage_waste          | waste_collected_regularly
+ village_drainage_waste          | waste_management_system
+ village_drainage_waste          | waste_remarks
+ village_drainage_waste          | waste_segregated
+ village_drinking_water          | created_at
+ village_drinking_water          | hand_pumps_available
+ village_drinking_water          | hand_pumps_count
+ village_drinking_water          | nal_jal_available
+ village_drinking_water          | other_sources
+ village_drinking_water          | session_id
+ village_drinking_water          | tube_wells_available
+ village_drinking_water          | tube_wells_count
+ village_drinking_water          | wells_available
+ village_drinking_water          | wells_count
+ village_entertainment           | analog_mobiles_available
+ village_entertainment           | analog_mobiles_count
+ village_entertainment           | created_at
+ village_entertainment           | games_available
+ village_entertainment           | other_entertainment
+ village_entertainment           | radios_available
+ village_entertainment           | radios_count
+ village_entertainment           | session_id
+ village_entertainment           | smart_mobiles_available
+ village_entertainment           | smart_mobiles_count
+ village_entertainment           | televisions_available
+ village_entertainment           | televisions_count
+ village_farm_families           | big_farmers
+ village_farm_families           | created_at
+ village_farm_families           | landless_farmers
+ village_farm_families           | marginal_farmers
+ village_farm_families           | session_id
+ village_farm_families           | small_farmers
+ village_farm_families           | total_farm_families
+ village_housing                 | created_at
+ village_housing                 | functional_toilets
+ village_housing                 | houses_with_biogas
+ village_housing                 | houses_with_cattle_shed
+ village_housing                 | houses_with_compost_pit
+ village_housing                 | houses_with_drainage
+ village_housing                 | houses_with_electricity
+ village_housing                 | houses_with_lpg
+ village_housing                 | houses_with_nadep
+ village_housing                 | houses_with_soak_pit
+ village_housing                 | houses_with_solar
+ village_housing                 | houses_with_toilet
+ village_housing                 | hut_houses
+ village_housing                 | katcha_houses
+ village_housing                 | katcha_pakka_houses
+ village_housing                 | pakka_houses
+ village_housing                 | session_id
+ village_infrastructure_details  | girls_students_count
+ village_infrastructure_details  | num_tap_water
+ village_irrigation_facilities   | canal_available
+ village_irrigation_facilities   | created_at
+ village_irrigation_facilities   | has_canal
+ village_irrigation_facilities   | has_ponds
+ village_irrigation_facilities   | has_river
+ village_irrigation_facilities   | has_tube_well
+ village_irrigation_facilities   | has_well
+ village_irrigation_facilities   | other_sources
+ village_irrigation_facilities   | pond_available
+ village_irrigation_facilities   | session_id
+ village_irrigation_facilities   | tube_well_available
+ village_kitchen_gardens         | created_at
+ village_kitchen_gardens         | gardens_available
+ village_kitchen_gardens         | session_id
+ village_kitchen_gardens         | total_gardens
+ village_malnutrition_data       | age
+ village_malnutrition_data       | child_name
+ village_malnutrition_data       | created_at
+ village_malnutrition_data       | disease_cause
+ village_malnutrition_data       | height
+ village_malnutrition_data       | height_feet
+ village_malnutrition_data       | name
+ village_malnutrition_data       | session_id
+ village_malnutrition_data       | sex
+ village_malnutrition_data       | sr_no
+ village_malnutrition_data       | weight
+ village_malnutrition_data       | weight_kg
+ village_medical_treatment       | allopathic_available
+ village_medical_treatment       | ayurvedic_available
+ village_medical_treatment       | created_at
+ village_medical_treatment       | homeopathy_available
+ village_medical_treatment       | jhad_phook_available
+ village_medical_treatment       | other_treatment
+ village_medical_treatment       | preference_order
+ village_medical_treatment       | session_id
+ village_medical_treatment       | traditional_available
+ village_population              | adults_25_59
+ village_population              | children_0_5
+ village_population              | children_6_14
+ village_population              | created_at
+ village_population              | female_population
+ village_population              | general_population
+ village_population              | higher_educated
+ village_population              | illiterate_population
+ village_population              | is_deleted
+ village_population              | male_population
+ village_population              | obc_population
+ village_population              | other_population
+ village_population              | primary_educated
+ village_population              | sc_population
+ village_population              | secondary_educated
+ village_population              | seniors_60_plus
+ village_population              | session_id
+ village_population              | st_population
+ village_population              | total_population
+ village_population              | unemployed_population
+ village_population              | working_population
+ village_population              | youth_15_24
+ village_seed_clubs              | clubs_available
+ village_seed_clubs              | created_at
+ village_seed_clubs              | session_id
+ village_seed_clubs              | total_clubs
+ village_signboards              | location
+ village_signboards              | signboard_type
+ village_social_consciousness    | activity_types
+ village_social_consciousness    | clothing_purchase_frequency
+ village_social_consciousness    | community_activities
+ village_social_consciousness    | community_participation
+ village_social_consciousness    | compost_pit_available
+ village_social_consciousness    | created_at
+ village_social_consciousness    | devices_turned_off
+ village_social_consciousness    | discourse_participants
+ village_social_consciousness    | drinking_prevalence
+ village_social_consciousness    | family_happiness
+ village_social_consciousness    | family_meditation
+ village_social_consciousness    | family_puja
+ village_social_consciousness    | family_yoga
+ village_social_consciousness    | food_waste_amount
+ village_social_consciousness    | food_waste_level
+ village_social_consciousness    | gambling_prevalence
+ village_social_consciousness    | gudka_prevalence
+ village_social_consciousness    | happiness_reasons
+ village_social_consciousness    | happy_members
+ village_social_consciousness    | led_lights_used
+ village_social_consciousness    | meditation_participants
+ village_social_consciousness    | plastic_avoidance
+ village_social_consciousness    | rainwater_harvesting
+ village_social_consciousness    | saving_habit
+ village_social_consciousness    | saving_percentage
+ village_social_consciousness    | session_id
+ village_social_consciousness    | shram_participants
+ village_social_consciousness    | shram_sadhana
+ village_social_consciousness    | smoking_prevalence
+ village_social_consciousness    | solar_energy_usage
+ village_social_consciousness    | spiritual_discourses
+ village_social_consciousness    | tobacco_prevalence
+ village_social_consciousness    | toilet_available
+ village_social_consciousness    | toilet_functional
+ village_social_consciousness    | toilet_soak_pit
+ village_social_consciousness    | waste_disposal_method
+ village_social_consciousness    | waste_management_system
+ village_social_consciousness    | waste_segregation
+ village_social_consciousness    | water_leaks_fixed
+ village_social_consciousness    | yoga_participants
+ village_social_maps             | cadastral_file_link
+ village_social_maps             | enterprise_file_link
+ village_social_maps             | map_data
+ village_social_maps             | map_type
+ village_social_maps             | topography_file_link
+ village_social_maps             | transect_file_link
+ village_social_maps             | venn_file_link
+ village_social_maps             | village_file_link
+ village_survey_sessions         | app_version
+ village_survey_sessions         | created_by
+ village_survey_sessions         | device_info
+ village_survey_sessions         | gps_link
+ village_survey_sessions         | last_synced_at
+ village_survey_sessions         | latitude
+ village_survey_sessions         | ldg_code
+ village_survey_sessions         | location_accuracy
+ village_survey_sessions         | location_timestamp
+ village_survey_sessions         | longitude
+ village_survey_sessions         | updated_by
+ village_survey_sessions         | village_code
+ village_traditional_occupations | average_income
+ village_traditional_occupations | created_at
+ village_traditional_occupations | families_engaged
+ village_traditional_occupations | number_of_families
+ village_traditional_occupations | occupation_name
+ village_traditional_occupations | session_id
+ village_traditional_occupations | sr_no
+ village_transport               | bullock_carts_available
+ village_transport               | cars_available
+ village_transport               | created_at
+ village_transport               | cycles_available
+ village_transport               | e_rickshaws_available
+ village_transport               | motorcycles_available
+ village_transport               | pickup_trucks_available
+ village_transport               | session_id
+ village_transport_facilities    | car_jeep_count
+ village_transport_facilities    | created_at
+ village_transport_facilities    | cycle_count
+ village_transport_facilities    | e_rickshaw_count
+ village_transport_facilities    | motorcycle_scooter_count
+ village_transport_facilities    | pickup_truck_count
+ village_transport_facilities    | public_transport_available
+ village_transport_facilities    | road_connectivity
+ village_transport_facilities    | session_id
+ village_transport_facilities    | tractor_count
+ village_unemployment            | created_at
+ village_unemployment            | session_id
+ village_unemployment            | total_unemployed
+ village_unemployment            | unemployed_adults
+ village_unemployment            | unemployed_youth
+(274 rows)
+
+           table_name           |          column_name          | data_type | filled_count |                                  sample_values                                   
+--------------------------------+-------------------------------+-----------+--------------+----------------------------------------------------------------------------------
+ village_biodiversity_register  | components                    | text      |            1 | 111
+ village_biodiversity_register  | created_at                    | text      |            1 | 2026-02-18T19:48:07.023584
+ village_biodiversity_register  | details                       | text      |            1 | 111
+ village_biodiversity_register  | knowledge                     | text      |            1 | 111
+ village_biodiversity_register  | register_maintained           | integer   |            1 | 0
+ village_biodiversity_register  | session_id                    | text      |            1 | 9e8d5c0e-b9d8-4aff-9ae2-94d7624ec641
+ village_biodiversity_register  | status                        | text      |            1 | 111
+ village_educational_facilities | anganwadi_centers             | integer   |            1 | 111
+ village_educational_facilities | colleges                      | integer   |            1 | 1111
+ village_educational_facilities | created_at                    | text      |            1 | 2026-02-18T19:36:11.865460
+ village_educational_facilities | high_schools                  | integer   |            1 | 0
+ village_educational_facilities | higher_secondary_schools      | integer   |            1 | 11111
+ village_educational_facilities | middle_schools                | integer   |            1 | 111
+ village_educational_facilities | other_facility_count          | integer   |            1 | 1111
+ village_educational_facilities | other_facility_name           | text      |            1 | qqqq
+ village_educational_facilities | primary_schools               | integer   |            1 | 111
+ village_educational_facilities | secondary_schools             | integer   |            1 | 1111
+ village_educational_facilities | session_id                    | text      |            1 | 9e8d5c0e-b9d8-4aff-9ae2-94d7624ec641
+ village_educational_facilities | shiksha_guarantee_centers     | integer   |            1 | 11111
+ village_educational_facilities | skill_development_centers     | integer   |            1 | 11111
+ village_forest_maps            | conservation_status           | text      |            1 | 111
+ village_forest_maps            | created_at                    | text      |            1 | 2026-02-18T19:47:59.586067
+ village_forest_maps            | forest_area                   | text      |            1 | 11
+ village_forest_maps            | forest_resources              | text      |            1 | 1111
+ village_forest_maps            | forest_types                  | text      |            1 | 111
+ village_forest_maps            | remarks                       | text      |            1 | 1111
+ village_forest_maps            | session_id                    | text      |            1 | 9e8d5c0e-b9d8-4aff-9ae2-94d7624ec641
+ village_infrastructure         | approach_condition            | text      |            1 | Bad
+ village_infrastructure         | approach_remarks              | text      |            1 | 211
+ village_infrastructure         | approach_roads_available      | integer   |            1 | 1
+ village_infrastructure         | created_at                    | text      |            1 | 2026-02-18T19:33:34.929463
+ village_infrastructure         | internal_condition            | text      |            1 | Bad
+ village_infrastructure         | internal_lanes_available      | integer   |            1 | 1
+ village_infrastructure         | internal_remarks              | text      |            1 | 1111
+ village_infrastructure         | num_approach_roads            | integer   |            1 | 6111
+ village_infrastructure         | num_internal_lanes            | integer   |            1 | 111
+ village_infrastructure         | session_id                    | text      |            1 | 9e8d5c0e-b9d8-4aff-9ae2-94d7624ec641
+ village_infrastructure         | updated_at                    | text      |            1 | 2026-02-18T19:33:34.929589
+ village_infrastructure_details | bank_distance                 | text      |            1 | 1111
+ village_infrastructure_details | boys_students_count           | integer   |            1 | 111
+ village_infrastructure_details | created_at                    | text      |            1 | 2026-02-18T19:35:51.868658
+ village_infrastructure_details | has_bank                      | integer   |            1 | 1
+ village_infrastructure_details | has_drinking_water_source     | integer   |            1 | 1
+ village_infrastructure_details | has_electrical_connection     | integer   |            1 | 1
+ village_infrastructure_details | has_health_facility           | integer   |            1 | 1
+ village_infrastructure_details | has_high_school               | integer   |            1 | 1
+ village_infrastructure_details | has_intermediate_school       | integer   |            1 | 1
+ village_infrastructure_details | has_junior_school             | integer   |            1 | 1
+ village_infrastructure_details | has_panchayat_bhavan          | integer   |            1 | 1
+ village_infrastructure_details | has_playground                | integer   |            1 | 1
+ village_infrastructure_details | has_post_office               | integer   |            1 | 1
+ village_infrastructure_details | has_primary_health_centre     | integer   |            1 | 1
+ village_infrastructure_details | has_primary_school            | integer   |            1 | 1
+ village_infrastructure_details | has_sharda_kendra             | integer   |            1 | 1
+ village_infrastructure_details | health_facility_distance      | text      |            1 | 111
+ village_infrastructure_details | high_school_distance          | text      |            1 | 1111
+ village_infrastructure_details | intermediate_school_distance  | text      |            1 | 111
+ village_infrastructure_details | junior_school_distance        | text      |            1 | 11111
+ village_infrastructure_details | num_hand_pumps                | integer   |            1 | 111
+ village_infrastructure_details | num_ponds                     | integer   |            1 | 111
+ village_infrastructure_details | num_tube_wells                | integer   |            1 | 111
+ village_infrastructure_details | num_wells                     | integer   |            1 | 111
+ village_infrastructure_details | other_education_facilities    | text      |            1 | 1111
+ village_infrastructure_details | panchayat_remarks             | text      |            1 | 111
+ village_infrastructure_details | playground_remarks            | text      |            1 | 111
+ village_infrastructure_details | post_office_distance          | text      |            1 | 1111
+ village_infrastructure_details | primary_school_distance       | text      |            1 | 1111
+ village_infrastructure_details | session_id                    | text      |            1 | 9e8d5c0e-b9d8-4aff-9ae2-94d7624ec641
+ village_infrastructure_details | sharda_kendra_distance        | text      |            1 | 111
+ village_map_points             | category                      | text      |            3 | Crop Plants,Forest,Knowledge
+ village_map_points             | created_at                    | text      |            3 | 2026-02-18T19:47:51.032854,2026-02-18T19:47:51.056383,2026-02-18T19:47:51.062181
+ village_map_points             | latitude                      | numeric   |            3 | 28.60781528,28.61075118,28.61322849
+ village_map_points             | longitude                     | numeric   |            3 | 77.20308064,77.21132475,77.21158889
+ village_map_points             | point_id                      | integer   |            3 | 1,2,3
+ village_map_points             | remarks                       | text      |            3 | 1111,11111
+ village_map_points             | session_id                    | text      |            3 | 9e8d5c0e-b9d8-4aff-9ae2-94d7624ec641
+ village_signboards             | created_at                    | text      |            1 | 2026-02-18T19:46:54.778289
+ village_signboards             | info_boards                   | text      |            1 | 111
+ village_signboards             | session_id                    | text      |            1 | 9e8d5c0e-b9d8-4aff-9ae2-94d7624ec641
+ village_signboards             | signboards                    | text      |            1 | 111
+ village_signboards             | wall_writing                  | text      |            1 | 111
+ village_social_maps            | created_at                    | text      |            1 | 2026-02-18T19:47:03.274844
+ village_social_maps            | remarks                       | text      |            1 | 11111
+ village_social_maps            | session_id                    | text      |            1 | 9e8d5c0e-b9d8-4aff-9ae2-94d7624ec641
+ village_survey_details         | animals_details               | text      |            1 | 1111
+ village_survey_details         | birds_details                 | text      |            1 | 1111
+ village_survey_details         | burial_ground_details         | text      |            1 | 1111
+ village_survey_details         | created_at                    | text      |            1 | 2026-02-18T19:47:27.307992
+ village_survey_details         | crop_plants_details           | text      |            1 | 111
+ village_survey_details         | forest_details                | text      |            1 | 111
+ village_survey_details         | fruit_trees_details           | text      |            1 | 111
+ village_survey_details         | garden_details                | text      |            1 | 111
+ village_survey_details         | local_biodiversity_details    | text      |            1 | 1
+ village_survey_details         | session_id                    | text      |            1 | 9e8d5c0e-b9d8-4aff-9ae2-94d7624ec641
+ village_survey_details         | special_features_details      | text      |            1 | 1111
+ village_survey_details         | traditional_knowledge_details | text      |            1 | 111
+ village_survey_details         | vegetables_details            | text      |            1 | 111
+ village_survey_details         | wasteland_details             | text      |            1 | 1111
+ village_survey_sessions        | block                         | text      |            1 | sjsj
+ village_survey_sessions        | created_at                    | text      |            1 | 2026-02-18T19:33:19.621315
+ village_survey_sessions        | current_version               | integer   |            1 | 1
+ village_survey_sessions        | district                      | text      |            1 | Ayodhya
+ village_survey_sessions        | is_deleted                    | integer   |            1 | 0
+ village_survey_sessions        | last_edited_at                | text      |            1 | 2026-02-18 14:03:22.589498+00
+ village_survey_sessions        | panchayat                     | text      |            1 | Bachhran
+ village_survey_sessions        | session_id                    | text      |            1 | 9e8d5c0e-b9d8-4aff-9ae2-94d7624ec641
+ village_survey_sessions        | shine_code                    | text      |            1 | SHINE_081
+ village_survey_sessions        | state                         | text      |            1 | Uttar Pradesh
+ village_survey_sessions        | status                        | text      |            1 | completed
+ village_survey_sessions        | surveyor_email                | text      |            1 | mr.shaurya25@gmail.com
+ village_survey_sessions        | tehsil                        | text      |            1 | sjsj
+ village_survey_sessions        | updated_at                    | text      |            1 | 2026-02-18T19:48:45.243593
+ village_survey_sessions        | village_name                  | text      |            1 | Bachhran,
+(113 rows)
+
+DROP TABLE

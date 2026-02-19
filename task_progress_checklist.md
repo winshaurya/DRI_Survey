@@ -1,0 +1,6 @@
+- [x] Analyze requirements
+- [x] List all relevant table names from schema
+- [x] Compare schema tables with SQL templates to identify missing tables
+- [ ] Prepare completeness queries for all tables for each session (family and village)
+- [ ] Run completeness queries for each session (1 family, 2 village)
+- [ ] Report completeness for all tables in both surveys

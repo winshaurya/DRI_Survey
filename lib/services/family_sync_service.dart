@@ -5,7 +5,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database_service.dart';
 import 'supabase_service.dart';
-
+import 'package:sqflite/sqflite.dart';
 class FamilySyncService {
   static final FamilySyncService _instance = FamilySyncService._internal();
   static FamilySyncService get instance => _instance;
@@ -138,28 +138,64 @@ class FamilySyncService {
     }
   }
 
-  /// Save page data locally first, then trigger background Supabase sync
+  /// Save page data locally for all pages (1-31) using robust modular logic.
   Future<bool> savePageData({
     required String phoneNumber,
     required int page,
     required Map<String, dynamic> pageData,
   }) async {
     try {
-      // Save locally first
-      final success = await _savePageDataLocally(phoneNumber, page, pageData);
-      if (!success) {
-        debugPrint('Failed to save page $page locally for $phoneNumber');
+      final db = await _databaseService.database;
+      String tableName = _getTableNameForPage(page);
+      if (tableName.isEmpty) {
+        debugPrint('No table mapping for page $page');
         return false;
       }
 
-      // Update sync status
-      _syncStatus[phoneNumber] ??= {
-        'pages_synced': <int>{},
-        'last_sync_attempt': DateTime.now(),
-      };
-      (_syncStatus[phoneNumber]?['pages_synced'] as Set<int>?)?.add(page);
+      // Remove old data for this page and phone number
+      final pk = int.tryParse(phoneNumber) ?? phoneNumber;
+      await db.delete(tableName, where: 'phone_number = ?', whereArgs: [pk]);
 
-      // Trigger background Supabase sync for this page (non-blocking)
+      // Insert new data
+      if (pageData.isNotEmpty) {
+        if (pageData.values.first is List) {
+          for (final item in pageData.values.first) {
+            await db.insert(tableName, {
+              'phone_number': phoneNumber,
+              ...item,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          }
+        } else if (pageData.values.first is Map) {
+          await db.insert(tableName, {
+            'phone_number': phoneNumber,
+            ...pageData.values.first,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        } else {
+          await db.insert(tableName, {
+            'phone_number': phoneNumber,
+            ...pageData,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+      }
+
+      // Save metadata
+      await db.insert(
+        'sync_metadata',
+        {
+          'phone_number': phoneNumber,
+          'last_sync_attempt': DateTime.now().toIso8601String(),
+          'data_hash': pageData.hashCode.toString(),
+          'sync_version': page,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      debugPrint('Local save successful for page $page, phone $phoneNumber, table $tableName');
+
+      // Trigger Supabase sync only after local save
       _syncPageToSupabase(phoneNumber, page, pageData).catchError((e) {
         debugPrint('Background sync failed for page $page of $phoneNumber: $e');
       });
@@ -171,262 +207,71 @@ class FamilySyncService {
     }
   }
 
-  Future<bool> _savePageDataLocally(String phoneNumber, int page, Map<String, dynamic> data) async {
-    try {
-      switch (page) {
-        case 1: // Family members
-          await _databaseService.deleteByPhone('family_members', phoneNumber);
-          if (data['family_members'] != null) {
-            int srNo = 0;
-            for (final member in data['family_members']) {
-              srNo++;
-              await _databaseService.saveData('family_members', {
-                'phone_number': phoneNumber,
-                'sr_no': member['sr_no'] ?? srNo,
-                'name': member['name'],
-                'fathers_name': member['fathers_name'],
-                'mothers_name': member['mothers_name'],
-                'relationship_with_head': member['relationship_with_head'],
-                'age': member['age'],
-                'sex': member['sex'],
-                'physically_fit': member['physically_fit'],
-                'physically_fit_cause': member['physically_fit_cause'],
-                'educational_qualification': member['educational_qualification'],
-                'inclination_self_employment': member['inclination_self_employment'],
-                'occupation': member['occupation'],
-                'days_employed': member['days_employed'],
-                'income': member['income'],
-                'awareness_about_village': member['awareness_about_village'],
-                'participate_gram_sabha': member['participate_gram_sabha'],
-                'insured': member['insured'],
-                'insurance_company': member['insurance_company'],
-                'created_at': DateTime.now().toIso8601String(),
-                'updated_at': DateTime.now().toIso8601String(),
-                'is_deleted': 0,
-              });
-            }
-          }
-          break;
-
-        case 2: // Social Consciousness
-        case 3:
-        case 4:
-          await _databaseService.deleteByPhone('social_consciousness', phoneNumber);
-          await _databaseService.deleteByPhone('tribal_questions', phoneNumber);
-          await _databaseService.saveData('social_consciousness', {
-            'phone_number': phoneNumber,
-            ...data,
-          });
-          if (data['tribal_questions'] != null) {
-            await _databaseService.saveData('tribal_questions', {
-              'phone_number': phoneNumber,
-              ...data['tribal_questions'],
-            });
-          }
-          break;
-
-        case 5: // Land Holding
-          await _databaseService.deleteByPhone('land_holding', phoneNumber);
-          await _databaseService.saveData('land_holding', {
-            'phone_number': phoneNumber,
-            'irrigated_area': data['irrigated_area'],
-            'cultivable_area': data['cultivable_area'],
-            'unirrigated_area': data['unirrigated_area'],
-            'barren_land': data['barren_land'],
-            'mango_trees': data['mango_trees'],
-            'guava_trees': data['guava_trees'],
-            'lemon_trees': data['lemon_trees'],
-            'pomegranate_trees': data['pomegranate_trees'],
-            'other_fruit_trees_name': data['other_fruit_trees_name'],
-            'other_fruit_trees_count': data['other_fruit_trees_count'],
-          });
-          break;
-
-        case 6: // Irrigation
-          await _databaseService.deleteByPhone('irrigation_facilities', phoneNumber);
-          await _databaseService.saveData('irrigation_facilities', {
-            'phone_number': phoneNumber,
-            ...data,
-          });
-          break;
-
-        case 7: // Crop Productivity
-          await _databaseService.deleteByPhone('crop_productivity', phoneNumber);
-          if (data['crop_productivity'] != null) {
-            int srNo = 0;
-            for (final crop in data['crop_productivity']) {
-              srNo++;
-              await _databaseService.saveData('crop_productivity', {
-                'phone_number': phoneNumber,
-                'sr_no': crop['sr_no'] ?? srNo,
-                'crop_name': crop['crop_name'],
-                'area_hectares': crop['area_hectares'],
-                'productivity_quintal_per_hectare': crop['productivity_quintal_per_hectare'],
-                'total_production_quintal': crop['total_production_quintal'],
-                'quantity_consumed_quintal': crop['quantity_consumed_quintal'],
-                'quantity_sold_quintal': crop['quantity_sold_quintal'],
-              });
-            }
-          }
-          break;
-
-        case 8: // Fertilizer Usage
-          await _databaseService.deleteByPhone('fertilizer_usage', phoneNumber);
-          await _databaseService.saveData('fertilizer_usage', {
-            'phone_number': phoneNumber,
-            ...data,
-          });
-          break;
-
-        case 9: // Animals
-          await _databaseService.deleteByPhone('animals', phoneNumber);
-          if (data['animals'] != null) {
-            int srNo = 0;
-            for (final animal in data['animals']) {
-              srNo++;
-              await _databaseService.saveData('animals', {
-                'phone_number': phoneNumber,
-                'sr_no': animal['sr_no'] ?? srNo,
-                'animal_type': animal['animal_type'],
-                'number_of_animals': animal['number_of_animals'],
-                'breed': animal['breed'],
-                'production_per_animal': animal['production_per_animal'],
-                'quantity_sold': animal['quantity_sold'],
-              });
-            }
-          }
-          break;
-
-        case 10: // Agricultural Equipment
-          await _databaseService.deleteByPhone('agricultural_equipment', phoneNumber);
-          await _databaseService.saveData('agricultural_equipment', {
-            'phone_number': phoneNumber,
-            ...data,
-          });
-          break;
-
-        case 11: // Entertainment Facilities
-          await _databaseService.deleteByPhone('entertainment_facilities', phoneNumber);
-          await _databaseService.saveData('entertainment_facilities', {
-            'phone_number': phoneNumber,
-            ...data,
-          });
-          break;
-
-        case 12: // Transport Facilities
-          await _databaseService.deleteByPhone('transport_facilities', phoneNumber);
-          await _databaseService.saveData('transport_facilities', {
-            'phone_number': phoneNumber,
-            ...data,
-          });
-          break;
-
-        case 13: // Drinking Water Sources
-          await _databaseService.deleteByPhone('drinking_water_sources', phoneNumber);
-          await _databaseService.saveData('drinking_water_sources', {
-            'phone_number': phoneNumber,
-            ...data,
-          });
-          break;
-
-        case 14: // Medical Treatment
-          await _databaseService.deleteByPhone('medical_treatment', phoneNumber);
-          await _databaseService.saveData('medical_treatment', {
-            'phone_number': phoneNumber,
-            ...data,
-          });
-          break;
-
-        case 15: // Disputes
-          await _databaseService.deleteByPhone('disputes', phoneNumber);
-          await _databaseService.saveData('disputes', {
-            'phone_number': phoneNumber,
-            ...data,
-          });
-          break;
-
-        case 16: // House Conditions & Facilities
-          await _databaseService.deleteByPhone('house_conditions', phoneNumber);
-          await _databaseService.deleteByPhone('house_facilities', phoneNumber);
-          await _databaseService.deleteByPhone('tulsi_plants', phoneNumber);
-          await _databaseService.deleteByPhone('nutritional_garden', phoneNumber);
-
-          await _databaseService.saveData('house_conditions', {
-            'phone_number': phoneNumber,
-            'katcha': data['katcha_house'] ?? false,
-            'pakka': data['pakka_house'] ?? false,
-            'katcha_pakka': data['katcha_pakka_house'] ?? false,
-            'hut': data['hut_house'] ?? false,
-            'toilet_in_use': data['toilet_in_use'],
-            'toilet_condition': data['toilet_condition'],
-          });
-
-          await _databaseService.saveData('house_facilities', {
-            'phone_number': phoneNumber,
-            'toilet': data['toilet'] ?? false,
-            'drainage': data['drainage'] ?? false,
-            'soak_pit': data['soak_pit'] ?? false,
-            'cattle_shed': data['cattle_shed'] ?? false,
-            'compost_pit': data['compost_pit'] ?? false,
-            'nadep': data['nadep'] ?? false,
-            'lpg_gas': data['lpg_gas'] ?? false,
-            'biogas': data['biogas'] ?? false,
-            'solar_cooking': data['solar_cooking'] ?? false,
-            'electric_connection': data['electric_connection'] ?? false,
-            'nutritional_garden_available': data['nutritional_garden'] ?? false,
-            'tulsi_plants_available': data['tulsi_plants'],
-          });
-
-          if (data['tulsi_plants'] != null) {
-            await _databaseService.saveData('tulsi_plants', {
-              'phone_number': phoneNumber,
-              'has_plants': data['tulsi_plants'],
-              'plant_count': data['tulsi_plant_count'],
-            });
-          }
-
-          if (data['nutritional_garden'] != null) {
-            await _databaseService.saveData('nutritional_garden', {
-              'phone_number': phoneNumber,
-              'has_garden': data['nutritional_garden'],
-              'garden_size': data['nutritional_garden_size'],
-              'vegetables_grown': data['nutritional_garden_vegetables'],
-            });
-          }
-          break;
-
-        case 17: // Diseases
-          await _databaseService.deleteByPhone('diseases', phoneNumber);
-          if (data['diseases'] != null) {
-            int srNo = 0;
-            for (final disease in data['diseases']) {
-              srNo++;
-              await _databaseService.saveData('diseases', {
-                'phone_number': phoneNumber,
-                'sr_no': disease['sr_no'] ?? srNo,
-                'family_member_name': disease['family_member_name'] ?? disease['name'],
-                'disease_name': disease['disease_name'],
-                'suffering_since': disease['suffering_since'],
-                'treatment_taken': disease['treatment_taken'],
-                'treatment_from_when': disease['treatment_from_when'],
-                'treatment_from_where': disease['treatment_from_where'],
-                'treatment_taken_from': disease['treatment_taken_from'],
-              });
-            }
-          }
-          break;
-
-        // Add remaining pages as needed...
-
-        default:
-          debugPrint('Page $page not implemented yet');
-          return false;
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Error saving page $page locally: $e');
-      return false;
+  /// Map page number to table name for local DB
+  String _getTableNameForPage(int page) {
+    switch (page) {
+      case 1:
+        return 'family_members';
+      case 2:
+      case 3:
+      case 4:
+        return 'social_consciousness';
+      case 5:
+        return 'land_holding';
+      case 6:
+        return 'irrigation_facilities';
+      case 7:
+        return 'crop_productivity';
+      case 8:
+        return 'fertilizer_usage';
+      case 9:
+        return 'animals';
+      case 10:
+        return 'agricultural_equipment';
+      case 11:
+        return 'entertainment_facilities';
+      case 12:
+        return 'transport_facilities';
+      case 13:
+        return 'drinking_water_sources';
+      case 14:
+        return 'medical_treatment';
+      case 15:
+        return 'disputes';
+      case 16:
+        return 'house_conditions';
+      case 17:
+        return 'diseases';
+      case 18:
+        return 'government_schemes';
+      case 19:
+        return 'folklore_medicine';
+      case 20:
+        return 'health_programmes';
+      case 21:
+        return 'children_data';
+      case 22:
+        return 'migration_data';
+      case 23:
+        return 'training_data';
+      case 24:
+        return 'vb_gram';
+      case 25:
+        return 'pm_kisan_nidhi';
+      case 26:
+        return 'pm_kisan_samman_nidhi';
+      case 27:
+        return 'kisan_credit_card';
+      case 28:
+        return 'swachh_bharat_mission';
+      case 29:
+        return 'fasal_bima';
+      case 30:
+        return 'bank_account';
+      case 31:
+        return 'merged_govt_schemes';
+      default:
+        return '';
     }
   }
 
@@ -466,16 +311,17 @@ class FamilySyncService {
       switch (page) {
         case 1: // Family members
           if (data['family_members'] != null) {
+            final phoneKey = int.tryParse(phoneNumber.toString()) ?? phoneNumber;
             // Delete existing records first
             await _supabaseService.client
                 .from('family_members')
                 .delete()
-                .eq('phone_number', phoneNumber);
+                .eq('phone_number', phoneKey);
 
             // Insert new records
             for (final member in data['family_members']) {
               await _supabaseService.client.from('family_members').insert({
-                'phone_number': phoneNumber,
+                'phone_number': phoneKey,
                 'sr_no': member['sr_no'],
                 'name': member['name'],
                 'fathers_name': member['fathers_name'],
@@ -509,12 +355,12 @@ class FamilySyncService {
           await _supabaseService.client
               .from('social_consciousness')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client
               .from('tribal_questions')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           // Insert social consciousness
           await _supabaseService.client.from('social_consciousness').insert({
@@ -573,7 +419,7 @@ class FamilySyncService {
           await _supabaseService.client
               .from('land_holding')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client.from('land_holding').insert({
             'phone_number': phoneNumber,
@@ -595,10 +441,7 @@ class FamilySyncService {
           await _supabaseService.client
               .from('irrigation_facilities')
               .delete()
-              .eq('phone_number', phoneNumber);
-
-          await _supabaseService.client.from('irrigation_facilities').insert({
-            'phone_number': phoneNumber,
+          .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
             'primary_source': data['primary_source'],
             'canal': data['canal'],
             'tube_well': data['tube_well'],
@@ -619,7 +462,7 @@ class FamilySyncService {
             await _supabaseService.client
                 .from('crop_productivity')
                 .delete()
-                .eq('phone_number', phoneNumber);
+                .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
             for (final crop in data['crop_productivity']) {
               await _supabaseService.client.from('crop_productivity').insert({
@@ -642,7 +485,7 @@ class FamilySyncService {
           await _supabaseService.client
               .from('fertilizer_usage')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client.from('fertilizer_usage').insert({
             'phone_number': phoneNumber,
@@ -659,7 +502,7 @@ class FamilySyncService {
             await _supabaseService.client
                 .from('animals')
                 .delete()
-                .eq('phone_number', phoneNumber);
+                .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
             for (final animal in data['animals']) {
               await _supabaseService.client.from('animals').insert({
@@ -680,7 +523,7 @@ class FamilySyncService {
           await _supabaseService.client
               .from('agricultural_equipment')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client.from('agricultural_equipment').insert({
             'phone_number': phoneNumber,
@@ -705,7 +548,7 @@ class FamilySyncService {
           await _supabaseService.client
               .from('entertainment_facilities')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client.from('entertainment_facilities').insert({
             'phone_number': phoneNumber,
@@ -726,7 +569,7 @@ class FamilySyncService {
           await _supabaseService.client
               .from('transport_facilities')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client.from('transport_facilities').insert({
             'phone_number': phoneNumber,
@@ -744,7 +587,7 @@ class FamilySyncService {
           await _supabaseService.client
               .from('drinking_water_sources')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client.from('drinking_water_sources').insert({
             'phone_number': phoneNumber,
@@ -770,7 +613,7 @@ class FamilySyncService {
           await _supabaseService.client
               .from('medical_treatment')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client.from('medical_treatment').insert({
             'phone_number': phoneNumber,
@@ -788,7 +631,7 @@ class FamilySyncService {
           await _supabaseService.client
               .from('disputes')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client.from('disputes').insert({
             'phone_number': phoneNumber,
@@ -813,22 +656,22 @@ class FamilySyncService {
           await _supabaseService.client
               .from('house_conditions')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client
               .from('house_facilities')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client
               .from('tulsi_plants')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           await _supabaseService.client
               .from('nutritional_garden')
               .delete()
-              .eq('phone_number', phoneNumber);
+              .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
           // Insert house conditions
           await _supabaseService.client.from('house_conditions').insert({
@@ -887,7 +730,7 @@ class FamilySyncService {
             await _supabaseService.client
                 .from('diseases')
                 .delete()
-                .eq('phone_number', phoneNumber);
+                .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber);
 
             for (final disease in data['diseases']) {
               await _supabaseService.client.from('diseases').insert({
