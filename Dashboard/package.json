@@ -1,5 +1,5 @@
 {
-  "name": "DRI PRA Dashboard",
+  "name": "edu-survey-root",
   "version": "1.0.0",
   "description": "Master dashboard for Supabase family survey data",
   "main": "index.js",
@@ -9,8 +9,8 @@
   "license": "ISC",
   "dependencies": {
     "@types/xlsx": "^0.0.35",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "xlsx": "^0.18.5"
   }
 }

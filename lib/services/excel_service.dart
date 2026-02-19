@@ -131,7 +131,8 @@ class ExcelService {
       ]);
 
       for (final session in sessions) {
-        final phoneNumber = session['phone_number'];
+        final phoneNumberRaw = session['phone_number'];
+        final phoneNumber = phoneNumberRaw?.toString();
         final identifier = phoneNumber ?? session['id'] ?? 'unknown_${DateTime.now().millisecondsSinceEpoch}';
         String exportStatus = 'Success';
         
@@ -469,6 +470,79 @@ class ExcelService {
 
     // 11. Other Information
     _addOtherInformationSection(sheet, data);
+
+    // 12. Raw Tables (fallback) - write every table/list/map with all columns found
+    _addRawTablesSection(sheet, data);
+  }
+
+  /// Write every raw table/map present in the data with all columns/keys
+  void _addRawTablesSection(Sheet sheet, Map<String, dynamic> data) {
+    _writeSectionHeader(sheet, 'RAW TABLES (All columns included)');
+
+    final excludedKeys = {
+      '_export_metadata',
+      // session-level keys already shown in header
+      'village_name', 'shine_code', 'panchayat', 'block', 'district', 'survey_date', 'surveyor_name',
+      'latitude', 'longitude', 'location_accuracy', 'location_timestamp', 'status', 'device_info', 'app_version'
+    };
+
+    for (final entry in data.entries) {
+      final key = entry.key;
+      if (excludedKeys.contains(key)) continue;
+      final value = entry.value;
+
+      if (value == null) continue;
+
+      if (value is List) {
+        if (value.isEmpty) continue;
+        // Find union of all keys across rows
+        final keys = <String>{};
+        for (final row in value) {
+          if (row is Map) keys.addAll(row.keys.map((k) => k.toString()));
+        }
+        final columns = keys.toList();
+        // Prefer common id/order columns first
+        final preferred = ['phone_number', 'sr_no', 'id', 'member_name', 'name', 'created_at', 'updated_at'];
+        columns.sort((a, b) {
+          final ai = preferred.indexOf(a);
+          final bi = preferred.indexOf(b);
+          if (ai >= 0 && bi >= 0) return ai.compareTo(bi);
+          if (ai >= 0) return -1;
+          if (bi >= 0) return 1;
+          return a.compareTo(b);
+        });
+
+        _writeSubSectionHeader(sheet, key.toUpperCase());
+        // Header
+        _writeTableHeader(sheet, columns);
+
+        for (final row in value) {
+          if (row is Map) {
+            final cells = <CellValue>[];
+            for (final col in columns) {
+              final v = row[col];
+              cells.add(TextCellValue(v?.toString() ?? ''));
+            }
+            _writeTableRow(sheet, cells);
+          } else {
+            // Non-map rows (primitives) - write single value
+            _writeTableRow(sheet, [TextCellValue(row.toString())]);
+          }
+        }
+        _rowIndex++;
+      } else if (value is Map) {
+        _writeSubSectionHeader(sheet, key.toUpperCase());
+        _writeDynamicMap(sheet, value);
+        _rowIndex++;
+      }
+    }
+  }
+
+  void _writeDynamicMap(Sheet sheet, Map<dynamic, dynamic> map) {
+    final keys = map.keys.toList();
+    for (final k in keys) {
+      _writeKeyValuePair(sheet, '${k.toString()}:', map[k]?.toString() ?? '');
+    }
   }
 
   /// Create a single-sheet village survey report with clear headings
@@ -634,6 +708,107 @@ class ExcelService {
   }
 
   // --- Helper Methods ---
+
+  /// Export each family survey table as a separate Excel sheet, including all columns and rows.
+  Future<void> exportFamilySurveyTablesToExcel(String phoneNumber) async {
+    try {
+      if (_isExporting) {
+        throw Exception('Another export is already in progress. Please wait.');
+      }
+      _isExporting = true;
+
+      final db = _databaseService;
+      final session = await db.getSurveySession(phoneNumber) ?? {};
+
+      // Comprehensive list of all family survey tables (from xlsx_export_service.dart)
+      final tableNames = <String>[
+        'family_members',
+        'social_consciousness',
+        'tribal_questions',
+        'land_holding',
+        'irrigation_facilities',
+        'crop_productivity',
+        'fertilizer_usage',
+        'animals',
+        'agricultural_equipment',
+        'entertainment_facilities',
+        'transport_facilities',
+        'drinking_water_sources',
+        'medical_treatment',
+        'disputes',
+        'house_conditions',
+        'house_facilities',
+        'diseases',
+        'health_programmes',
+        'folklore_medicine',
+        'aadhaar_scheme_members',
+        'tribal_scheme_members',
+        'pension_scheme_members',
+        'widow_scheme_members',
+        'ayushman_scheme_members',
+        'ration_scheme_members',
+        'family_id_scheme_members',
+        'samagra_scheme_members',
+        'handicapped_scheme_members',
+        'vb_gram',
+        'vb_gram_members',
+        'pm_kisan_nidhi',
+        'pm_kisan_members',
+        'pm_kisan_samman_nidhi',
+        'pm_kisan_samman_members',
+        'merged_govt_schemes',
+        'shg_members',
+        'fpo_members',
+        'children_data',
+        'malnourished_children_data',
+        'child_diseases',
+        'migration_data',
+        'training_data',
+        'bank_accounts',
+      ];
+
+      final excel = Excel.createExcel();
+
+      // Session sheet (key / value)
+      final sessionSheet = excel['Session'];
+      sessionSheet.appendRow([TextCellValue('Field'), TextCellValue('Value')]);
+      session.forEach((k, v) {
+        sessionSheet.appendRow([TextCellValue(k), TextCellValue(v?.toString() ?? '')]);
+      });
+
+      // Other tables: create sheet per table
+      for (final table in tableNames) {
+        final rows = await db.getData(table, phoneNumber);
+        final sheetName = table.length <= 31 ? table : table.substring(0, 31);
+        final sheet = excel[sheetName];
+
+        if (rows.isEmpty) {
+          sheet.appendRow([TextCellValue('No data')]);
+          continue;
+        }
+
+        // Use keys of first row as header
+        final headerKeys = rows.first.keys.toList();
+        final header = headerKeys.map((k) => TextCellValue(k.toString())).toList();
+        sheet.appendRow(header);
+
+        for (final row in rows) {
+          final values = headerKeys.map((key) => TextCellValue(row[key] != null ? row[key].toString() : '')).toList();
+          sheet.appendRow(values);
+        }
+      }
+
+      // Encode and save file
+      await _saveExcelFile(
+        excel,
+        _safeFileName('family_survey_tables_${phoneNumber}_${DateTime.now().millisecondsSinceEpoch}.xlsx'),
+      );
+    } catch (e) {
+      throw Exception('Failed to export family survey tables: $e');
+    } finally {
+      _isExporting = false;
+    }
+  }
 
   void _addReportHeader(Sheet sheet, Map<String, dynamic> data) {
     // Main Title

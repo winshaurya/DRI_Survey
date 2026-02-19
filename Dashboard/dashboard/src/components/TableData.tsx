@@ -1,6 +1,5 @@
 // dashboard/src/components/TableData.tsx
 import React, { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
 import { Table, Loader, Alert, TextInput, Group, Button } from "@mantine/core";
 import { IconSearch, IconSortAscending, IconSortDescending, IconDownload } from "@tabler/icons-react";
 import * as XLSX from "xlsx";
@@ -26,39 +25,63 @@ export function TableData({ tableName }: TableDataProps) {
     setLoading(true);
     setError(null);
 
-    // Helper to fetch session_ids for a shine_code
-    const fetchSessionIds = async (shine: string) => {
-      const { data, error } = await supabase
-        .from("village_survey_sessions")
-        .select("session_id")
-        .eq("shine_code", shine);
-      if (error) throw new Error(error.message);
-      return (data || []).map((row: any) => row.session_id);
-    };
-
     const fetchData = async () => {
       try {
-        let query = supabase.from(tableName).select("*");
-        if (shoneCode && tableName === "village_survey_sessions") {
-          query = query.eq("shine_code", shoneCode);
-        } else if (shoneCode && tableName !== "village_survey_sessions") {
-          const sessionIds = await fetchSessionIds(shoneCode);
-          if (sessionIds.length > 0) {
-            query = query.in("session_id", sessionIds);
-          } else {
+        // Use Supabase project URL and service role key from env (server-side key)
+        const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '') as string;
+        const serviceRole = (import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '') as string;
+        if (!supabaseUrl || !serviceRole) throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_SERVICE_ROLE_KEY are required in env');
+        const restBase = `${supabaseUrl.replace(/\/$/, '')}/rest/v1`;
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'apikey': serviceRole,
+          'Authorization': `Bearer ${serviceRole}`,
+        };
+
+        let rows: any[] = [];
+
+        // If shine_code provided and table != village_survey_sessions, resolve session_ids first
+        if (shoneCode && tableName !== 'village_survey_sessions') {
+          const sUrl = `${restBase}/village_survey_sessions?select=session_id&shine_code=eq.${encodeURIComponent(shoneCode)}`;
+          const sRes = await fetch(sUrl, { headers });
+          if (!sRes.ok) {
+            const txt = await sRes.text();
+            throw new Error(`Failed to resolve sessions: ${txt}`);
+          }
+          const sessionJson = await sRes.json();
+          const sessionIds = (sessionJson || []).map((r: any) => r.session_id);
+          if (sessionIds.length === 0) {
             setData([]);
             setLoading(false);
             return;
           }
+          // build in filter (quote ids)
+          const inVals = sessionIds.map((id: string) => `"${id}"`).join(',');
+          const qUrl = `${restBase}/${encodeURIComponent(tableName)}?select=*&limit=1000&session_id=in.(${encodeURIComponent(inVals)})`;
+          const qRes = await fetch(qUrl, { headers });
+          if (!qRes.ok) {
+            const txt = await qRes.text();
+            throw new Error(`Query failed: ${txt}`);
+          }
+          rows = await qRes.json();
+        } else {
+          const params: string[] = [];
+          params.push('select=*');
+          params.push('limit=1000');
+          if (shoneCode && tableName === 'village_survey_sessions') params.push(`shine_code=eq.${encodeURIComponent(shoneCode)}`);
+          if (phoneNumber) params.push(`phone_number=eq.${encodeURIComponent(phoneNumber)}`);
+          const url = `${restBase}/${encodeURIComponent(tableName)}?${params.join('&')}`;
+          const res = await fetch(url, { headers });
+          if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`Query failed: ${txt}`);
+          }
+          rows = await res.json();
         }
-        if (phoneNumber && columns.includes("phone_number")) {
-          query = query.eq("phone_number", phoneNumber);
-        }
-        const { data, error } = await query;
-        if (error) setError(error.message);
-        else setData(data || []);
+
+        setData(rows || []);
       } catch (err: any) {
-        setError(err.message);
+        setError(err.message || String(err));
       }
       setLoading(false);
     };

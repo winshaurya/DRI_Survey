@@ -216,6 +216,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                       },
                     ),
                   ),
+                  // SurveyNavigationBar removed
                 ],
               ),
             ),

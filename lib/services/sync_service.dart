@@ -260,8 +260,15 @@ class SyncService {
   Future<void> syncFamilyPageData(String phoneNumber, int page, Map<String, dynamic> data) async {
     _ensureConnectivityMonitoringInitialized();
     if (phoneNumber.isEmpty || page < 0) return;
+
     await _withSyncLock('family:$phoneNumber', () async {
-      if (!_isOnline || _supabaseService.currentUser == null) {
+      // Re-check connectivity now to prefer immediate sync when possible
+      final connectivityResult = await Connectivity().checkConnectivity();
+      final currentlyOnline = connectivityResult != ConnectivityResult.none;
+      _isOnline = currentlyOnline;
+
+      // If offline or not authenticated, queue and return
+      if (!currentlyOnline || _supabaseService.currentUser == null) {
         await queueSyncOperation('sync_family_page', {
           'phone_number': phoneNumber,
           'page': page,
@@ -270,6 +277,7 @@ class SyncService {
         return;
       }
 
+      // Prevent overwriting when remote has newer data
       final localUpdatedAt = await _getLocalUpdatedAt('family_survey_sessions', 'phone_number', phoneNumber);
       final remoteNewer = await _isRemoteNewerFamily(phoneNumber, localUpdatedAt);
       if (remoteNewer) {
@@ -277,11 +285,42 @@ class SyncService {
         return;
       }
 
+      // If this is page 0, perform immediate synchronous upsert so session is created/updated
+      if (page == 0) {
+        try {
+          await _supabaseService.syncFamilyPageToSupabase(phoneNumber, 0, data);
+          await _databaseService.markFamilyPageSynced(phoneNumber, 0);
+        } catch (e) {
+          final errMsg = 'Immediate session sync failed for $phoneNumber: $e';
+          _escalateError(errMsg, persistent: true);
+          await queueSyncOperation('sync_family_page', {
+            'phone_number': phoneNumber,
+            'page': page,
+            'data': data,
+          });
+        }
+        return;
+      }
+
+      // For other pages, schedule a background (non-blocking) sync similar to village flow
       try {
-        await _supabaseService.syncFamilyPageToSupabase(phoneNumber, page, data);
-        await _databaseService.markFamilyPageSynced(phoneNumber, page);
+        _supabaseService.syncFamilyPageToSupabase(phoneNumber, page, data).then((_) async {
+          try {
+            await _databaseService.markFamilyPageSynced(phoneNumber, page);
+          } catch (markErr) {
+            _escalateError('Failed to mark page synced for $phoneNumber page $page: $markErr', persistent: true);
+          }
+        }).catchError((e) async {
+          final errMsg = 'Background page sync failed for family $phoneNumber page $page: $e';
+          _escalateError(errMsg, persistent: true);
+          await queueSyncOperation('sync_family_page', {
+            'phone_number': phoneNumber,
+            'page': page,
+            'data': data,
+          });
+        });
       } catch (e) {
-        final errMsg = 'Page sync failed for family $phoneNumber page $page: $e';
+        final errMsg = 'Page sync scheduling failed for family $phoneNumber page $page: $e';
         _escalateError(errMsg, persistent: true);
         await queueSyncOperation('sync_family_page', {
           'phone_number': phoneNumber,

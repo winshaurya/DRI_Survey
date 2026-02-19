@@ -332,10 +332,10 @@ static Database? _database;
     final pageKey = page.toString();
     final entry = Map<String, dynamic>.from(statusMap[pageKey] ?? {});
     if (completed != null) {
-      entry['completed'] = completed;
+      entry['completed'] = completed ? 1 : 0;
     }
     if (synced != null) {
-      entry['synced'] = synced;
+      entry['synced'] = synced ? 1 : 0;
     }
     statusMap[pageKey] = entry;
 
@@ -393,12 +393,12 @@ static Database? _database;
     for (final entry in statusMap.entries) {
       final value = entry.value;
       if (value is Map) {
-        final completed = value['completed'] == true;
-        final synced = value['synced'] == true;
+        final completed = value['completed'] == 1;
+        final synced = value['synced'] == 1;
         if (completed && !synced) {
           return true;
         }
-      } else if (value == true) {
+      } else if (value == 1) {
         // Legacy format: completed but no sync flag means pending
         return true;
       }
@@ -538,6 +538,19 @@ static Database? _database;
       dataWithTimestamp.entries.where((e) => columns.contains(e.key)),
     );
 
+    // Normalize complex values (Maps/Lists) to JSON strings so sqflite can store them
+    for (final key in filteredData.keys.toList()) {
+      final value = filteredData[key];
+      if (value is Map || value is List) {
+        try {
+          filteredData[key] = jsonEncode(value);
+        } catch (_) {
+          // If encoding fails, fall back to string conversion
+          filteredData[key] = value.toString();
+        }
+      }
+    }
+
     try {
       if (existing.isEmpty) {
         // Insert new
@@ -555,7 +568,16 @@ static Database? _database;
         );
       }
     } catch (e) {
-      // Surface DB errors for troubleshooting
+      // Surface DB errors for troubleshooting with schema + payload context
+      try {
+        final info = await db.rawQuery('PRAGMA table_info($tableName)');
+        final cols = info.map((r) => r['name']?.toString()).whereType<String>().toList();
+        print('DB error on insertOrUpdate -> table: $tableName, columns: $cols');
+        print('Payload keys: ${filteredData.keys.toList()}');
+        print('Payload snapshot: $filteredData');
+      } catch (schemaErr) {
+        print('Failed to fetch PRAGMA for $tableName: $schemaErr');
+      }
       rethrow;
     }
   }
@@ -752,7 +774,7 @@ static Database? _database;
 
     int totalSynced = 0;
     for (final row in results) {
-      final phoneNumber = row['phone_number'] as String;
+      final phoneNumber = (row['phone_number'] ?? '').toString();
       totalSynced += await getSyncedPagesCount(phoneNumber);
     }
     return totalSynced;
@@ -766,7 +788,7 @@ static Database? _database;
     final pendingPages = <Map<String, dynamic>>[];
 
     for (final row in results) {
-      final phoneNumber = row['phone_number'] as String;
+      final phoneNumber = (row['phone_number'] ?? '').toString();
       final pageSyncStatusRaw = row['page_sync_status'] as String?;
 
       if (pageSyncStatusRaw != null) {

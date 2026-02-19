@@ -1,10 +1,7 @@
 // dashboard/src/App.tsx
-import React, { useState, useEffect } from "react";
-import { MantineProvider, AppShell, Navbar, Header, Title, Container, NavLink, ScrollArea, Center, Loader } from "@mantine/core";
+import React, { useState } from "react";
+import { MantineProvider, AppShell, Navbar, Header, Title, Container, NavLink, ScrollArea } from "@mantine/core";
 import { TableData } from "./components/TableData";
-import { supabase } from "./supabaseClient";
-import { Auth } from "@supabase/auth-ui-react";
-import { ThemeSupa } from "@supabase/auth-ui-shared";
 
 // List of all tables (from SQL completeness summary)
 const TABLES = [
@@ -68,46 +65,6 @@ const TABLES = [
 
 function App() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const session = supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => {
-      listener?.subscription.unsubscribe();
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <MantineProvider withGlobalStyles withNormalizeCSS>
-        <Center style={{ height: "100vh" }}>
-          <Loader />
-        </Center>
-      </MantineProvider>
-    );
-  }
-
-  if (!user) {
-    return (
-      <MantineProvider withGlobalStyles withNormalizeCSS>
-        <Center style={{ height: "100vh" }}>
-          <Container size="xs">
-            <Title order={2} align="center" mb="md">
-              Login to Dashboard
-            </Title>
-            <Auth supabaseClient={supabase} appearance={{ theme: ThemeSupa }} providers={[]} />
-          </Container>
-        </Center>
-      </MantineProvider>
-    );
-  }
 
   return (
     <MantineProvider withGlobalStyles withNormalizeCSS>
@@ -130,26 +87,8 @@ function App() {
           </Navbar>
         }
         header={
-          <Header height={60} p="xs" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Header height={60} p="xs" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <Title order={2}>Family Survey Master Dashboard</Title>
-            <button
-              style={{
-                background: "#e03131",
-                color: "#fff",
-                border: "none",
-                borderRadius: 4,
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontWeight: 600,
-                fontSize: 14,
-              }}
-              onClick={async () => {
-                await supabase.auth.signOut();
-                window.location.reload();
-              }}
-            >
-              Logout
-            </button>
           </Header>
         }
       >

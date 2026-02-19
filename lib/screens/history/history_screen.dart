@@ -400,9 +400,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
 
   Widget _buildHistoryCard(Map<String, dynamic> session) {
     final type = session['type'];
-    final phoneNumber = session['phone_number'] ?? 'Unknown Phone';
+    final phoneNumberRaw = session['phone_number'] ?? 'Unknown Phone';
+    final phoneNumber = phoneNumberRaw.toString();
     final villageName = session['village_name'] ?? 'Unknown Village';
-    final sessionId = session['session_id'] ?? phoneNumber; // Village uses session_id
+    final sessionId = (session['session_id'] ?? phoneNumber).toString(); // Village uses session_id
     
     final rawDate = session['survey_date'] ?? session['created_at'];
     String formattedDate = 'N/A';
@@ -715,8 +716,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
 
   void _showDataPreview(BuildContext context, Map<String, dynamic> session) {
     final type = session['type'];
-    final phoneNumber = session['phone_number'] ?? 'N/A';
-    final sessionId = session['session_id'] ?? phoneNumber;
+    final phoneNumberRaw = session['phone_number'] ?? 'N/A';
+    final phoneNumber = phoneNumberRaw.toString();
+    final sessionId = (session['session_id'] ?? phoneNumber).toString();
     final villageName = session['village_name'] ?? 'N/A';
     final surveyorName = session['surveyor_name'] ?? 'N/A';
     final latitude = session['latitude']?.toString() ?? 'N/A';

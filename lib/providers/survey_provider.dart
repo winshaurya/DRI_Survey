@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dri_survey/services/database_service.dart';
 import 'package:dri_survey/services/supabase_service.dart';
 import 'package:dri_survey/services/sync_service.dart';
-import 'package:dri_survey/services/family_sync_service.dart';
 
 class SurveyState {
   final int currentPage;
@@ -54,7 +53,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
   String? _lastSavedDataSignature;
   final SupabaseService _supabaseService = SupabaseService.instance;
   final SyncService _syncService = SyncService.instance;
-  final FamilySyncService _familySyncService = FamilySyncService.instance;
 
   DateTime? _lastSaveTimestamp;
 
@@ -71,7 +69,9 @@ class SurveyNotifier extends Notifier<SurveyState> {
   // Save current page data to database
   Future<void> saveCurrentPageData() async {
     // Accept phone number from state OR from in-memory surveyData (page 0 may not have set state.phoneNumber yet)
-    final fallbackPhone = (state.surveyData['phone_number'] as String?)?.trim();
+    final fallbackPhone = state.surveyData['phone_number'] != null
+        ? state.surveyData['phone_number'].toString().trim()
+        : null;
     final effectivePhone = (state.phoneNumber ?? fallbackPhone)?.trim();
 
     if (effectivePhone == null || effectivePhone.isEmpty) {
@@ -80,7 +80,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
     }
 
     // If provider state didn't yet contain phoneNumber, populate it now so other flows work
-    if (state.phoneNumber == null && fallbackPhone != null && fallbackPhone.isNotEmpty) {
+    if ((state.phoneNumber == null || state.phoneNumber!.isEmpty) && fallbackPhone != null && fallbackPhone.isNotEmpty) {
       state = state.copyWith(phoneNumber: fallbackPhone);
       debugPrint('Recovered phoneNumber from surveyData -> $fallbackPhone');
     }
@@ -420,7 +420,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         return {'fasal_bima': state.surveyData['fasal_bima']};
 
       case 30: // Bank Account
-        return {'bank_account': state.surveyData['bank_account']};
+        return {'bank_accounts': state.surveyData['bank_accounts']};
 
       default:
         return {};
@@ -518,7 +518,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _saveFasalBima(pageData['fasal_bima'], phoneNumber);
         break;
       case 30: // Bank Account
-        await _saveBankAccount(pageData['bank_account'], phoneNumber);
+        await _saveBankAccount(pageData['bank_accounts'], phoneNumber);
         break;
     }
   }
@@ -617,8 +617,8 @@ class SurveyNotifier extends Notifier<SurveyState> {
         final fasal = await _databaseService.getData('fasal_bima', phoneNumber);
         return {'fasal_bima': fasal.isNotEmpty ? fasal.first : {}};
       case 30: // Bank Account
-        final bank = await _databaseService.getData('bank_account', phoneNumber);
-        return {'bank_account': bank.isNotEmpty ? bank.first : {}};
+        final bank = await _databaseService.getData('bank_accounts', phoneNumber);
+        return {'bank_accounts': bank};
       default:
         return {};
     }
@@ -684,7 +684,12 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
   Future<void> _saveSocialConsciousness(dynamic data, String phoneNumber) async {
     if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('social_consciousness', data, phoneNumber);
+      try {
+        await _databaseService.insertOrUpdate('social_consciousness', data, phoneNumber);
+      } catch (e, st) {
+        debugPrint('Failed to save social_consciousness for $phoneNumber: $e');
+        debugPrint(st.toString());
+      }
     }
   }
 
@@ -704,7 +709,12 @@ class SurveyNotifier extends Notifier<SurveyState> {
     if (crops is! List) return;
     for (final crop in crops) {
       if (crop is Map<String, dynamic>) {
-        await _databaseService.insertOrUpdate('crop_productivity', crop, phoneNumber);
+        try {
+          await _databaseService.insertOrUpdate('crop_productivity', crop, phoneNumber);
+        } catch (e, st) {
+          debugPrint('Failed to save crop_productivity for $phoneNumber: $e');
+          debugPrint(st.toString());
+        }
       }
     }
   }
@@ -860,8 +870,24 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> _saveBankAccount(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('bank_account', data, phoneNumber);
+    if (data is List) {
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          try {
+            await _databaseService.insertOrUpdate('bank_accounts', item, phoneNumber);
+          } catch (e, st) {
+            debugPrint('Failed to save bank_account item for $phoneNumber: $e');
+            debugPrint(st.toString());
+          }
+        }
+      }
+    } else if (data is Map<String, dynamic>) {
+      try {
+        await _databaseService.insertOrUpdate('bank_accounts', data, phoneNumber);
+      } catch (e, st) {
+        debugPrint('Failed to save bank_account map for $phoneNumber: $e');
+        debugPrint(st.toString());
+      }
     }
   }
 

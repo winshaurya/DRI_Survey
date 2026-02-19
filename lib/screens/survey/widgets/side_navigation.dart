@@ -628,8 +628,10 @@ class SideNavigation extends ConsumerWidget {
                 itemCount: sessions.length,
                 itemBuilder: (context, index) {
                   final session = sessions[index];
+                  final phoneNumberRaw = session['phone_number'] ?? 'Unknown Phone';
+                  final phoneNumber = phoneNumberRaw.toString();
                   return ListTile(
-                    title: Text(session['phone_number'] ?? 'Unknown Phone'),
+                    title: Text(phoneNumber),
                     subtitle: Text(
                       'Village: ${session['village_name'] ?? 'N/A'}\nDate: ${session['survey_date'] ?? 'N/A'}\nStatus: ${session['status'] ?? 'Unknown'}',
                     ),
@@ -638,7 +640,7 @@ class SideNavigation extends ConsumerWidget {
                     onPressed: () {
                       Navigator.pop(context); // Close dialog
                       // Navigate to final page (preview) with this session data
-                      _navigateToSurveyPreview(context, session['phone_number']);
+                      _navigateToSurveyPreview(context, phoneNumber);
                     },
                     ),
                   );

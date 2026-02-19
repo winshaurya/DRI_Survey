@@ -244,6 +244,8 @@ offset: const Offset(0, -0.8),
   Future<void> _handleNext(WidgetRef ref) async {
     if (_formKey.currentState?.validate() ?? false) {
       _formKey.currentState?.save();
+      // Save current page data locally before navigating (family survey only)
+      await ref.read(surveyProvider.notifier).saveCurrentPageData();
       widget.onNext(_pageData);
     }
   }

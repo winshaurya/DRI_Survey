@@ -487,9 +487,11 @@ class SideNavigation extends ConsumerWidget {
                 itemCount: sessions.length,
                 itemBuilder: (context, index) {
                   final session = sessions[index];
+                  final phoneNumberRaw = session['phone_number'] ?? 'Unknown Phone';
+                  final phoneNumber = phoneNumberRaw.toString();
                   return Card(
                     child: ListTile(
-                      title: Text(session['phone_number'] ?? 'Unknown Phone'),
+                      title: Text(phoneNumber),
                       subtitle: Text(
                         'Village: ${session['village_name'] ?? 'N/A'}\nDate: ${session['survey_date'] ?? 'N/A'}\nStatus: ${session['status'] ?? 'Unknown'}',
                       ),
@@ -497,9 +499,9 @@ class SideNavigation extends ConsumerWidget {
                         onSelected: (value) {
                           if (value == 'preview') {
                             Navigator.pop(context);
-                            _navigateToSurveyPreview(context, session['phone_number']);
+                            _navigateToSurveyPreview(context, phoneNumber);
                           } else if (value == 'delete') {
-                            _showDeleteSurveyDialog(context, l10n, session['phone_number']);
+                            _showDeleteSurveyDialog(context, l10n, phoneNumber);
                           }
                         },
                         itemBuilder: (context) => [
@@ -897,7 +899,8 @@ class SideNavigation extends ConsumerWidget {
                 itemCount: sessions.length,
                 itemBuilder: (context, index) {
                   final session = sessions[index];
-                  final phoneNumber = session['phone_number'] ?? 'Unknown Phone';
+                  final phoneNumberRaw = session['phone_number'] ?? 'Unknown Phone';
+                  final phoneNumber = phoneNumberRaw.toString();
                   final villageName = session['village_name'] ?? 'N/A';
                   final surveyDate = session['survey_date'] ?? session['created_at'] ?? 'N/A';
                   final status = session['status'] ?? 'in_progress';

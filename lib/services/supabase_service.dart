@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'database_service.dart';
 
 typedef SyncErrorCallback = void Function(String message, {bool persistent});
 
@@ -45,15 +46,9 @@ class SupabaseService {
       final expiresAtStr = prefs.getString(_expiresAtKey);
 
       if (jwt != null && refreshToken != null && expiresAtStr != null) {
-        final expiresAt = DateTime.parse(expiresAtStr);
-        if (expiresAt.isAfter(DateTime.now())) {
-          // Restore session
-          await Supabase.instance.client.auth.setSession(jwt);
-          debugPrint('Restored persistent Supabase session');
-        } else {
-          // Clear expired session
-          await _clearStoredSession();
-        }
+        // Always restore session regardless of expiry
+        await Supabase.instance.client.auth.setSession(jwt);
+        debugPrint('Restored persistent Supabase session');
       }
     } catch (e) {
       debugPrint('Failed to restore persistent session: $e');
@@ -81,14 +76,8 @@ class SupabaseService {
       final refresh = session.refreshToken ?? '';
 
       // Supabase Session.expiresAt is seconds since epoch (nullable)
-      String expiresIso = DateTime.now().add(const Duration(days: 30)).toIso8601String();
-      try {
-        if (session.expiresAt != null) {
-          final expSeconds = session.expiresAt!;
-          final dt = DateTime.fromMillisecondsSinceEpoch(expSeconds * 1000);
-          expiresIso = dt.toIso8601String();
-        }
-      } catch (_) {}
+      // Set expiry to far future to make session infinite
+      String expiresIso = '2099-12-31T23:59:59.000Z';
 
       await prefs.setString(_jwtKey, jwt);
       await prefs.setString(_refreshTokenKey, refresh);
@@ -349,6 +338,48 @@ class SupabaseService {
           normalizedList.add(_normalizeMap(casted));
         }
       }
+
+      // If this table uses sr_no, auto-assign missing sr_no values using local DB state
+      if (columns.contains('sr_no')) {
+        final dbService = DatabaseService();
+        // Map phone -> next available sr_no
+        final Map<String, int> nextSr = {};
+
+        for (final row in normalizedList) {
+          final phoneVal = row['phone_number']?.toString();
+          if (phoneVal == null) continue;
+
+          if (row.containsKey('sr_no') && row['sr_no'] != null) {
+            // ensure nextSr at least that + 1
+            final existing = int.tryParse(row['sr_no'].toString()) ?? (row['sr_no'] is int ? row['sr_no'] as int : 0);
+            final cur = nextSr[phoneVal] ?? 0;
+            if (existing >= cur) nextSr[phoneVal] = existing + 1;
+            continue;
+          }
+
+          // compute start if not cached
+          if (!nextSr.containsKey(phoneVal)) {
+            try {
+              final localRows = await dbService.getData(table, phoneVal);
+              int maxSr = 0;
+              for (final lr in localRows) {
+                if (lr.containsKey('sr_no') && lr['sr_no'] != null) {
+                  final s = int.tryParse(lr['sr_no'].toString()) ?? (lr['sr_no'] is int ? lr['sr_no'] as int : 0);
+                  if (s > maxSr) maxSr = s;
+                }
+              }
+              nextSr[phoneVal] = maxSr + 1;
+            } catch (_) {
+              nextSr[phoneVal] = 1;
+            }
+          }
+
+          // assign and increment
+          row['sr_no'] = nextSr[phoneVal];
+          nextSr[phoneVal] = nextSr[phoneVal]! + 1;
+        }
+      }
+
       filtered = normalizedList;
     } else if (filtered is Map<String, dynamic>) {
       filtered = _normalizeMap(filtered);
