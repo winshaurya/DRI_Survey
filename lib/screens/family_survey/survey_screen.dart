@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../components/logo_widget.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/survey_provider.dart';
+import '../../services/sync_service.dart';
+import '../../services/supabase_service.dart';
 import 'widgets/side_navigation.dart';
 import 'widgets/survey_page.dart';
 import 'widgets/survey_progress_indicator.dart';
@@ -54,7 +56,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
       await surveyNotifier.loadSurveySessionForPreview(widget.previewSessionId!);
       // Navigate to final page (preview page)
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _pageController.jumpToPage(surveyNotifier.state.totalPages - 1);
+        _pageController.jumpToPage(ref.read(surveyProvider).totalPages - 1);
       });
     } else if (widget.continueSessionId != null) {
       // Continue mode - load existing session data for continuation
@@ -68,7 +70,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     _isPreviewMode = true;
     await surveyNotifier.loadSurveySessionForPreview(previewSessionId);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _pageController.jumpToPage(surveyNotifier.state.totalPages - 1);
+      _pageController.jumpToPage(ref.read(surveyProvider).totalPages - 1);
     });
   }
 
@@ -168,6 +170,7 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                         return SurveyPage(
                           pageIndex: index,
                           onNext: ([Map<String, dynamic>? pageData]) async {
+                            debugPrint('[SurveyScreen] onNext called for index $index; pageData keys=${pageData?.keys}');
                             // Update survey data with current page data
                             if (pageData != null) {
                               surveyNotifier.updateSurveyDataMap(pageData);
@@ -184,6 +187,32 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                                   );
                                   return;
                                 }
+
+                                // 1. create minimal remote session
+                                final online = await SupabaseService.instance.isOnline();
+                                if (!online && mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Offline – session will sync when network is available.')),
+                                  );
+                                }
+                                final success = await SupabaseService.instance.ensureFamilySessionExists(phoneNumber);
+                                debugPrint('[SurveyScreen] ensureFamilySessionExists returned $success for $phoneNumber');
+                                if (mounted) {
+                                  if (success && online) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Remote session created')),
+                                    );
+                                  } else if (!success && online) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Attempted to create remote session but it may have failed. Check logs.'),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                  }
+                                }
+
+                                // 2. initialize locally and save page0 fields
                                 await surveyNotifier.initializeSurvey(
                                   villageName: pageData?['village_name'] ?? '',
                                   villageNumber: pageData?['village_number'],
@@ -196,15 +225,57 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
                                   surveyorName: pageData?['surveyor_name'],
                                   phoneNumber: phoneNumber,
                                 );
-
-                                // Extra-safety: ensure the freshly initialized session is persisted immediately
                                 await surveyNotifier.saveCurrentPageData();
+
+                                // 3. update remote session with full page0 data
+                                try {
+                                  final upd = Map<String, dynamic>.from(pageData!);
+                                  upd['phone_number'] = phoneNumber;
+                                  await SupabaseService.instance.saveFamilyData(
+                                    'family_survey_sessions',
+                                    upd,
+                                  );
+                                  debugPrint('[SurveyScreen] updated remote session data for $phoneNumber');
+                                } catch (e) {
+                                  debugPrint('[SurveyScreen] failed remote session update: $e');
+                                }
+
+                                // now perform lightweight page-0 sync as before
+                                try {
+                                  SyncService.instance
+                                      .syncFamilyPageData(phoneNumber, 0, pageData ?? {})
+                                      .timeout(const Duration(seconds: 6));
+                                } catch (e) {
+                                  debugPrint('Failed to start background family sync: $e');
+                                }
+
+                                // fire‑and‑forget a lightweight page‑0 sync to Supabase so that a
+                                // session row exists remotely as soon as possible, matching the
+                                // village survey pattern (timeout prevents long delays).
+                                try {
+                                  // kick off a background page‑0 sync to Supabase; we intentionally
+                                  // ignore the returned future so it runs fire‑and‑forget
+                                  SyncService.instance
+                                      .syncFamilyPageData(phoneNumber, 0, pageData!)
+                                      .timeout(const Duration(seconds: 6));
+                                } catch (e) {
+                                  debugPrint('Failed to start background family sync: $e');
+                                }
                               }
                               // Jump (centralized save + navigation)
                               await _jumpToPage(index + 1);
                             } else {
                               // Complete survey
                               _showCompletionDialog();
+
+                              // final full sync in case any page-level ops failed or
+                              // additional tables were added later; this is fire-and-forget
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                final phoneNumber = (pageData?['phone_number'] ?? '').toString().trim();
+                                if (phoneNumber.isNotEmpty) {
+                                  SyncService.instance.syncFamilySurveyToSupabase(phoneNumber);
+                                }
+                              });
                             }
                           },
                           onPrevious: index > 0
@@ -271,9 +342,15 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
   Future<void> _jumpToPage(int pageIndex) async {
     final surveyNotifier = ref.read(surveyProvider.notifier);
 
-    if (pageIndex < 0 || pageIndex >= surveyNotifier.state.totalPages) return;
+    final total = ref.read(surveyProvider).totalPages;
+    if (pageIndex < 0 || pageIndex >= total) return;
 
-    // Always save current page data before navigating (await per your preference)
+    // Before moving off the current page we save & sync its contents.  the
+    // call to `saveCurrentPageData` will persist to local db and dispatch a
+    // family‑survey sync operation; that operation in turn collects the entire
+    // survey (including the session row) and ships it to Supabase.  this means
+    // as soon as the user navigates, their previous page is already en route
+    // to the backend.
     await surveyNotifier.saveCurrentPageData();
 
     // Jump the PageView (instant) and keep provider state in sync

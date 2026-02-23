@@ -94,10 +94,12 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   void _updateData() {
     final allTrainings = [..._trainingsTaken, ..._trainingsNeeded];
     final data = {
-      'training_members': allTrainings,
-      'want_training': _needTraining,
-      'shg_members': _shgMembers,
-      'fpo_members': _fpoMembers,
+      'training': {
+        'training_members': allTrainings,
+        'want_training': _needTraining,
+        'shg_members': _shgMembers,
+        'fpo_members': _fpoMembers,
+      }
     };
     widget.onDataChanged(data);
   }

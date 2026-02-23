@@ -1,0 +1,6 @@
+- [x] Use Supabase service role key for all requests
+- [ ] Refactor app to run as a Node.js server-side dashboard (not browser)
+- [ ] Fetch and display all survey session data using service role key
+- [ ] Implement PK-based aggregation and export features server-side
+- [ ] Implement user management and survey tracking server-side
+- [ ] Test all features in Node.js environment

@@ -98,32 +98,33 @@ class _DisputesPageState extends State<DisputesPage> {
 
   void _updateData() {
     final data = {
-      // Family Disputes
-      'family_disputes': _familyDisputes,
-      'family_registered': _familyRegistered,
-      'family_period': _familyPeriod,
+      'disputes': {
+        // Family Disputes
+        'family_disputes': _familyDisputes,
+        'family_registered': _familyRegistered,
+        'family_period': _familyPeriod,
 
-      // Revenue Disputes
-      'revenue_disputes': _revenueDisputes,
-      'revenue_registered': _revenueRegistered,
-      'revenue_period': _revenuePeriod,
+        // Revenue Disputes
+        'revenue_disputes': _revenueDisputes,
+        'revenue_registered': _revenueRegistered,
+        'revenue_period': _revenuePeriod,
 
-      // Criminal Disputes
-      'criminal_disputes': _criminalDisputes,
-      'criminal_registered': _criminalRegistered,
-      'criminal_period': _criminalPeriod,
+        // Criminal Disputes
+        'criminal_disputes': _criminalDisputes,
+        'criminal_registered': _criminalRegistered,
+        'criminal_period': _criminalPeriod,
 
-      // Other Disputes
-      'other_disputes': _otherDisputes,
-      'other_description': _otherDescription,
-      'other_registered': _otherRegistered,
-      'other_period': _otherPeriod,
+        // Other Disputes
+        'other_disputes': _otherDisputes,
+        'other_description': _otherDescription,
+        'other_registered': _otherRegistered,
+        'other_period': _otherPeriod,
+      }
     };
 
-    // Debug: confirm page is emitting collected values
-    // (Left intentionally lightweight; remove if noisy)
-    // ignore: avoid_print
-    print('📝 DisputesPage._updateData -> keys: ${data.keys.where((k) => data[k] != null && data[k].toString().isNotEmpty).toList()}');
+    if (data['disputes'] != null) {
+      print('📝 DisputesPage._updateData -> keys: ${(data['disputes']!.keys as Iterable).where((k) => data['disputes']![k] != null && data['disputes']![k].toString().isNotEmpty).toList()}');
+    }
 
     widget.onDataChanged(data);
   }

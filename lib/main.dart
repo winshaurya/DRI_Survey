@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart' as p;
+import 'package:provider/single_child_widget.dart';
 
 import 'l10n/app_localizations.dart';
 import 'providers/locale_provider.dart';
@@ -16,6 +17,8 @@ import 'router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Track whether Supabase was initialized successfully
+  var supabaseInitialized = false;
 
   try {
     // Load environment variables (skip for web)
@@ -24,10 +27,18 @@ Future<void> main() async {
     }
 
     // Initialize Supabase
+    final supabaseUrl = kIsWeb
+        ? const String.fromEnvironment('SUPABASE_URL', defaultValue: '')
+        : (dotenv.env["SUPABASE_URL"] ?? '');
+    final supabaseKey = kIsWeb
+        ? const String.fromEnvironment('SUPABASE_KEY', defaultValue: '')
+        : (dotenv.env["SUPABASE_KEY"] ?? '');
+
     await Supabase.initialize(
-      url: dotenv.env["SUPABASE_URL"] ?? '',
-      anonKey: dotenv.env["SUPABASE_KEY"] ?? '',
+      url: supabaseUrl,
+      anonKey: supabaseKey,
     );
+    supabaseInitialized = true;
 
     // Initialize sync service for offline data management
     // This will start monitoring connectivity and syncing data when online
@@ -38,20 +49,21 @@ Future<void> main() async {
     // If Supabase initialization fails, continue without it
   }
 
+  // Build provider list conditionally: only add Supabase-dependent providers
+  final providers = <SingleChildWidget>[
+    p.Provider<DatabaseService>(create: (_) => DatabaseService()),
+  ];
+  if (supabaseInitialized) {
+    providers.addAll([
+      p.Provider<SupabaseService>(create: (_) => SupabaseService.instance),
+      p.Provider<SyncService>(create: (_) => SyncService.instance),
+    ]);
+  }
+
   runApp(
     ProviderScope(
       child: p.MultiProvider(
-        providers: [
-          p.Provider<DatabaseService>(
-            create: (_) => DatabaseService(),
-          ),
-          p.Provider<SupabaseService>(
-            create: (_) => SupabaseService.instance,
-          ),
-          p.Provider<SyncService>(
-            create: (_) => SyncService.instance,
-          ),
-        ],
+        providers: providers,
         child: const FamilySurveyApp(),
       ),
     ),
@@ -77,15 +89,15 @@ class _FamilySurveyAppState extends ConsumerState<FamilySurveyApp> {
   }
 
   void _checkAuthState() {
+    // If Supabase wasn't initialized, skip checking and go to auth
     try {
+      // Accessing Supabase.instance when it hasn't been initialized throws an assertion.
+      // Guard by checking whether it's initialized via Supabase.instance (catch will handle it).
       final session = Supabase.instance.client.auth.currentSession;
       setState(() {
-         // If session exists, go to home. Otherwise go to auth.
         _initialRoute = session != null ? '/' : '/auth';
       });
     } catch (e) {
-      // If there's an error checking auth (e.g. Supabase not init), default to auth screen
-      // Auth check failed
       setState(() {
         _initialRoute = '/auth';
       });

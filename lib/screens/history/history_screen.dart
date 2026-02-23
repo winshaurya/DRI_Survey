@@ -57,24 +57,34 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
     }
   }
 
+  /// Historically this returned information about how many *pages* had
+  /// been uploaded to Supabase.  Since the protocol now syncs the entire
+  /// survey in one shot, we no longer track per-page sync status.  The
+  /// history screen still likes to show some notion of progress, so we
+  /// reuse the page-completion map (which is still maintained during data
+  /// entry) as a proxy: "synced" pages are simply the pages that have been
+  /// filled out locally.
   Future<Map<String, dynamic>> _getSyncProgress(String phoneNumber) async {
     try {
       final databaseService = DatabaseService();
-      final totalPages = await databaseService.getTotalPagesCount();
-      final syncedPages = await databaseService.getSyncedPagesCount(phoneNumber);
-      final pendingPages = await databaseService.getPendingPages(phoneNumber).then((pages) => pages.length);
+      final pageStatus = await databaseService.getFamilyPageStatus(phoneNumber);
+      final statusMap = pageStatus['page_completion_status'] as Map<String, dynamic>? ?? {};
+
+      final totalPages = statusMap.keys.length;
+      final syncedPages = statusMap.values
+          .where((e) => (e as Map)['completed'] == 1)
+          .length;
 
       return {
         'total_pages': totalPages,
         'synced_pages': syncedPages,
-        'pending_pages': pendingPages,
-        'progress_percentage': totalPages > 0 ? ((syncedPages / totalPages) * 100).round() : 0,
+        'progress_percentage':
+            totalPages > 0 ? ((syncedPages / totalPages) * 100).round() : 0,
       };
     } catch (e) {
       return {
         'total_pages': 0,
         'synced_pages': 0,
-        'pending_pages': 0,
         'progress_percentage': 0,
       };
     }
@@ -554,12 +564,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
                               color: syncedPages == totalPages ? Colors.green : Colors.blue,
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              '$syncedPages/$totalPages pages synced',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: syncedPages == totalPages ? Colors.green : Colors.blue,
-                                fontWeight: FontWeight.w500,
+                            Expanded(
+                              child: Text(
+                                '$syncedPages/$totalPages pages synced',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: syncedPages == totalPages ? Colors.green : Colors.blue,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ],

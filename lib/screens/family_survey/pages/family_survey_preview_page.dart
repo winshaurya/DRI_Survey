@@ -763,6 +763,9 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
           // Bottom Submit Button
           if (widget.showSubmitButton)
             _buildBottomSubmit(),
+
+          // Raw Data Debug Section
+          _buildSection('Raw Data (Debug)', _buildRawData(), Icons.bug_report),
         ],
       ),
     );
@@ -1849,6 +1852,16 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRawData() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SelectableText(
+        const JsonEncoder.withIndent('  ').convert(_surveyData),
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.black87),
       ),
     );
   }

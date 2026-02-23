@@ -124,6 +124,7 @@ class _LocationPageState extends State<LocationPage> {
     await _getCurrentLocation();
 
     // Automatically fetch and save location data without user interaction
+    if (!mounted) return;
     setState(() {
       _isLoadingLocation = true;
       _locationError = null;
@@ -132,12 +133,14 @@ class _LocationPageState extends State<LocationPage> {
     try {
       final locationData = await LocationService.getCompleteLocationData();
 
-      if (locationData != null && mounted) {
+          if (locationData != null && mounted) {
         setState(() {
           widget.pageData['latitude'] = locationData['latitude'];
           widget.pageData['longitude'] = locationData['longitude'];
+          // store both legacy and schema-named accuracy/timestamp
           widget.pageData['accuracy'] = locationData['accuracy'];
-          widget.pageData['location_timestamp'] = locationData['timestamp'];
+          widget.pageData['location_accuracy'] = locationData['location_accuracy'] ?? locationData['accuracy'];
+          widget.pageData['location_timestamp'] = locationData['location_timestamp'] ?? locationData['timestamp'];
 
           // Auto-fill address fields
           if (locationData['village']?.isNotEmpty == true) {

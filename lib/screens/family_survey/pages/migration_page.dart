@@ -71,8 +71,10 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
 
   void _updateData() {
     final data = {
-      'migrated_members': _migratedMembers,
-      'family_members_migrated': _migratedMembers.length,
+      'migration': {
+        'migrated_members': _migratedMembers,
+        'family_members_migrated': _migratedMembers.length,
+      }
     };
     widget.onDataChanged(data);
   }

@@ -55,7 +55,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 43,
+      version: 44, // bump for training_needs table
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -94,6 +94,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 43) {
       await _migrateFamilyTablesPrimaryKey(db);
+    }
+    if (oldVersion < 44) {
+      await _ensureTrainingNeedsTable(db);
     }
   }
 
@@ -142,6 +145,10 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, account_number TEXT, benefits_received TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
     await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_samman_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, account_number TEXT, benefits_received TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
     await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_samman_nidhi (phone_number INTEGER PRIMARY KEY, is_beneficiary TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
+  }
+
+  Future<void> _ensureTrainingNeedsTable(Database db) async {
+    await db.execute('CREATE TABLE IF NOT EXISTS training_needs (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, wants_training int, preferred_training TEXT, DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (phone_number, sr_no))');
   }
 
   Future<void> _migrateFamilySurveySessionsPrimaryKey(Database db) async {
@@ -295,10 +302,10 @@ class DatabaseHelper {
     // Remove old page completion status - we don't need it anymore
     // await _addColumnIfMissing(db, 'family_survey_sessions', 'page_completion_status', "TEXT DEFAULT '{}'");
 
-    // Add new page-level sync tracking
-    await _addColumnIfMissing(db, 'family_survey_sessions', 'page_sync_status', "TEXT DEFAULT '{}'");
+    // legacy page-level sync tracking columns are no longer required
+    // the survey is now synced as a whole. leave page_data_hashes in case
+    // other features rely on it, but drop the status/timestamp fields.
     await _addColumnIfMissing(db, 'family_survey_sessions', 'page_data_hashes', "TEXT DEFAULT '{}'");
-    await _addColumnIfMissing(db, 'family_survey_sessions', 'page_last_synced_at', "TEXT DEFAULT '{}'");
 
     await _addColumnIfMissing(db, 'family_survey_sessions', 'sync_pending', 'INTEGER DEFAULT 0');
     await _addColumnIfMissing(db, 'family_survey_sessions', 'sync_status', "TEXT DEFAULT 'pending'");
@@ -669,6 +676,9 @@ class DatabaseHelper {
 
     // Training Data
     await db.execute('CREATE TABLE IF NOT EXISTS training_data (phone_number INTEGER NOT NULL, member_name TEXT, training_topic TEXT, training_duration TEXT, training_date TEXT, status TEXT DEFAULT "taken", created_at TEXT, PRIMARY KEY (phone_number, created_at))');
+
+    // Training needs (Do you want training?) - new table to track per-family-member training requests
+    await db.execute('CREATE TABLE IF NOT EXISTS training_needs (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, wants_training INTEGER, preferred_training TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (phone_number, sr_no))');
 
     // SHG Members
     await db.execute('CREATE TABLE IF NOT EXISTS shg_members (phone_number INTEGER NOT NULL, member_name TEXT NOT NULL, shg_name TEXT, purpose TEXT, agency TEXT, position TEXT, monthly_saving REAL, created_at TEXT, PRIMARY KEY (phone_number, member_name))');

@@ -4,12 +4,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'sync_service.dart';
 
 typedef SyncErrorCallback = void Function(String message, {bool persistent});
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
   static SupabaseService get instance => _instance;
+
 
   SupabaseService._internal() {
     _initializePersistentSession();
@@ -139,6 +141,30 @@ class SupabaseService {
       }
     }
   }
+
+  // detect whether a key refers to a phone number field
+  bool _isPhoneKey(String key) {
+    final lower = key.toLowerCase();
+    return lower.contains('phone');
+  }
+
+  // normalize phone number text: strip non-digits and convert to int when possible
+  dynamic _normalizePhoneNumber(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value;
+    var str = value.toString().trim();
+    if (str.isEmpty) return null;
+    // remove everything except digits
+    final digits = str.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) {
+      // couldn't extract digits; return original trimmed string
+      return str;
+    }
+    return int.tryParse(digits) ?? digits;
+  }
+
+  // shorthand for callers that just need the normalized phone key
+  dynamic _phoneKey(dynamic phone) => _normalizePhoneNumber(phone);
 
   dynamic _normalizeValue(String key, dynamic value) {
     if (value == null) return null;
@@ -290,6 +316,8 @@ class SupabaseService {
     if (data == null) return;
     if (data is List && data.isEmpty) return;
 
+    debugPrint('[Supabase Sync] _upsertWithRetry start for $table; payloadType=${data.runtimeType}');
+
     // Fetch and cache remote table columns, then filter payload to known columns to avoid unknown-column errors
     final columns = await _getRemoteTableColumns(table);
     var filtered = _filterPayloadToColumns(table, data, columns);
@@ -319,7 +347,66 @@ class SupabaseService {
       filtered = _normalizeMap(casted);
     }
 
-    await _withRetry(() => client.from(table).upsert(filtered), operation: 'upsert $table');
+    // determine conflict target for upsert to satisfy PK requirements
+    String? conflictTarget;
+    // try using cached column list first, fall back to payload keys if empty
+    Set<String> detectCols = columns;
+    if (detectCols.isEmpty) {
+      if (filtered is Map<String, dynamic>) {
+        detectCols = filtered.keys.toSet();
+      } else if (filtered is List && filtered.isNotEmpty && filtered.first is Map) {
+        detectCols = (filtered.first as Map<String, dynamic>).keys.toSet();
+      }
+    }
+    if (detectCols.contains('phone_number')) {
+      conflictTarget = detectCols.contains('sr_no') ? 'phone_number,sr_no' : 'phone_number';
+    }
+    if (conflictTarget == null && table == 'family_survey_sessions') {
+      debugPrint('Upsert $table without conflict target, payload=$filtered');
+    }
+
+      await _withRetry(() async {
+      // Ensure PostgREST returns the upserted rows so we can detect RLS/permission failures.
+      // .select() forces the server to return the affected rows.
+      final res = await (conflictTarget != null
+          ? client.from(table).upsert(filtered, onConflict: conflictTarget).select()
+          : client.from(table).upsert(filtered).select());
+
+      // Defensive inspection of the Supabase response: some RLS/permission
+      // configurations can result in an empty/no-data response without an
+      // explicit error. Treat empty responses for session-like tables as
+      // failures so callers will retry/queue and we can surface the issue.
+      final dynamic dyn = res;
+      debugPrint('[Supabase Sync] Raw upsert response for $table: $dyn');
+      try {
+        debugPrint('[Supabase Sync] Auth session present: ${client.auth.currentSession != null}');
+        debugPrint('[Supabase Sync] Access token present: ${client.auth.currentSession?.accessToken != null}');
+      } catch (_) {}
+      final dynamic respError = (dyn?.error ?? (dyn as dynamic).error);
+      final dynamic respData = (dyn is Map ? (dyn['data'] ?? dyn['body'] ?? dyn) : (dyn?.data ?? (dyn as dynamic).data));
+      final dynamic respStatus = (dyn?.status ?? (dyn as dynamic).status);
+
+      if (respError != null) {
+        final msg = '[Supabase Sync] upsert error for $table: ${respError?.message ?? respError}';
+        _escalateError(msg, persistent: true);
+        throw Exception(msg);
+      }
+
+      if (respData == null || (respData is List && respData.isEmpty) || (respData is Map && respData.isEmpty)) {
+        // For session tables and other top-level tables we expect at least
+        // one returned row from an upsert. If none returned, escalate.
+        if (table == 'family_survey_sessions' || table.endsWith('_sessions') || table == 'village_survey_sessions') {
+          final msg = '[Supabase Sync] upsert returned empty data for $table; status=$respStatus; data=$respData';
+          _escalateError(msg, persistent: true);
+          throw Exception(msg);
+        } else {
+          debugPrint('[Supabase Sync] upsert returned empty data for $table; continuing; status=$respStatus; data=$respData');
+        }
+      }
+
+      debugPrint('[Supabase Sync] upsert success for $table; data=$respData; status=$respStatus');
+      return res;
+    }, operation: 'upsert $table');
   }
 
   Future<Map<String, String>> validateSchema(List<String> tableNames) async {
@@ -391,9 +478,57 @@ class SupabaseService {
   }
 
   // Sync family survey data to Supabase (legacy method - kept for compatibility)
-  Future<void> syncFamilySurveyToSupabase(String phoneNumber, Map<String, dynamic> surveyData) async {
+  Future<bool> syncFamilySurveyToSupabase(String phoneNumber, Map<String, dynamic> surveyData) async {
     final trackingMap = <String, bool>{};
-    await syncFamilySurveyToSupabaseWithTracking(phoneNumber, surveyData, trackingMap);
+    return await syncFamilySurveyToSupabaseWithTracking(phoneNumber, surveyData, trackingMap);
+  }
+
+  /// Helper to upsert a minimal session row directly to Supabase.
+  ///
+  /// This is used on page‑0 "Next" click to ensure a remote session always
+  /// exists as soon as the user provides a phone number.  The calling code can
+  /// supply any additional fields that should be present in the session row.
+  ///
+  /// The phone number is normalised to an integer when possible to match the
+  /// remote schema's primary key.  Errors are simply printed and escalated via
+  /// [_escalateError] so they don't crash the UI.
+  /// Ensure a session record exists in the remote family_survey_sessions table.
+  ///
+  /// Returns `true` if the row was actually sent immediately, `false` if the
+  /// operation was queued or failed.
+  Future<bool> ensureFamilySessionExists(String phoneNumber, {Map<String, dynamic>? extra}) async {
+    final key = _phoneKey(phoneNumber) ?? phoneNumber;
+
+    // Attempt immediate upsert regardless of connectivity/auth state. If it
+    // fails (network, RLS, auth), fall back to queuing a high-priority retry.
+    final payload = <String, dynamic>{
+      'phone_number': key,
+      'status': 'in_progress',
+      'surveyor_email': currentUser?.email ?? 'anonymous',
+      if (extra != null) ...extra,
+    };
+
+    try {
+      await client.from('family_survey_sessions').upsert(_normalizeMap(payload));
+      debugPrint('[SupabaseService] ensured remote session for $key (immediate attempt)');
+      return true;
+    } catch (e) {
+      _escalateError('Immediate ensureFamilySession failed: $e', persistent: true);
+      debugPrint('[SupabaseService] immediate upsert failed for $key: $e — queuing high-priority retry');
+      try {
+        await SyncService.instance.queueSyncOperation(
+          'ensure_family_session',
+          {
+            'phone_number': key,
+            'extra': extra ?? {},
+          },
+          highPriority: true,
+        );
+      } catch (q) {
+        _escalateError('Failed to queue ensure_family_session: $q', persistent: true);
+      }
+      return false;
+    }
   }
 
   // Sync family survey data to Supabase with error tracking
@@ -419,91 +554,37 @@ class SupabaseService {
       debugPrint('[Supabase Sync] Authenticated user email: \\${currentUser?.email}');
       debugPrint('[Supabase Sync] surveyData["surveyor_email"]: \\${surveyData['surveyor_email']}');
 
-      // Insert main survey session data
+      // the village‑style generic sync handles session + children together
       try {
-        final payload = _normalizeMap({
-          'phone_number': phoneNumber,
-          'surveyor_email': userEmail,
-          'village_name': surveyData['village_name'],
-          'village_number': surveyData['village_number'],
-          'state': surveyData['state'],
-          'panchayat': surveyData['panchayat'],
-          'block': surveyData['block'],
-          'tehsil': surveyData['tehsil'],
-          'district': surveyData['district'],
-          'postal_address': surveyData['postal_address'],
-          'pin_code': surveyData['pin_code'],
-          'lgd_code': surveyData['lgd_code'],
-          'shine_code': surveyData['shine_code'],
-          'latitude': surveyData['latitude'],
-          'longitude': surveyData['longitude'],
-          'location_accuracy': surveyData['location_accuracy'],
-          'location_timestamp': surveyData['location_timestamp'],
-          'surveyor_name': surveyData['surveyor_name'],
-          'status': surveyData['status'] ?? 'in_progress',
-          'created_by': userEmail,
-          'updated_by': userEmail,
-        });
-        await _upsertWithRetry('family_survey_sessions', payload);
-        tableSyncStatus['family_survey_sessions'] = true;
-      } catch (e) {
-        tableSyncStatus['family_survey_sessions'] = false;
-        overallSuccess = false;
-        final errMsg = 'Failed to sync family_survey_sessions: $e';
-        _escalateError(errMsg, persistent: true);
-      }
-
-      // Execute syncs sequentially to avoid foreign key constraint violations
-      // All child tables depend on family_survey_sessions, so sync them one by one
-
-      // Define sync operations with their table names for status tracking
-      final syncOperations = [
-        ('family_members', () => _syncFamilyMembers(phoneNumber, surveyData['family_members'])),
-        ('land_holding', () => _syncLandHolding(phoneNumber, surveyData['land_holding'])),
-        ('irrigation_facilities', () => _syncIrrigationFacilities(phoneNumber, surveyData['irrigation_facilities'])),
-        ('crop_productivity', () => _syncCropProductivity(phoneNumber, surveyData['crop_productivity'])),
-        ('fertilizer_usage', () => _syncFertilizerUsage(phoneNumber, surveyData['fertilizer_usage'])),
-        ('animals', () => _syncAnimals(phoneNumber, surveyData['animals'])),
-        ('agricultural_equipment', () => _syncAgriculturalEquipment(phoneNumber, surveyData['agricultural_equipment'])),
-        ('entertainment_facilities', () => _syncEntertainmentFacilities(phoneNumber, surveyData['entertainment_facilities'])),
-        ('transport_facilities', () => _syncTransportFacilities(phoneNumber, surveyData['transport_facilities'])),
-        ('drinking_water_sources', () => _syncDrinkingWaterSources(phoneNumber, surveyData['drinking_water_sources'])),
-        ('medical_treatment', () => _syncMedicalTreatment(phoneNumber, surveyData['medical_treatment'])),
-        ('disputes', () => _syncDisputes(phoneNumber, surveyData['disputes'])),
-        ('house_conditions', () => _syncHouseConditions(phoneNumber, surveyData['house_conditions'])),
-        ('house_facilities', () => _syncHouseFacilities(phoneNumber, surveyData['house_facilities'])),
-        ('diseases', () => _syncDiseases(phoneNumber, surveyData['diseases'])),
-        ('children_data', () => _syncChildrenData(phoneNumber, surveyData['children_data'])),
-        ('malnourished_children_data', () => _syncMalnourishedChildrenData(phoneNumber, surveyData['malnourished_children_data'])),
-        ('child_diseases', () => _syncChildDiseases(phoneNumber, surveyData['child_diseases'])),
-        ('folklore_medicine', () => _syncFolkloreMedicine(phoneNumber, surveyData['folklore_medicine'])),
-        ('health_programmes', () => _syncHealthProgrammes(phoneNumber, surveyData['health_programmes'])),
-        ('malnutrition_data', () => _syncMalnutritionData(phoneNumber, surveyData['malnutrition_data'])),
-        ('migration_data', () => _syncMigration(phoneNumber, surveyData['migration_data'])),
-        ('training_data', () => _syncTraining(phoneNumber, surveyData['training_data'])),
-        ('shg_members', () => _syncSelfHelpGroups(phoneNumber, surveyData['shg_members'])),
-        ('fpo_members', () => _syncFpoMembership(phoneNumber, surveyData['fpo_members'])),
-        ('bank_accounts', () => _syncBankAccounts(phoneNumber, surveyData['bank_accounts'])),
-        ('social_consciousness', () => _syncSocialConsciousness(phoneNumber, surveyData['social_consciousness'])),
-        ('tribal_questions', () => _syncTribalQuestions(phoneNumber, surveyData['tribal_questions'])),
-        ('tulsi_plants', () => _syncTulsiPlants(phoneNumber, surveyData['tulsi_plants'] ?? surveyData['house_facilities'])),
-        ('nutritional_garden', () => _syncNutritionalGarden(phoneNumber, surveyData['nutritional_garden'] ?? surveyData['house_facilities'])),
-        ('government_schemes', () => _syncGovernmentSchemesParallel(phoneNumber, surveyData, tableSyncStatus)),
-      ];
-
-      // Execute each sync operation sequentially with error tracking
-      for (final (tableName, operation) in syncOperations) {
-        try {
-          await operation();
-          tableSyncStatus[tableName] = true;
-        } catch (e) {
-          tableSyncStatus[tableName] = false;
-          overallSuccess = false;
-          final errMsg = 'Failed to sync $tableName: $e';
-          _escalateError(errMsg, persistent: true);
+        await syncFamilySurveyGeneric(phoneNumber, surveyData);
+        // if generic succeeds mark all known tables as synced
+        const allTables = [
+          'family_survey_sessions',
+          'family_members','land_holding','irrigation_facilities','crop_productivity',
+          'fertilizer_usage','animals','agricultural_equipment','entertainment_facilities',
+          'transport_facilities','drinking_water_sources','medical_treatment','disputes',
+          'house_conditions','house_facilities','diseases','children_data',
+          'malnourished_children_data','child_diseases','folklore_medicine',
+          'health_programmes','malnutrition_data','migration_data','training_data',
+          'shg_members','fpo_members','bank_accounts','social_consciousness',
+          'tribal_questions','tulsi_plants','nutritional_garden',
+        ];
+        for (var t in allTables) {
+          tableSyncStatus[t] = true;
         }
+      } catch (e) {
+        overallSuccess = false;
+        final errMsg = 'Failed to sync family survey generically: $e';
+        _escalateError(errMsg, persistent: true);
+        // propagate so callers (SyncService) know to retry/queue
+        rethrow;
       }
 
+      // if we reach here but overallSuccess is false (shouldn't happen because
+      // we rethrow), throw a generic error
+      if (!overallSuccess) {
+        throw Exception('Family survey sync encountered errors');
+      }
       return overallSuccess;
 
     } catch (e) {
@@ -513,136 +594,6 @@ class SupabaseService {
     }
   }
 
-  Future<void> syncFamilyPageToSupabase(String phoneNumber, int page, Map<String, dynamic> data) async {
-    if (phoneNumber.isEmpty) return;
-
-    final userEmail = currentUser?.email ?? data['surveyor_email'];
-
-    if (page == 0) {
-      final payload = _normalizeMap({
-        'phone_number': phoneNumber,
-        'surveyor_email': userEmail,
-        'village_name': data['village_name'],
-        'village_number': data['village_number'],
-        'state': data['state'],
-        'panchayat': data['panchayat'],
-        'block': data['block'],
-        'tehsil': data['tehsil'],
-        'district': data['district'],
-        'postal_address': data['postal_address'],
-        'pin_code': data['pin_code'],
-        'lgd_code': data['lgd_code'],
-        'shine_code': data['shine_code'],
-        'latitude': data['latitude'],
-        'longitude': data['longitude'],
-        'location_accuracy': data['location_accuracy'],
-        'location_timestamp': data['location_timestamp'],
-        'surveyor_name': data['surveyor_name'],
-        'status': data['status'] ?? 'in_progress',
-        'created_by': userEmail,
-        'updated_by': userEmail,
-      });
-      await _upsertWithRetry('family_survey_sessions', payload);
-      return;
-    }
-
-    switch (page) {
-      case 1:
-        await _syncFamilyMembers(phoneNumber, data['family_members'] ?? data['familyMembers'] ?? data['members']);
-        break;
-      case 2:
-      case 3:
-      case 4:
-      case 25:
-        await _syncSocialConsciousness(phoneNumber, data['social_consciousness'] ?? data);
-        break;
-      case 5:
-        await _syncLandHolding(phoneNumber, data['land_holding'] ?? data);
-        break;
-      case 6:
-        await _syncIrrigationFacilities(phoneNumber, data['irrigation_facilities'] ?? data);
-        break;
-      case 7:
-        await _syncCropProductivity(phoneNumber, data['crops'] ?? data['crop_productivity']);
-        break;
-      case 8:
-        await _syncFertilizerUsage(phoneNumber, data['fertilizer_usage'] ?? data);
-        break;
-      case 9:
-        await _syncAnimals(phoneNumber, data['animals']);
-        break;
-      case 10:
-        await _syncAgriculturalEquipment(phoneNumber, data['agricultural_equipment'] ?? data);
-        break;
-      case 11:
-        await _syncEntertainmentFacilities(phoneNumber, data['entertainment_facilities'] ?? data);
-        break;
-      case 12:
-        await _syncTransportFacilities(phoneNumber, data['transport_facilities'] ?? data);
-        break;
-      case 13:
-        await _syncDrinkingWaterSources(phoneNumber, data['drinking_water_sources'] ?? data);
-        break;
-      case 14:
-        await _syncMedicalTreatment(phoneNumber, data['medical_treatment'] ?? data);
-        break;
-      case 15:
-        await _syncDisputes(phoneNumber, data['disputes'] ?? data);
-        break;
-      case 16:
-        await _syncHouseConditions(phoneNumber, data['house_conditions'] ?? data);
-        await _syncHouseFacilities(phoneNumber, data['house_facilities'] ?? data);
-        await _syncTulsiPlants(phoneNumber, data['tulsi_plants'] ?? data['house_facilities'] ?? data);
-        await _syncNutritionalGarden(phoneNumber, data['nutritional_garden'] ?? data['house_facilities'] ?? data);
-        break;
-      case 17:
-        await _syncDiseases(phoneNumber, data['diseases']);
-        break;
-      case 19:
-        await _syncFolkloreMedicine(phoneNumber, data['folklore_medicine'] ?? data['folklore_medicines']);
-        break;
-      case 20:
-        await _syncHealthProgrammes(phoneNumber, data['health_programmes'] ?? data);
-        break;
-      case 18:
-        await _syncGovernmentSchemesParallel(phoneNumber, data, {});
-        break;
-      case 21:
-        await _syncChildrenData(phoneNumber, data['children_data'] ?? data);
-        await _syncMalnourishedChildrenData(phoneNumber, data['malnourished_children_data']);
-        await _syncChildDiseases(phoneNumber, data['child_diseases']);
-        await _syncMalnutritionData(phoneNumber, data['malnutrition_data']);
-        break;
-      case 22:
-        await _syncMigration(phoneNumber, data['migration_data'] ?? data);
-        break;
-      case 23:
-        await _syncTraining(phoneNumber, data['training_data']);
-        await _syncSelfHelpGroups(phoneNumber, data['shg_members']);
-        await _syncFpoMembership(phoneNumber, data['fpo_members']);
-        break;
-      case 24:
-        await _syncVbGram(phoneNumber, data['vb_gram'] ?? data);
-        await _syncVbGramMembers(phoneNumber, data['vb_gram_members']);
-        break;
-      case 25:
-        await _syncPmKisanNidhi(phoneNumber, data['pm_kisan_nidhi'] ?? data);
-        await _syncPmKisanMembers(phoneNumber, data['pm_kisan_members']);
-        break;
-      case 26:
-        await _syncPmKisanSammanNidhi(phoneNumber, data['pm_kisan_samman_nidhi'] ?? data);
-        await _syncPmKisanSammanMembers(phoneNumber, data['pm_kisan_samman_members']);
-        break;
-      case 27:
-      case 28:
-      case 29:
-        await _syncMergedGovtSchemes(phoneNumber, data['merged_govt_schemes'] ?? data);
-        break;
-      case 30:
-        await _syncBankAccounts(phoneNumber, data['bank_accounts']);
-        break;
-    }
-  }
 
   Future<void> syncVillagePageToSupabase(String sessionId, int page, Map<String, dynamic> data) async {
     if (sessionId.isEmpty) return;
@@ -791,65 +742,6 @@ class SupabaseService {
     await _upsertWithRetry('entertainment_facilities', _normalizeMap({...data, 'phone_number': phoneNumber}));
   }
 
-  Future<void> _syncTransportFacilities(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('transport_facilities', _normalizeMap({...data, 'phone_number': phoneNumber}));
-  }
-
-  Future<void> _syncDrinkingWaterSources(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry(
-      'drinking_water_sources',
-      _normalizeMap({
-        ...data,
-        'phone_number': phoneNumber,
-        'hand_pumps_quality': data['hand_pumps_quality'],
-        'well_quality': data['well_quality'],
-        'tubewell_quality': data['tubewell_quality'],
-        'nal_jaal_quality': data['nal_jaal_quality'],
-        'other_sources_quality': data['other_sources_quality'],
-      }),
-    );
-  }
-
-  Future<void> _syncMedicalTreatment(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry(
-      'medical_treatment',
-      _normalizeMap({
-        'allopathic': data['allopathic'] ?? '0',
-        'ayurvedic': data['ayurvedic'] ?? '0',
-        'homeopathy': data['homeopathy'] ?? '0',
-        'traditional': data['traditional'] ?? '0',
-        'other_treatment': data['other_treatment'] ?? '0',
-        'preferred_treatment': data['preferred_treatment'],
-        'phone_number': phoneNumber,
-      }),
-    );
-  }
-
-  Future<void> _syncDisputes(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('disputes', _normalizeMap({...data, 'phone_number': phoneNumber}));
-  }
-
-  Future<void> _syncHouseConditions(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('house_conditions', _normalizeMap({...data, 'phone_number': phoneNumber}));
-  }
-
-  Future<void> _syncHouseFacilities(String phoneNumber, Map<String, dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    await _upsertWithRetry('house_facilities', _normalizeMap({...data, 'phone_number': phoneNumber}));
-  }
-
-  Future<void> _syncDiseases(String phoneNumber, List<dynamic>? data) async {
-    if (data == null || data.isEmpty) return;
-    final rows = _normalizeList(
-      data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
-    );
-    await _upsertWithRetry('diseases', rows);
-  }
 
   // Parallel sync for government schemes with error tracking
   Future<void> _syncGovernmentSchemesParallel(
@@ -942,6 +834,29 @@ class SupabaseService {
       data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
     await _upsertWithRetry('training_data', rows);
+  }
+
+  /// Sync training_needs (per-family-member training requests)
+  Future<void> _syncTrainingNeeds(String phoneNumber, List<dynamic>? data) async {
+    if (data == null || data.isEmpty) return;
+    // Build rows ensuring phone_number + sr_no composite key
+    final rows = <Map<String, dynamic>>[];
+    for (final item in data) {
+      if (item is Map) {
+        final row = <String, dynamic>{
+          'phone_number': phoneNumber,
+          'sr_no': item['sr_no'],
+          // prefer explicit boolean/int fields; normalize later
+          'wants_training': item['wants_training'] ?? item['wants_training_flag'] ?? item['wants_training_text'],
+          // single free-text preferred training field per requested schema
+          'preferred_training': item['preferred_training'] ?? item['preferred_training_type'] ?? item['preferred_type'] ?? item['preferred_training_text'],
+          'created_at': item['created_at'] ?? DateTime.now().toIso8601String(),
+        };
+        rows.add(_normalizeMap(row));
+      }
+    }
+    if (rows.isEmpty) return;
+    await _upsertWithRetry('training_needs', rows);
   }
 
   Future<void> _syncSelfHelpGroups(String phoneNumber, List<dynamic>? data) async {
@@ -1304,8 +1219,8 @@ class SupabaseService {
       final payload = Map<String, dynamic>.from(data);
 
       // Add surveyor_email from authenticated user if not already present
-      if (!payload.containsKey('surveyor_email') && currentUser?.email != null) {
-        payload['surveyor_email'] = currentUser!.email;
+      if (!payload.containsKey('surveyor_email')) {
+        payload['surveyor_email'] = currentUser?.email ?? 'anonymous';
       }
 
       if (tableName == 'village_survey_sessions') {
@@ -1319,6 +1234,12 @@ class SupabaseService {
       } else {
         debugPrint('[Supabase Sync] Upserting $tableName with session_id=${payload['session_id']}');
       }
+
+      // Strip any deprecated accuracy fields before sending to Supabase.
+      // Remote schema columns `accuracy` / `location_accuracy` were removed.
+      payload.remove('accuracy');
+      payload.remove('location_accuracy');
+
       debugPrint('[Supabase Sync] Payload: ' + payload.toString());
       debugPrint('[Supabase Sync] Authenticated user email: \\${currentUser?.email}');
       debugPrint('[Supabase Sync] payload["surveyor_email"]: \\${payload['surveyor_email']}');
@@ -1327,6 +1248,129 @@ class SupabaseService {
       final errMsg = 'ERROR saving $tableName: $e';
       _escalateError(errMsg, persistent: true);
       throw Exception('Failed to save village data to $tableName: $e');
+    }
+  }
+
+  // Save family survey data to Supabase using village-style protocol
+  Future<void> saveFamilyData(String tableName, Map<String, dynamic> data) async {
+    try {
+      final payload = Map<String, dynamic>.from(data);
+
+      // Add surveyor_email if not present
+      if (!payload.containsKey('surveyor_email') && currentUser?.email != null) {
+        payload['surveyor_email'] = currentUser!.email;
+      }
+
+      if (tableName == 'family_survey_sessions') {
+        // drop transient fields if inserted locally
+        payload.remove('page_completion_status');
+        payload.remove('sync_pending');
+        payload.remove('sync_status');
+        // Do not send timestamp columns that have DB defaults; let DB set them.
+        payload.remove('created_at');
+        payload.remove('updated_at');
+      }
+
+      if (!payload.containsKey('phone_number')) {
+        final errMsg = 'WARNING: phone_number missing in payload for $tableName!';
+        _escalateError(errMsg, persistent: true);
+      } else {
+        debugPrint('[Supabase Sync] Upserting $tableName with phone_number=${payload['phone_number']}');
+      }
+
+      // Strip any deprecated accuracy fields before sending to Supabase.
+      // Remote schema columns `accuracy` / `location_accuracy` were removed.
+      payload.remove('accuracy');
+      payload.remove('location_accuracy');
+
+      debugPrint('[Supabase Sync] Payload: ' + payload.toString());
+      debugPrint('[Supabase Sync] Authenticated user email: ${currentUser?.email}');
+      debugPrint('[Supabase Sync] payload["surveyor_email"]: ${payload['surveyor_email']}');
+      await _upsertWithRetry(tableName, _normalizeMap(payload));
+    } catch (e) {
+      final errMsg = 'ERROR saving $tableName: $e';
+      _escalateError(errMsg, persistent: true);
+      throw Exception('Failed to save family data to $tableName: $e');
+    }
+  }
+
+  /// Generic family survey sync that mirrors [syncVillageSurveyToSupabase].
+  ///
+  /// Splits the input into a main session row and a list of child table
+  /// entries, upserting each individually using [saveFamilyData]. This is the
+  /// same protocol used by the village flow and ensures identical behaviour
+  /// for phone‑number key, logging and filtering.
+  Future<void> syncFamilySurveyGeneric(String phoneNumber, Map<String, dynamic> data) async {
+    // normalize phone key once
+    final phoneKey = _phoneKey(phoneNumber) ?? phoneNumber;
+
+    // copy payload and strip child tables
+    final mainTableData = Map<String, dynamic>.from(data);
+
+    const childTables = [
+      'family_members',
+      'land_holding',
+      'irrigation_facilities',
+      'crop_productivity',
+      'fertilizer_usage',
+      'animals',
+      'agricultural_equipment',
+      'entertainment_facilities',
+      'transport_facilities',
+      'drinking_water_sources',
+      'medical_treatment',
+      'disputes',
+      'house_conditions',
+      'house_facilities',
+      'diseases',
+      'children_data',
+      'malnourished_children_data',
+      'child_diseases',
+      'folklore_medicine',
+      'health_programmes',
+      'malnutrition_data',
+      'migration_data',
+      'training_data',
+      'shg_members',
+      'fpo_members',
+      'bank_accounts',
+      'social_consciousness',
+      'tribal_questions',
+      'tulsi_plants',
+      'nutritional_garden',
+      // government schemes are handled separately by _syncGovernmentSchemesParallel
+    ];
+
+    for (var t in childTables) {
+      mainTableData.remove(t);
+    }
+
+    // ensure phone in main
+    mainTableData['phone_number'] = phoneKey;
+
+    await saveFamilyData('family_survey_sessions', mainTableData);
+
+    for (var t in childTables) {
+      if (!data.containsKey(t)) continue;
+      final tableData = data[t];
+      if (tableData is List) {
+        for (var item in tableData) {
+          final mapItem = Map<String, dynamic>.from(item);
+          mapItem['phone_number'] = phoneKey;
+          await saveFamilyData(t, mapItem);
+        }
+      } else if (tableData is Map<String, dynamic>) {
+        final mapItem = Map<String, dynamic>.from(tableData);
+        mapItem['phone_number'] = phoneKey;
+        await saveFamilyData(t, mapItem);
+      }
+    }
+
+    // government scheme tables (non‑childTables) are handled in parallel
+    try {
+      await _syncGovernmentSchemesParallel(phoneKey, data, {});
+    } catch (_) {
+      // errors already escalated inside helper
     }
   }
 

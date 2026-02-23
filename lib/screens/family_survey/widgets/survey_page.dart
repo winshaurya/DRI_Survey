@@ -225,14 +225,15 @@ offset: const Offset(0, -0.8),
       case 31:
         // Preview page with submit button (end of survey flow)
         final surveyState = ref.watch(surveyProvider);
-        final phoneNumber = surveyState.phoneNumber ?? '';
-        print('SurveyPage: Passing survey data to preview: ${surveyState.surveyData.keys}');
+        // Ensure we pass a string phone identifier — provider stores phoneNumber as String
+        final phoneNumber = surveyState.phoneNumber?.toString() ?? '';
+        debugPrint('SurveyPage: Passing survey data to preview: ${surveyState.surveyData.keys} for phone=$phoneNumber');
         return FamilySurveyPreviewPage(
           phoneNumber: phoneNumber,
           fromHistory: false,
-          showSubmitButton: true, // Show submit button when in survey flow
+          showSubmitButton: true,
           embedInSurveyFlow: true,
-          surveyData: surveyState.surveyData, // Pass survey data directly
+          surveyData: surveyState.surveyData,
         );
       default:
         return const Center(child: Text('Page not found'));
@@ -242,11 +243,16 @@ offset: const Offset(0, -0.8),
 
 
   Future<void> _handleNext(WidgetRef ref) async {
-    if (_formKey.currentState?.validate() ?? false) {
+    debugPrint('[SurveyPage] _handleNext called for page ${widget.pageIndex}');
+    final isValid = _formKey.currentState?.validate() ?? false;
+    debugPrint('[SurveyPage] form valid=$isValid for page ${widget.pageIndex}');
+    if (isValid) {
       _formKey.currentState?.save();
       // Save current page data locally before navigating (family survey only)
       await ref.read(surveyProvider.notifier).saveCurrentPageData();
       widget.onNext(_pageData);
+    } else {
+      debugPrint('[SurveyPage] Validation failed for page ${widget.pageIndex}');
     }
   }
 }

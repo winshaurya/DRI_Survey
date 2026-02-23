@@ -257,11 +257,17 @@ static Database? _database;
   Future<List<Map<String, dynamic>>> getData(String tableName, String phoneNumber) async {
     final db = await database;
     final pk = int.tryParse(phoneNumber) ?? phoneNumber;
-    return await db.query(
-      tableName,
-      where: 'phone_number = ?',
-      whereArgs: [pk],
-    );
+    try {
+      return await db.query(
+        tableName,
+        where: 'phone_number = ?',
+        whereArgs: [pk],
+      );
+    } catch (e) {
+      // Table might not exist (migration pending) - log and return empty
+      print('DB getData error for $tableName: $e');
+      return <Map<String, dynamic>>[];
+    }
   }
 
   // Get all unsynced family surveys for sync operations
@@ -582,241 +588,17 @@ static Database? _database;
     }
   }
 
-  // ===========================================
-  // PAGE-LEVEL SYNC STATUS MANAGEMENT
-  // ===========================================
-
-  Future<void> updatePageSyncStatus(String phoneNumber, int pageIndex, String status) async {
-    final db = await database;
-    final currentStatus = await _getPageSyncStatusMap(phoneNumber);
-    currentStatus['page_$pageIndex'] = status;
-
-    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
-    await db.update(
-      'family_survey_sessions',
-      {'page_sync_status': jsonEncode(currentStatus)},
-      where: 'phone_number = ?',
-      whereArgs: [pk],
-    );
-  }
-
-  Future<String?> getPageSyncStatus(String phoneNumber, int pageIndex) async {
-    final statusMap = await _getPageSyncStatusMap(phoneNumber);
-    return statusMap['page_$pageIndex'];
-  }
-
-  Future<Map<String, String>> _getPageSyncStatusMap(String phoneNumber) async {
-    final db = await database;
-    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
-    final results = await db.query(
-      'family_survey_sessions',
-      columns: ['page_sync_status'],
-      where: 'phone_number = ?',
-      whereArgs: [pk],
-    );
-
-    if (results.isEmpty) return {};
-
-    final rawStatus = results.first['page_sync_status'] as String?;
-    if (rawStatus == null || rawStatus.isEmpty) return {};
-
-    try {
-      final decoded = jsonDecode(rawStatus) as Map<String, dynamic>;
-      return decoded.map((key, value) => MapEntry(key, value.toString()));
-    } catch (e) {
-      return {};
-    }
-  }
-
-  Future<List<int>> getPendingPages(String phoneNumber) async {
-    final statusMap = await _getPageSyncStatusMap(phoneNumber);
-    final pendingPages = <int>[];
-
-    for (int i = 0; i < 32; i++) {
-      final status = statusMap['page_$i'];
-      if (status == null || status == 'pending' || status == 'failed') {
-        pendingPages.add(i);
-      }
-    }
-
-    return pendingPages;
-  }
-
-  Future<int> getSyncedPagesCount(String phoneNumber) async {
-    final statusMap = await _getPageSyncStatusMap(phoneNumber);
-    int count = 0;
-
-    for (int i = 0; i < 32; i++) {
-      if (statusMap['page_$i'] == 'synced') {
-        count++;
-      }
-    }
-
-    return count;
-  }
-
-  // ===========================================
-  // DATA HASH MANAGEMENT FOR DELTA SYNC
-  // ===========================================
-
-  Future<void> updatePageDataHash(String phoneNumber, int pageIndex, String hash) async {
-    final db = await database;
-    final currentHashes = await _getPageDataHashesMap(phoneNumber);
-    currentHashes['page_$pageIndex'] = hash;
-
-    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
-    await db.update(
-      'family_survey_sessions',
-      {'page_data_hashes': jsonEncode(currentHashes)},
-      where: 'phone_number = ?',
-      whereArgs: [pk],
-    );
-  }
-
-  Future<String?> getPageDataHash(String phoneNumber, int pageIndex) async {
-    final hashesMap = await _getPageDataHashesMap(phoneNumber);
-    return hashesMap['page_$pageIndex'];
-  }
-
-  Future<Map<String, String>> _getPageDataHashesMap(String phoneNumber) async {
-    final db = await database;
-    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
-    final results = await db.query(
-      'family_survey_sessions',
-      columns: ['page_data_hashes'],
-      where: 'phone_number = ?',
-      whereArgs: [pk],
-    );
-
-    if (results.isEmpty) return {};
-
-    final rawHashes = results.first['page_data_hashes'] as String?;
-    if (rawHashes == null || rawHashes.isEmpty) return {};
-
-    try {
-      final decoded = jsonDecode(rawHashes) as Map<String, dynamic>;
-      return decoded.map((key, value) => MapEntry(key, value.toString()));
-    } catch (e) {
-      return {};
-    }
-  }
-
-  // ===========================================
-  // SYNC TIMESTAMP MANAGEMENT
-  // ===========================================
-
-  Future<void> updatePageLastSyncedAt(String phoneNumber, int pageIndex) async {
-    final db = await database;
-    final currentTimestamps = await _getPageLastSyncedAtMap(phoneNumber);
-    currentTimestamps['page_$pageIndex'] = DateTime.now().toIso8601String();
-
-    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
-    await db.update(
-      'family_survey_sessions',
-      {'page_last_synced_at': jsonEncode(currentTimestamps)},
-      where: 'phone_number = ?',
-      whereArgs: [pk],
-    );
-  }
-
-  Future<String?> getPageLastSyncedAt(String phoneNumber, int pageIndex) async {
-    final timestampsMap = await _getPageLastSyncedAtMap(phoneNumber);
-    return timestampsMap['page_$pageIndex'];
-  }
-
-  Future<Map<String, String>> _getPageLastSyncedAtMap(String phoneNumber) async {
-    final db = await database;
-    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
-    final results = await db.query(
-      'family_survey_sessions',
-      columns: ['page_last_synced_at'],
-      where: 'phone_number = ?',
-      whereArgs: [pk],
-    );
-
-    if (results.isEmpty) return {};
-
-    final rawTimestamps = results.first['page_last_synced_at'] as String?;
-    if (rawTimestamps == null || rawTimestamps.isEmpty) return {};
-
-    try {
-      final decoded = jsonDecode(rawTimestamps) as Map<String, dynamic>;
-      return decoded.map((key, value) => MapEntry(key, value.toString()));
-    } catch (e) {
-      return {};
-    }
-  }
-
-  /// Get total count of all pages across all surveys
-  Future<int> getTotalPagesCount() async {
-    final db = await database;
-    final results = await db.rawQuery('''
-      SELECT COUNT(*) as total
-      FROM (
-        SELECT json_extract(page_sync_status, '\$.page_count') as page_count
-        FROM family_survey_sessions
-        WHERE page_sync_status IS NOT NULL
-      )
-    ''');
-
-    int total = 0;
-    for (final result in results) {
-      final pageCount = result['total'] as int? ?? 0;
-      total += pageCount;
-    }
-    return total;
-  }
-
-  /// Get count of synced pages across all families
-  Future<int> getTotalSyncedPagesCount() async {
-    final db = await database;
-    final results = await db.query('family_survey_sessions');
-
-    int totalSynced = 0;
-    for (final row in results) {
-      final phoneNumber = (row['phone_number'] ?? '').toString();
-      totalSynced += await getSyncedPagesCount(phoneNumber);
-    }
-    return totalSynced;
-  }
-
-  /// Get list of all pending pages that need syncing across all families
-  Future<List<Map<String, dynamic>>> getAllPendingPages() async {
-    final db = await database;
-    final results = await db.query('family_survey_sessions');
-
-    final pendingPages = <Map<String, dynamic>>[];
-
-    for (final row in results) {
-      final phoneNumber = (row['phone_number'] ?? '').toString();
-      final pageSyncStatusRaw = row['page_sync_status'] as String?;
-
-      if (pageSyncStatusRaw != null) {
-        try {
-          final pageSyncStatus = jsonDecode(pageSyncStatusRaw) as Map<String, dynamic>;
-          final pageCount = pageSyncStatus['page_count'] as int? ?? 0;
-
-          for (int page = 1; page <= pageCount; page++) {
-            final pageKey = 'page_$page';
-            final status = pageSyncStatus[pageKey] as String?;
-
-            if (status != 'synced') {
-              // Get page data using the sync service method
-              // For now, return basic info and let sync service handle data collection
-              pendingPages.add({
-                'phone_number': phoneNumber,
-                'page': page,
-                'data': {}, // Will be populated by sync service
-              });
-            }
-          }
-        } catch (e) {
-          // Skip malformed data
-          continue;
-        }
-      }
-    }
-
-    return pendingPages;
-  }
+  // =========================================================
+  // LEGACY PAGE-SYNC STATUS REMOVED
+  // =========================================================
+  // The application now uploads an entire family survey in a single operation.
+  // Previous implementations tracked sync status and timestamps for each page in
+  // the family survey, which required additional columns (`page_sync_status` and
+  // `page_last_synced_at`) that were later dropped from the schema. All of the
+  // methods and helpers that manipulated those columns have been deleted to avoid
+  // runtime errors. Any remaining page-related functionality (completion status,
+  // etc.) is handled by other parts of this class.
+  //
+  // This comment replaces the old methods and ensures the class closes properly.
 }
+

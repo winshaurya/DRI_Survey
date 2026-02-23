@@ -22,6 +22,7 @@
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="DRI survey app">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -36,9 +37,35 @@
 </head>
 <body>
   <script>
-    window.addEventListener('load', function(ev) {
-      // Download main.dart.js
-      FlutterLoader.load();
+    // Robust loader: support different flutter.js loader APIs and fall back to loading main.dart.js
+    window.addEventListener('load', function () {
+      try {
+        if (typeof flutter !== 'undefined' && flutter.loader && flutter.loader.loadEntrypoint) {
+          // Newer loader API
+          flutter.loader.loadEntrypoint({ serviceWorker: { url: 'flutter_service_worker.js' } }).then(function(engineInitializer) {
+            engineInitializer.initializeEngine().then(function(appRunner) {
+              appRunner.runApp();
+            });
+          }).catch(function() {
+            // fallback to loading main.dart.js directly
+            var s = document.createElement('script');
+            s.src = 'main.dart.js';
+            document.body.appendChild(s);
+          });
+        } else if (typeof FlutterLoader !== 'undefined' && FlutterLoader.load) {
+          // Older loader API
+          FlutterLoader.load();
+        } else {
+          // Final fallback: inject main.dart.js
+          var script = document.createElement('script');
+          script.src = 'main.dart.js';
+          document.body.appendChild(script);
+        }
+      } catch (e) {
+        var script = document.createElement('script');
+        script.src = 'main.dart.js';
+        document.body.appendChild(script);
+      }
     });
   </script>
 </body>

@@ -27,8 +27,13 @@ class LocationService {
       return {
         'latitude': locationData.latitude,
         'longitude': locationData.longitude,
+        // Provide both the legacy key `accuracy` and the schema-named
+        // `location_accuracy` (numeric) so callers and DB mapping work.
         'accuracy': locationData.accuracy,
+        'location_accuracy': locationData.accuracy,
+        // Provide both legacy `timestamp` and schema `location_timestamp`.
         'timestamp': DateTime.now().toIso8601String(),
+        'location_timestamp': DateTime.now().toIso8601String(),
       };
     } catch (e) {
       return null;
@@ -82,11 +87,14 @@ class LocationService {
         return null;
       }
 
+      final nowIso = DateTime.now().toIso8601String();
       final result = {
         'latitude': locationData.latitude!,
         'longitude': locationData.longitude!,
         'accuracy': locationData.accuracy ?? 0.0,
-        'timestamp': DateTime.now().toIso8601String(),
+        'location_accuracy': locationData.accuracy ?? 0.0,
+        'timestamp': nowIso,
+        'location_timestamp': nowIso,
         'village': '', // Will be filled by reverse geocoding if implemented
         'subLocality': '', // Will be filled by reverse geocoding if implemented
         'subAdministrativeArea': '', // Will be filled by reverse geocoding if implemented

@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database_service.dart';
 import 'supabase_service.dart';
-import 'file_upload_service.dart';
 
 class SyncProgress {
   final String stage;
@@ -36,7 +35,6 @@ class SyncService {
 
   final DatabaseService _databaseService = DatabaseService();
   late final SupabaseService _supabaseService;
-  late final FileUploadService _fileUploadService;
 
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
   bool _isOnline = false;
@@ -84,10 +82,11 @@ class SyncService {
     'child_diseases',
     'folklore_medicine',
     'health_programmes',
-    'migration_data',
-    'training_data',
-    'shg_members',
-    'fpo_members',
+      'migration_data',
+      'training_data',
+      'training_needs',
+      'shg_members',
+      'fpo_members',
     'bank_accounts',
     'tulsi_plants',
     'nutritional_garden',
@@ -158,7 +157,6 @@ class SyncService {
   SyncService._internal() {
     // Lazy initialization to make service testable
     _supabaseService = SupabaseService.instance;
-    _fileUploadService = FileUploadService.instance;
     // Initialize connectivity monitoring and load queue
     _ensureConnectivityMonitoringInitialized();
     loadSyncQueue();
@@ -257,18 +255,276 @@ class SyncService {
     }
   }
 
+/// This method has been simplified to mirror the village survey protocol.
+  ///
+  /// Instead of syncing a single page, we collect the *entire* family survey
+  /// from the local database and push it in one shot.  This keeps the remote
+  /// logic identical to the village flow and avoids a huge switch statement.
+  /// Sync a single page of the family survey to Supabase.
+  ///
+  /// This mirrors the village protocol: each page is uploaded separately
+  /// (along with a lightweight session row).  In case of offline/auth
+  /// failures the operation is queued as `sync_family_page`; the queue
+  /// executor calls back into [_upsertFamilyPage] when connectivity returns.
+  /// Upsert the given page data to the appropriate family table(s) on Supabase.
+  /// This mirrors the logic used when saving locally in [SurveyNotifier]._savePageDataToDatabase.
+  Future<void> _upsertFamilyPage(String phoneNumber, int page, Map<String, dynamic> data) async {
+    // phoneNumber already normalized by caller
+    final phoneKey = int.tryParse(phoneNumber.replaceAll(RegExp(r'[^0-9]'), '')) ?? phoneNumber;
+    phoneNumber = phoneKey.toString();
+
+    // remote‑newer check (based on session row) to avoid overwriting newer cloud record
+    final localUpdatedAt = await _getLocalUpdatedAt('family_survey_sessions', 'phone_number', phoneNumber);
+    final remoteNewer = await _isRemoteNewerFamily(phoneNumber, localUpdatedAt);
+    if (remoteNewer) {
+      await _markSurveyAsFailed(phoneNumber, ['REMOTE_NEWER']);
+      throw Exception('Remote copy newer, skipping page sync');
+    }
+
+    // Only upsert session row on page 0; page0 already triggers ensureFamilySessionExists,
+    // so further page syncs no longer attempt it (avoids RLS recursion errors).
+    if (page == 0) {
+      try {
+        await _supabaseService.saveFamilyData('family_survey_sessions', {
+          'phone_number': phoneNumber,
+          'status': 'in_progress',
+          'surveyor_email': _supabaseService.currentUser?.email ?? 'unknown',
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('warning: failed to upsert session row for $phoneNumber: $e');
+      }
+    }
+
+    List<MapEntry<String, Map<String, dynamic>>> toUpload = [];
+
+    switch (page) {
+      case 0:
+        // page0 data is already the session payload
+        final payload = Map<String, dynamic>.from(data);
+        payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('family_survey_sessions', payload));
+        break;
+      case 1:
+        if (data['family_members'] is List) {
+          for (var item in data['family_members']) {
+            if (item is Map) {
+              final map = Map<String, dynamic>.from(item);
+              map['phone_number'] = phoneNumber;
+              toUpload.add(MapEntry('family_members', map));
+            }
+          }
+        }
+        break;
+      case 2:
+      case 3:
+      case 4:
+        final payload = Map<String, dynamic>.from(data)..['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('social_consciousness', payload));
+        break;
+      case 5:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('land_holding', payload));
+        break;
+      case 6:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('irrigation_facilities', payload));
+        break;
+      case 7:
+        if (data is Map && data['crop_productivity'] is List) {
+          for (var crop in data['crop_productivity']) {
+            if (crop is Map) {
+              final m = Map<String, dynamic>.from(crop);
+              m['phone_number'] = phoneNumber;
+              toUpload.add(MapEntry('crop_productivity', m));
+            }
+          }
+        }
+        break;
+      case 8:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('fertilizer_usage', payload));
+        break;
+      case 9:
+        if (data is Map && data['animals'] is List) {
+          for (var animal in data['animals']) {
+            if (animal is Map) {
+              final m = Map<String, dynamic>.from(animal);
+              m['phone_number'] = phoneNumber;
+              toUpload.add(MapEntry('animals', m));
+            }
+          }
+        }
+        break;
+      case 10:
+        if (data is Map && data['agricultural_equipment'] is List) {
+          for (var item in data['agricultural_equipment']) {
+            if (item is Map) {
+              final m = Map<String, dynamic>.from(item);
+              m['phone_number'] = phoneNumber;
+              toUpload.add(MapEntry('agricultural_equipment', m));
+            }
+          }
+        }
+        break;
+      case 11:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('entertainment_facilities', payload));
+        break;
+      case 12:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('transport_facilities', payload));
+        break;
+      case 13:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('drinking_water_sources', payload));
+        break;
+      case 14:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('medical_treatment', payload));
+        break;
+      case 15:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('disputes', payload));
+        break;
+      case 16:
+        // may include both house_conditions and house_facilities maps
+        if (data['house_conditions'] is Map) {
+          final m = Map<String, dynamic>.from(data['house_conditions']);
+          m['phone_number'] = phoneNumber;
+          toUpload.add(MapEntry('house_conditions', m));
+        }
+        if (data['house_facilities'] is Map) {
+          final m = Map<String, dynamic>.from(data['house_facilities']);
+          m['phone_number'] = phoneNumber;
+          toUpload.add(MapEntry('house_facilities', m));
+        }
+        break;
+      case 17:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('diseases', payload));
+        break;
+      case 18:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('government_schemes', payload));
+        break;
+      case 19:
+        // folklore_medicine may be stored as list under different keys
+        Map<String, dynamic> payload = {};
+        if (data['folklore_medicine'] != null) payload['folklore_medicine'] = data['folklore_medicine'];
+        if (data['folklore_medicines'] != null) payload['folklore_medicine'] = data['folklore_medicines'];
+        payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('folklore_medicine', payload));
+        break;
+      case 20:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('health_programmes', payload));
+        break;
+      case 21:
+        if (data['children'] is List) {
+          for (var item in data['children']) {
+            if (item is Map) {
+              final m = Map<String, dynamic>.from(item);
+              m['phone_number'] = phoneNumber;
+              toUpload.add(MapEntry('children_data', m));
+            }
+          }
+        }
+        break;
+      case 22:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('migration_data', payload));
+        break;
+      case 23:
+        // training programs already taken (training_data) and training requests (training_needs)
+        if (data is Map && data['training_data'] is List) {
+          for (var item in data['training_data']) {
+            if (item is Map) {
+              final m = Map<String, dynamic>.from(item);
+              m['phone_number'] = phoneNumber;
+              toUpload.add(MapEntry('training_data', m));
+            }
+          }
+        } else {
+          final payload = Map<String, dynamic>.from(data);
+          payload['phone_number'] = phoneNumber;
+          toUpload.add(MapEntry('training_data', payload));
+        }
+
+        if (data is Map && data['training_needs'] is List) {
+          for (var item in data['training_needs']) {
+            if (item is Map) {
+              final m = Map<String, dynamic>.from(item);
+              m['phone_number'] = phoneNumber;
+              toUpload.add(MapEntry('training_needs', m));
+            }
+          }
+        }
+        break;
+      case 24:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('vb_gram', payload));
+        break;
+      case 25:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('pm_kisan_nidhi', payload));
+        break;
+      case 26:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('pm_kisan_samman_nidhi', payload));
+        break;
+      case 27:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('kisan_credit_card', payload));
+        break;
+      case 28:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('swachh_bharat_mission', payload));
+        break;
+      case 29:
+        final payload = Map<String, dynamic>.from(data); payload['phone_number'] = phoneNumber;
+        toUpload.add(MapEntry('fasal_bima', payload));
+        break;
+      case 30:
+        if (data['bank_accounts'] is List) {
+          for (var item in data['bank_accounts']) {
+            if (item is Map) {
+              final m = Map<String, dynamic>.from(item);
+              m['phone_number'] = phoneNumber;
+              toUpload.add(MapEntry('bank_accounts', m));
+            }
+          }
+        }
+        break;
+      default:
+        // nothing to do
+        break;
+    }
+
+    // perform upserts sequentially (mirroring generic sync concurrency pattern is unnecessary here)
+    for (var entry in toUpload) {
+      await _supabaseService.saveFamilyData(entry.key, entry.value);
+    }
+  }
+
   Future<void> syncFamilyPageData(String phoneNumber, int page, Map<String, dynamic> data) async {
     _ensureConnectivityMonitoringInitialized();
     if (phoneNumber.isEmpty || page < 0) return;
 
+    // normalize phone number to numeric to satisfy supabase PKs
+    final phoneKey = int.tryParse(phoneNumber.replaceAll(RegExp(r'[^0-9]'), '')) ?? phoneNumber;
+    phoneNumber = phoneKey.toString();
+
     await _withSyncLock('family:$phoneNumber', () async {
-      // Re-check connectivity now to prefer immediate sync when possible
       final connectivityResult = await Connectivity().checkConnectivity();
       final currentlyOnline = connectivityResult != ConnectivityResult.none;
       _isOnline = currentlyOnline;
 
-      // If offline or not authenticated, queue and return
+      debugPrint('[SyncService] syncFamilyPageData online=$currentlyOnline user=${_supabaseService.currentUser?.email} page=$page');
+
+      // When offline or unauthenticated, queue just the page operation
       if (!currentlyOnline || _supabaseService.currentUser == null) {
+        debugPrint('[SyncService] queueing family page sync, online=$currentlyOnline, user=${_supabaseService.currentUser?.email}');
         await queueSyncOperation('sync_family_page', {
           'phone_number': phoneNumber,
           'page': page,
@@ -277,56 +533,21 @@ class SyncService {
         return;
       }
 
-      // Prevent overwriting when remote has newer data
-      final localUpdatedAt = await _getLocalUpdatedAt('family_survey_sessions', 'phone_number', phoneNumber);
-      final remoteNewer = await _isRemoteNewerFamily(phoneNumber, localUpdatedAt);
-      if (remoteNewer) {
-        await _markSurveyAsFailed(phoneNumber, ['REMOTE_NEWER']);
-        return;
-      }
-
-      // If this is page 0, perform immediate synchronous upsert so session is created/updated
-      if (page == 0) {
-        try {
-          await _supabaseService.syncFamilyPageToSupabase(phoneNumber, 0, data);
-          await _databaseService.markFamilyPageSynced(phoneNumber, 0);
-        } catch (e) {
-          final errMsg = 'Immediate session sync failed for $phoneNumber: $e';
-          _escalateError(errMsg, persistent: true);
-          await queueSyncOperation('sync_family_page', {
-            'phone_number': phoneNumber,
-            'page': page,
-            'data': data,
-          });
-        }
-        return;
-      }
-
-      // For other pages, schedule a background (non-blocking) sync similar to village flow
       try {
-        _supabaseService.syncFamilyPageToSupabase(phoneNumber, page, data).then((_) async {
-          try {
-            await _databaseService.markFamilyPageSynced(phoneNumber, page);
-          } catch (markErr) {
-            _escalateError('Failed to mark page synced for $phoneNumber page $page: $markErr', persistent: true);
-          }
-        }).catchError((e) async {
-          final errMsg = 'Background page sync failed for family $phoneNumber page $page: $e';
-          _escalateError(errMsg, persistent: true);
-          await queueSyncOperation('sync_family_page', {
-            'phone_number': phoneNumber,
-            'page': page,
-            'data': data,
-          });
-        });
+        await _upsertFamilyPage(phoneNumber, page, data);
+        await _databaseService.markFamilyPageSynced(phoneNumber, page);
       } catch (e) {
-        final errMsg = 'Page sync scheduling failed for family $phoneNumber page $page: $e';
-        _escalateError(errMsg, persistent: true);
-        await queueSyncOperation('sync_family_page', {
-          'phone_number': phoneNumber,
-          'page': page,
-          'data': data,
-        });
+        _escalateError('Family page $page sync failed for $phoneNumber: $e', persistent: true);
+        // fallback: attempt to queue full survey, but guard against schema errors
+        try {
+          final surveyData = await _collectCompleteSurveyData(phoneNumber);
+          await queueSyncOperation('sync_family_survey', {
+            'phone_number': phoneNumber,
+            'data': surveyData,
+          });
+        } catch (e2) {
+          _escalateError('Fallback collect failed for $phoneNumber: $e2', persistent: true);
+        }
       }
     });
   }
@@ -413,180 +634,8 @@ class SyncService {
   Map<String, Map<String, bool>> get tableSyncStatus => _tableSyncStatus;
   SyncProgress? get lastProgress => _lastProgress;
 
-  Map<String, dynamic>? _firstOrNull(List<Map<String, dynamic>> list) {
-    if (list.isEmpty) return null;
-    return Map<String, dynamic>.from(list.first);
-  }
-
   List<String> getErrorsForSurvey(String phoneNumber) =>
       List<String>.from(_syncErrors[phoneNumber] ?? const []);
-
-  Future<Map<String, dynamic>> _collectFamilyPageDataFromDb(String phoneNumber, int page) async {
-    switch (page) {
-      case 27:
-      case 28:
-      case 29:
-        return {
-          'merged_govt_schemes': _firstOrNull(await _databaseService.getData('merged_govt_schemes', phoneNumber)),
-        };
-      case 23:
-        return {
-          'training_data': await _databaseService.getData('training_data', phoneNumber),
-          'shg_members': await _databaseService.getData('shg_members', phoneNumber),
-          'fpo_members': await _databaseService.getData('fpo_members', phoneNumber),
-        };
-      case 6:
-        final irrigation = await _databaseService.getData('irrigation_facilities', phoneNumber);
-        return irrigation.isNotEmpty ? Map<String, dynamic>.from(irrigation.first) : {};
-      case 7:
-        final crops = await _databaseService.getData('crop_productivity', phoneNumber);
-        return {'crops': crops};
-      case 8:
-        final fertilizer = await _databaseService.getData('fertilizer_usage', phoneNumber);
-        return fertilizer.isNotEmpty ? Map<String, dynamic>.from(fertilizer.first) : {};
-      case 9:
-        final animals = await _databaseService.getData('animals', phoneNumber);
-        return {'animals': animals};
-      case 10:
-        final equipment = await _databaseService.getData('agricultural_equipment', phoneNumber);
-        return equipment.isNotEmpty ? Map<String, dynamic>.from(equipment.first) : {};
-      case 11:
-        final entertainment = await _databaseService.getData('entertainment_facilities', phoneNumber);
-        return entertainment.isNotEmpty ? Map<String, dynamic>.from(entertainment.first) : {};
-      case 12:
-        final transport = await _databaseService.getData('transport_facilities', phoneNumber);
-        return transport.isNotEmpty ? Map<String, dynamic>.from(transport.first) : {};
-      case 13:
-        final water = await _databaseService.getData('drinking_water_sources', phoneNumber);
-        return water.isNotEmpty ? Map<String, dynamic>.from(water.first) : {};
-      case 14:
-        final medical = await _databaseService.getData('medical_treatment', phoneNumber);
-        return medical.isNotEmpty ? Map<String, dynamic>.from(medical.first) : {};
-      case 15:
-        final disputes = await _databaseService.getData('disputes', phoneNumber);
-        return disputes.isNotEmpty ? Map<String, dynamic>.from(disputes.first) : {};
-      case 16:
-        final houseConditions = await _databaseService.getData('house_conditions', phoneNumber);
-        final houseFacilities = await _databaseService.getData('house_facilities', phoneNumber);
-        return {
-          'house_conditions': houseConditions.isNotEmpty ? Map<String, dynamic>.from(houseConditions.first) : {},
-          'house_facilities': houseFacilities.isNotEmpty ? Map<String, dynamic>.from(houseFacilities.first) : {},
-        };
-      case 17:
-        final diseases = await _databaseService.getData('diseases', phoneNumber);
-        return {'diseases': diseases};
-      case 18:
-        return {
-          'aadhaar_info': _firstOrNull(await _databaseService.getData('aadhaar_info', phoneNumber)),
-          'aadhaar_scheme_members': await _databaseService.getData('aadhaar_scheme_members', phoneNumber),
-          'ayushman_card': _firstOrNull(await _databaseService.getData('ayushman_card', phoneNumber)),
-          'ayushman_scheme_members': await _databaseService.getData('ayushman_scheme_members', phoneNumber),
-          'family_id': _firstOrNull(await _databaseService.getData('family_id', phoneNumber)),
-          'family_id_scheme_members': await _databaseService.getData('family_id_scheme_members', phoneNumber),
-          'ration_card': _firstOrNull(await _databaseService.getData('ration_card', phoneNumber)),
-          'ration_scheme_members': await _databaseService.getData('ration_scheme_members', phoneNumber),
-          'samagra_id': _firstOrNull(await _databaseService.getData('samagra_id', phoneNumber)),
-          'samagra_scheme_members': await _databaseService.getData('samagra_scheme_members', phoneNumber),
-          'tribal_card': _firstOrNull(await _databaseService.getData('tribal_card', phoneNumber)),
-          'tribal_scheme_members': await _databaseService.getData('tribal_scheme_members', phoneNumber),
-          'handicapped_allowance': _firstOrNull(await _databaseService.getData('handicapped_allowance', phoneNumber)),
-          'handicapped_scheme_members': await _databaseService.getData('handicapped_scheme_members', phoneNumber),
-          'pension_allowance': _firstOrNull(await _databaseService.getData('pension_allowance', phoneNumber)),
-          'pension_scheme_members': await _databaseService.getData('pension_scheme_members', phoneNumber),
-          'widow_allowance': _firstOrNull(await _databaseService.getData('widow_allowance', phoneNumber)),
-          'widow_scheme_members': await _databaseService.getData('widow_scheme_members', phoneNumber),
-          'vb_gram': _firstOrNull(await _databaseService.getData('vb_gram', phoneNumber)),
-          'vb_gram_members': await _databaseService.getData('vb_gram_members', phoneNumber),
-          'pm_kisan_nidhi': _firstOrNull(await _databaseService.getData('pm_kisan_nidhi', phoneNumber)),
-          'pm_kisan_members': await _databaseService.getData('pm_kisan_members', phoneNumber),
-          'merged_govt_schemes': _firstOrNull(await _databaseService.getData('merged_govt_schemes', phoneNumber)),
-        };
-      case 19:
-        final medicines = await _databaseService.getData('folklore_medicine', phoneNumber);
-        return {'folklore_medicine': medicines};
-      case 20:
-        final programmes = await _databaseService.getData('health_programmes', phoneNumber);
-        return programmes.isNotEmpty ? Map<String, dynamic>.from(programmes.first) : {};
-      case 21:
-        return {
-          'children_data': _firstOrNull(await _databaseService.getData('children_data', phoneNumber)),
-          'malnourished_children_data': await _databaseService.getData('malnourished_children_data', phoneNumber),
-          'child_diseases': await _databaseService.getData('child_diseases', phoneNumber),
-        };
-      case 22:
-        final migration = await _databaseService.getData('migration_data', phoneNumber);
-        return migration.isNotEmpty ? Map<String, dynamic>.from(migration.first) : {};
-      case 23:
-        return {
-          'training_data': await _databaseService.getData('training_data', phoneNumber),
-          'shg_members': await _databaseService.getData('shg_members', phoneNumber),
-          'fpo_members': await _databaseService.getData('fpo_members', phoneNumber),
-        };
-      case 24:
-        return {
-          'vb_gram': _firstOrNull(await _databaseService.getData('vb_gram', phoneNumber)),
-          'vb_gram_members': await _databaseService.getData('vb_gram_members', phoneNumber),
-        };
-      case 25:
-        return {
-          'pm_kisan_nidhi': _firstOrNull(await _databaseService.getData('pm_kisan_nidhi', phoneNumber)),
-          'pm_kisan_members': await _databaseService.getData('pm_kisan_members', phoneNumber),
-        };
-      case 26:
-        return {
-          'pm_kisan_samman_nidhi': _firstOrNull(await _databaseService.getData('pm_kisan_samman_nidhi', phoneNumber)),
-          'pm_kisan_samman_members': await _databaseService.getData('pm_kisan_samman_members', phoneNumber),
-        };
-      case 27:
-      case 28:
-      case 29:
-        return {
-          'merged_govt_schemes': _firstOrNull(await _databaseService.getData('merged_govt_schemes', phoneNumber)),
-        };
-      case 30:
-        return {'bank_accounts': await _databaseService.getData('bank_accounts', phoneNumber)};
-      default:
-        return {};
-    }
-  }
-
-  Future<Map<String, dynamic>> _collectVillagePageDataFromDb(String sessionId, int page) async {
-    switch (page) {
-      case 0:
-        return await _databaseService.getVillageSurveySession(sessionId) ?? {};
-      case 1:
-        return _firstOrNull(await _databaseService.getVillageData('village_infrastructure', sessionId)) ?? {};
-      case 2:
-        return _firstOrNull(await _databaseService.getVillageData('village_infrastructure_details', sessionId)) ?? {};
-      case 3:
-        return _firstOrNull(await _databaseService.getVillageData('village_educational_facilities', sessionId)) ?? {};
-      case 4:
-        return _firstOrNull(await _databaseService.getVillageData('village_drainage_waste', sessionId)) ?? {};
-      case 5:
-        return _firstOrNull(await _databaseService.getVillageData('village_irrigation_facilities', sessionId)) ?? {};
-      case 6:
-        return _firstOrNull(await _databaseService.getVillageData('village_seed_clubs', sessionId)) ?? {};
-      case 7:
-        return _firstOrNull(await _databaseService.getVillageData('village_signboards', sessionId)) ?? {};
-      case 8:
-        return _firstOrNull(await _databaseService.getVillageData('village_social_maps', sessionId)) ?? {};
-      case 9:
-        return _firstOrNull(await _databaseService.getVillageData('village_survey_details', sessionId)) ?? {};
-      case 10:
-        final points = await _databaseService.getVillageData('village_map_points', sessionId);
-        return {'map_points': points};
-      case 11:
-        return _firstOrNull(await _databaseService.getVillageData('village_forest_maps', sessionId)) ?? {};
-      case 12:
-        return _firstOrNull(await _databaseService.getVillageData('village_biodiversity_register', sessionId)) ?? {};
-      case 13:
-        return _firstOrNull(await _databaseService.getVillageData('village_cadastral_maps', sessionId)) ?? {};
-      case 14:
-        return _firstOrNull(await _databaseService.getVillageData('village_transport_facilities', sessionId)) ?? {};
-      default:
-        return {};
-    }
-  }
 
   Future<List<Map<String, dynamic>>> _getPendingSurveys() async {
     try {
@@ -614,67 +663,8 @@ class SyncService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _getPendingVillageSurveys() async {
-    try {
-      final allSurveys = await _databaseService.getAllVillageSurveySessions();
-      
-      return allSurveys.where((survey) {
-        final sessionId = survey['session_id']?.toString();
-        // 1. Must have a valid primary key (session_id)
-        if (sessionId == null || sessionId.isEmpty) {
-          return false;
-        }
 
-        final status = survey['status']?.toString();
-        final syncPending = survey['sync_pending'] == 1;
-        final syncStatus = survey['sync_status']?.toString();
 
-        // Only full-sync completed surveys. Pending pages are handled separately.
-        if (syncPending) return false;
-        if (syncStatus == 'synced') return false;
-        return status == 'completed' || status == 'exported';
-      }).toList();
-    } catch (e) {
-      _escalateError('Error getting pending village surveys: $e', persistent: true);
-      return [];
-    }
-  }
-
-  Future<bool> _checkSurveyExistsInSupabase(String phoneNumber) async {
-    _ensureConnectivityMonitoringInitialized();
-    if (!_isOnline) return false;
-
-    try {
-      final response = await _supabaseService.client
-          .from('family_survey_sessions')
-          .select('phone_number')
-          .eq('phone_number', int.tryParse(phoneNumber) ?? phoneNumber)
-          .limit(1);
-
-      return response.isNotEmpty;
-    } catch (e) {
-      _escalateError('Error checking survey existence in Supabase: $e');
-      return false;
-    }
-  }
-
-  Future<bool> _checkVillageSurveyExistsInSupabase(String sessionId) async {
-    _ensureConnectivityMonitoringInitialized();
-    if (!_isOnline) return false;
-
-    try {
-      final response = await _supabaseService.client
-          .from('village_survey_sessions')
-          .select('session_id')
-          .eq('session_id', sessionId)
-          .limit(1);
-
-      return response.isNotEmpty;
-    } catch (e) {
-      _escalateError('Error checking village survey existence in Supabase: $e');
-      return false;
-    }
-  }
 
   Future<void> _syncVillageSurveyToSupabase(Map<String, dynamic> survey) async {
     _ensureConnectivityMonitoringInitialized();
@@ -690,15 +680,9 @@ class SyncService {
       ));
 
       if (_supabaseService.currentUser == null) {
-        final msg = 'Not authenticated. Skipping village sync.';
-        _escalateError(msg, persistent: true);
-        _emitProgress(SyncProgress(
-          stage: 'village_sync',
-          surveyId: sessionId?.toString(),
-          message: msg,
-          isError: true,
-        ));
-        return;
+        final msg = 'No authenticated user; proceeding with anon key for village sync';
+        debugPrint('[SyncService] $msg');
+        // continue without returning
       }
 
       final schemaIssues = await _checkSchemaWithCache(_requiredVillageTables, 'village');
@@ -753,28 +737,117 @@ class SyncService {
       // Mark as synced locally
       await _markVillageSurveyAsSynced(sessionId);
 
-      debugPrint('✓ Successfully synced village survey: $sessionId');
-      _emitProgress(SyncProgress(
-        stage: 'village_sync',
-        surveyId: sessionId?.toString(),
-        message: 'Village survey synced successfully',
-      ));
-
+      // finished
       } catch (e) {
-        _escalateError('✗ Failed to sync village survey ${survey['session_id']}: $e', persistent: true);
+        _escalateError('Error during village sync: $e', persistent: true);
+      }
+    });
+  }
+
+  // -----------------------------------------------------------------------
+  // Family survey generic sync follows the same pattern as village
+  Future<void> syncFamilySurveyToSupabase(String phoneNumber) async {
+    _ensureConnectivityMonitoringInitialized();
+    try {
+      final survey = await _databaseService.getSurveySession(phoneNumber);
+      if (survey == null) {
+        _escalateError('Survey not found for phoneNumber: $phoneNumber', persistent: true);
+        return;
+      }
+
+      if (!_isOnline) {
+        await queueSyncOperation('sync_family_survey', survey);
+        return;
+      }
+
+      await _syncFamilySurveyToSupabase(survey);
+    } catch (e) {
+      _escalateError('Error syncing family survey: $e', persistent: true);
+    }
+  }
+
+  Future<void> _syncFamilySurveyToSupabase(Map<String, dynamic> survey) async {
+    _ensureConnectivityMonitoringInitialized();
+    if (!_isOnline) return;
+    final phone = survey['phone_number']?.toString();
+    await _withSyncLock('family:$phone', () async {
+      try {
         _emitProgress(SyncProgress(
-          stage: 'village_sync',
-          surveyId: survey['session_id']?.toString(),
-          message: 'Village sync failed: $e',
-          isError: true,
+          stage: 'family_sync',
+          surveyId: phone,
+          message: 'Preparing family survey for sync',
         ));
-        await queueSyncOperation('sync_village_survey', survey); 
+
+        if (_supabaseService.currentUser == null) {
+          final msg = 'No authenticated user; proceeding with anon key';
+          debugPrint('[SyncService] $msg');
+          // we do not return; allow sync to continue using anon access
+        }
+
+        final schemaIssues = await _checkSchemaWithCache(_requiredFamilyTables, 'family');
+        if (schemaIssues.isNotEmpty) {
+          final msg = 'Supabase schema issues found. Skipping family sync.';
+          _escalateError(msg + ': ' + schemaIssues.toString(), persistent: true);
+          _emitProgress(SyncProgress(
+            stage: 'family_sync',
+            surveyId: phone,
+            message: 'Schema validation failed for family tables',
+            isError: true,
+          ));
+          return;
+        }
+
+        // ensure local record still exists
+        final localSession = await _databaseService.getSurveySession(phone!);
+        if (localSession == null) {
+          _escalateError('⚠ Family survey $phone not found locally. Skipping cloud sync.', persistent: true);
+          return;
+        }
+
+        _emitProgress(SyncProgress(
+          stage: 'family_sync',
+          surveyId: phone,
+          message: 'Collecting family survey data',
+        ));
+        final surveyData = await _collectCompleteSurveyData(phone);
+
+        if (surveyData.isEmpty || surveyData['phone_number'] == null) {
+          _escalateError('✗ Family survey data incomplete for $phone. Not syncing.', persistent: true);
+          return;
+        }
+
+        final localUpdatedAt = survey['updated_at']?.toString();
+        final remoteNewer = await _isRemoteNewerFamily(phone, localUpdatedAt);
+        if (remoteNewer) {
+          await _markSurveyAsFailed(phone, ['REMOTE_NEWER']);
+          return;
+        }
+
+        _emitProgress(SyncProgress(
+          stage: 'family_sync',
+          surveyId: phone,
+          message: 'Syncing family survey tables',
+        ));
+        final success = await _supabaseService.syncFamilySurveyToSupabase(phone, surveyData);
+        if (!success) {
+          await _markSurveyAsFailed(phone, ['SYNC_FAILURE']);
+          _escalateError('Family survey sync returned false for $phone', persistent: true);
+          return;
+        }
+
+        await _markFamilySurveyAsSynced(phone);
+      } catch (e) {
+        _escalateError('Error during family sync: $e', persistent: true);
       }
     });
   }
 
   Future<void> _markVillageSurveyAsSynced(String sessionId) async {
     await _databaseService.updateVillageSurveySyncStatus(sessionId, 'synced');
+  }
+
+  Future<void> _markFamilySurveyAsSynced(String phoneNumber) async {
+    await _databaseService.updateSurveyStatus(phoneNumber, 'synced');
   }
 
   Future<Map<String, dynamic>> _collectCompleteVillageSurveyData(String sessionId) async {
@@ -870,7 +943,7 @@ class SyncService {
       surveyData.addAll(sessionData);
     }
 
-    // Get all related data
+    // Get all related data (failures for individual tables are caught)
     final dataMappings = {
       'family_members': 'family_members',
       'land_holding': 'land_holding',
@@ -896,6 +969,7 @@ class SyncService {
       'malnutrition_data': 'malnutrition_data',
       'migration_data': 'migration_data',
       'training_data': 'training_data',
+      'training_needs': 'training_needs',
       'shg_members': 'shg_members',
       'fpo_members': 'fpo_members',
       'bank_accounts': 'bank_accounts',
@@ -904,171 +978,24 @@ class SyncService {
     };
 
     for (final entry in dataMappings.entries) {
-      final data = await _databaseService.getData(entry.key, phoneNumber);
-      if (data.isNotEmpty) {
-        surveyData[entry.value] = data;
+      try {
+        final data = await _databaseService.getData(entry.key, phoneNumber);
+        if (data.isNotEmpty) {
+          surveyData[entry.value] = data;
+        }
+      } catch (e) {
+        _escalateError('Failed to read ${entry.key} for $phoneNumber: $e');
       }
     }
 
-    // Get government schemes data
-    final governmentSchemes = await _collectGovernmentSchemesData(phoneNumber);
+    // Get government schemes data (tracked for errors)
+    final governmentSchemes = await _collectGovernmentSchemesDataWithTracking(phoneNumber);
     surveyData.addAll(governmentSchemes);
 
     return surveyData;
   }
 
-  Future<Map<String, dynamic>> _collectGovernmentSchemesData(String phoneNumber) async {
-    final schemesData = <String, dynamic>{};
 
-    final schemeInfoTables = <String>{
-      'aadhaar_info',
-      'ayushman_card',
-      'family_id',
-      'ration_card',
-      'samagra_id',
-      'tribal_card',
-      'handicapped_allowance',
-      'pension_allowance',
-      'widow_allowance',
-      'vb_gram',
-      'pm_kisan_nidhi',
-      'pm_kisan_samman_nidhi',
-      'merged_govt_schemes',
-    };
-
-    final schemeTables = [
-      'aadhaar_info', 'aadhaar_scheme_members',
-      'ayushman_card', 'ayushman_scheme_members',
-      'family_id', 'family_id_scheme_members',
-      'ration_card', 'ration_scheme_members',
-      'samagra_id', 'samagra_scheme_members',
-      'tribal_card', 'tribal_scheme_members',
-      'handicapped_allowance', 'handicapped_scheme_members',
-      'pension_allowance', 'pension_scheme_members',
-      'widow_allowance', 'widow_scheme_members',
-      'vb_gram',
-      'vb_gram_members',
-      'pm_kisan_nidhi',
-      'pm_kisan_members',
-      'pm_kisan_samman_nidhi',
-      'pm_kisan_samman_members',
-      'merged_govt_schemes', // Merged table for small schemes
-    ];
-
-    for (final table in schemeTables) {
-      final data = await _databaseService.getData(table, phoneNumber);
-      if (data.isNotEmpty) {
-        if (schemeInfoTables.contains(table)) {
-          schemesData[table] = data.first;
-        } else {
-          schemesData[table] = data;
-        }
-      }
-    }
-
-    return schemesData;
-  }
-
-  /// Collect survey data with error tracking
-  Future<Map<String, dynamic>> _collectCompleteSurveyDataWithTracking(String phoneNumber) async {
-    final surveyData = <String, dynamic>{};
-    _syncErrors.putIfAbsent(phoneNumber, () => <String>[]);
-    final errors = _syncErrors[phoneNumber]!;
-
-    // Get session data
-    try {
-      final sessionData = await _databaseService.getSurveySession(phoneNumber);
-      if (sessionData != null) {
-        surveyData.addAll(sessionData);
-      } else {
-        errors.add('Session data not found');
-      }
-    } catch (e) {
-      errors.add('Failed to fetch session data: $e');
-    }
-
-    // Get all related data
-    final singleRowTables = <String>{
-      'land_holding',
-      'irrigation_facilities',
-      'fertilizer_usage',
-      'agricultural_equipment',
-      'entertainment_facilities',
-      'transport_facilities',
-      'drinking_water_sources',
-      'medical_treatment',
-      'disputes',
-      'house_conditions',
-      'house_facilities',
-      'social_consciousness',
-      'children_data',
-      'health_programmes',
-      'migration_data',
-      'tribal_questions',
-      'tulsi_plants',
-      'nutritional_garden',
-    };
-
-    final dataMappings = {
-      'family_members': 'family_members',
-      'land_holding': 'land_holding',
-      'irrigation_facilities': 'irrigation_facilities',
-      'crop_productivity': 'crop_productivity',
-      'fertilizer_usage': 'fertilizer_usage',
-      'animals': 'animals',
-      'agricultural_equipment': 'agricultural_equipment',
-      'entertainment_facilities': 'entertainment_facilities',
-      'transport_facilities': 'transport_facilities',
-      'drinking_water_sources': 'drinking_water_sources',
-      'medical_treatment': 'medical_treatment',
-      'disputes': 'disputes',
-      'house_conditions': 'house_conditions',
-      'house_facilities': 'house_facilities',
-      'diseases': 'diseases',
-      'social_consciousness': 'social_consciousness',
-      'children_data': 'children_data',
-      'malnourished_children_data': 'malnourished_children_data',
-      'child_diseases': 'child_diseases',
-      'folklore_medicine': 'folklore_medicine',
-      'health_programmes': 'health_programmes',
-      'malnutrition_data': 'malnutrition_data',
-      'migration_data': 'migration_data',
-      'training_data': 'training_data',
-      'shg_members': 'shg_members',
-      'fpo_members': 'fpo_members',
-      'bank_accounts': 'bank_accounts',
-      'tribal_questions': 'tribal_questions',
-      'tulsi_plants': 'tulsi_plants',
-      'nutritional_garden': 'nutritional_garden',
-    };
-
-    for (final entry in dataMappings.entries) {
-      try {
-        final data = await _databaseService.getData(entry.key, phoneNumber);
-        if (data.isNotEmpty) {
-          if (singleRowTables.contains(entry.key)) {
-            surveyData[entry.value] = data.first;
-          } else {
-            surveyData[entry.value] = data;
-          }
-        }
-      } catch (e) {
-        errors.add('Failed to fetch ${entry.key}: $e');
-        _escalateError('⚠ Could not fetch ${entry.key} for $phoneNumber: $e');
-      }
-    }
-
-    // Get government schemes data with tracking
-    try {
-      final governmentSchemes = await _collectGovernmentSchemesDataWithTracking(phoneNumber);
-      surveyData.addAll(governmentSchemes);
-    } catch (e) {
-      errors.add('Failed to fetch government schemes: $e');
-      _escalateError('⚠ Could not fetch government schemes for $phoneNumber: $e');
-    }
-
-    return surveyData;
-  }
 
   /// Collect government schemes with error tracking
   Future<Map<String, dynamic>> _collectGovernmentSchemesDataWithTracking(String phoneNumber) async {
@@ -1130,49 +1057,7 @@ class SyncService {
     return schemesData;
   }
 
-  /// Validate survey data completeness before sync
-  List<String> _validateSurveyCompleteness(Map<String, dynamic> surveyData) {
-    final errors = <String>[];
 
-    // Check critical fields in session data
-    if (surveyData['village_name'] == null || surveyData['village_name'].toString().isEmpty) {
-      errors.add('Missing village_name');
-    }
-    if (surveyData['district'] == null || surveyData['district'].toString().isEmpty) {
-      errors.add('Missing district');
-    }
-    if (surveyData['surveyor_email'] == null || surveyData['surveyor_email'].toString().isEmpty) {
-      errors.add('Missing surveyor_email');
-    }
-
-    // Check for family members (required for family survey)
-    if (surveyData['family_members'] == null || 
-        (surveyData['family_members'] as List).isEmpty) {
-      errors.add('Missing family_members data');
-    }
-
-    // Warn about missing optional but important tables
-    final importantTables = [
-      'land_holding',
-      'house_conditions',
-      'social_consciousness',
-    ];
-
-    for (final table in importantTables) {
-      if (surveyData[table] == null) {
-        errors.add('Missing optional but important table: $table');
-      }
-    }
-
-    return errors;
-  }
-
-  bool _isCriticalValidationError(String error) {
-    return error.startsWith('Missing village_name') ||
-        error.startsWith('Missing district') ||
-        error.startsWith('Missing surveyor_email') ||
-        error.startsWith('Missing family_members');
-  }
 
   /// Mark survey as failed with failed tables list
   Future<void> _markSurveyAsFailed(String phoneNumber, List<String> failedTables) async {
@@ -1194,48 +1079,26 @@ class SyncService {
     }
   }
 
-  Future<void> _markSurveyAsSynced(String phoneNumber) async {
-    await _databaseService.updateSurveySyncStatus(phoneNumber, 'synced');
-  }
 
 
 
-  Future<void> _updateSyncMetadata(String phoneNumber, Map<String, dynamic> surveyData) async {
-    try {
-      // Store sync metadata locally
-      final metadata = {
-        'phone_number': phoneNumber,
-        'last_sync_attempt': DateTime.now().toIso8601String(),
-        'data_hash': _calculateDataHash(surveyData),
-        'sync_version': 1,
-      };
 
-      await _databaseService.saveData('sync_metadata', metadata);
-    } catch (e) {
-      _escalateError('Error updating sync metadata: $e');
-    }
-  }
 
-  String _calculateDataHash(Map<String, dynamic> data) {
-    // Simple hash calculation for data integrity checking
-    final jsonString = jsonEncode(data);
-    var hash = 0;
-    for (var i = 0; i < jsonString.length; i++) {
-      final char = jsonString.codeUnitAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return hash.toString();
-  }
-
-  // Queue operations for when network returns
-  Future<void> queueSyncOperation(String operation, Map<String, dynamic> data) async {
-    _syncQueue.add({
+  // Queue operations for when network returns. Pass `highPriority: true` to
+  // insert the operation at the front of the queue so it runs before others.
+  Future<void> queueSyncOperation(String operation, Map<String, dynamic> data, {bool highPriority = false}) async {
+    final entry = {
       'operation': operation,
       'data': data,
       'timestamp': DateTime.now().toIso8601String(),
       'retry_count': 0,
-    });
+    };
+
+    if (highPriority) {
+      _syncQueue.insert(0, entry);
+    } else {
+      _syncQueue.add(entry);
+    }
 
     // Save queue to persistent storage
     await _saveSyncQueue();
@@ -1315,8 +1178,27 @@ class SyncService {
       case 'update_survey_data':
         await syncFamilyPageData(data['phone_number'], data['page'] ?? -1, data['data'] ?? {});
         break;
+      case 'sync_family_survey':
+        await _syncFamilySurveyToSupabase(data);
+        break;
       case 'sync_family_page':
-        await syncFamilyPageData(data['phone_number'], data['page'] ?? -1, data['data'] ?? {});
+        final phone = data['phone_number']?.toString() ?? '';
+        final page = data['page'] is int ? data['page'] as int : -1;
+        final pageData = data['data'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(data['data'])
+            : <String, dynamic>{};
+        if (phone.isNotEmpty && page >= 0) {
+          await _upsertFamilyPage(phone, page, pageData);
+        }
+        break;
+      case 'ensure_family_session':
+        final phone = data['phone_number']?.toString() ?? '';
+        final extra = data['extra'] is Map<String, dynamic> ? Map<String, dynamic>.from(data['extra']) : null;
+        if (phone.isNotEmpty) {
+          // Only attempt when online and authenticated; ensureFamilySessionExists will
+          // queue again if conditions aren't met.
+          await _supabaseService.ensureFamilySessionExists(phone, extra: extra);
+        }
         break;
       case 'sync_village_page':
         await syncVillagePageData(data['session_id'], data['page'] ?? -1, data['data'] ?? {});
@@ -1443,8 +1325,10 @@ class SyncService {
   // Get current queue status
   List<Map<String, dynamic>> get syncQueue => List.unmodifiable(_syncQueue);
 
-  /// Sync all pending pages for all families with progress tracking
-  /// Returns progress updates showing "x/y pages synced"
+  /// Synchronize all pending family surveys to Supabase.  The previous
+  /// implementation synced individual pages; the new protocol uploads the
+  /// entire survey in one shot. Progress callbacks count surveys rather than
+  /// pages.
   Future<void> syncAllPendingPages({
     Function(int, int)? onProgress, // (syncedCount, totalCount)
     Function(String)? onError,
@@ -1455,139 +1339,35 @@ class SyncService {
       return;
     }
 
-    // Check authentication
     if (_supabaseService.currentUser == null) {
-      onError?.call('Authentication required. Please sign in with Google to sync data.');
-      throw Exception('Authentication required for syncing. Please sign in first.');
+      onError?.call('Authentication required. Please sign in before syncing.');
+      throw Exception('Authentication required for syncing.');
     }
 
     try {
-      // Get all pending pages
-      final pendingPages = await _databaseService.getAllPendingPages();
-      
-      // Collect actual page data for each pending page
-      final pagesWithData = <Map<String, dynamic>>[];
-      for (final pageInfo in pendingPages) {
-        final phoneNumber = pageInfo['phone_number'] as String;
-        final page = pageInfo['page'] as int;
-        
-        final pageData = await _collectFamilyPageDataFromDb(phoneNumber, page);
-        if (pageData.isNotEmpty) {
-          pagesWithData.add({
-            'phone_number': phoneNumber,
-            'page': page,
-            'data': pageData,
-          });
-        }
-      }
-      if (pendingPages.isEmpty) {
-        onProgress?.call(0, 0); // No pages to sync
-        return;
-      }
-
-      final totalPages = pagesWithData.length;
+      final pendingSurveys = await _getPendingSurveys();
+      final total = pendingSurveys.length;
       int syncedCount = 0;
 
-      // Group pages by phone number for batch processing
-      final pagesByPhone = <String, List<Map<String, dynamic>>>{};
-      for (final page in pagesWithData) {
-        final phoneNumber = page['phone_number'] as String;
-        pagesByPhone.putIfAbsent(phoneNumber, () => []).add(page);
-      }
-
-      // Process each family's pages in batches
-      for (final entry in pagesByPhone.entries) {
-        final phoneNumber = entry.key;
-        final familyPages = entry.value;
-
+      for (final survey in pendingSurveys) {
+        final phone = survey['phone_number']?.toString();
+        if (phone == null || phone.isEmpty) continue;
         try {
-          await syncPageBatch(phoneNumber, familyPages, onPageSynced: (page, result) {
-            final Map<String, dynamic> r = result is Map ? Map<String, dynamic>.from(result) : {};
-            final ok = r['success'] == true;
-            if (ok) {
-              syncedCount++;
-              onProgress?.call(syncedCount, totalPages);
-            } else {
-              onError?.call('Failed to sync page $page for $phoneNumber: ${r['error'] ?? 'unknown'}');
-            }
-          });
+          await syncFamilySurveyToSupabase(phone);
+          syncedCount++;
+          onProgress?.call(syncedCount, total);
         } catch (e) {
-          onError?.call('Failed to sync pages for $phoneNumber: $e');
+          onError?.call('Failed to sync survey $phone: $e');
         }
       }
-
     } catch (e) {
       onError?.call('Sync failed: $e');
       rethrow;
     }
   }
 
-  /// Sync a batch of pages for a specific family
-  Future<void> syncPageBatch(
-    String phoneNumber,
-    List<Map<String, dynamic>> pageDataList, {
-    Function(int, dynamic)? onPageSynced,
-  }) async {
-    // Check if pages actually need syncing (delta sync)
-    final pagesToSync = <Map<String, dynamic>>[];
-    for (final pageData in pageDataList) {
-      final page = pageData['page'] as int;
-      final data = pageData['data'] as Map<String, dynamic>;
 
-      if (await _pageNeedsSync(phoneNumber, page, data)) {
-        pagesToSync.add(pageData);
-      }
-    }
 
-    if (pagesToSync.isEmpty) {
-      return; // All pages are up to date
-    }
-
-    // Perform batch sync
-    final results = await _supabaseService.syncPageBatch(
-      phoneNumber,
-      pagesToSync,
-      onPageSynced: onPageSynced,
-    );
-
-    // Update local sync status
-    for (final entry in results.entries) {
-      final page = entry.key as int;
-      final Map<String, dynamic> resultMap = entry.value is Map ? Map<String, dynamic>.from(entry.value as Map) : {};
-      final success = resultMap['success'] == true;
-
-      if (success) {
-        await _databaseService.updatePageSyncStatus(phoneNumber, page, 'synced');
-        await _databaseService.updatePageLastSyncedAt(phoneNumber, page);
-        final pageData = pageDataList.firstWhere((p) => (p['page'] is int ? p['page'] as int : int.tryParse(p['page'].toString()) ?? -1) == page)['data'];
-        await _databaseService.updatePageDataHash(phoneNumber, page, _calculateDataHash(pageData));
-      } else {
-        await _databaseService.updatePageSyncStatus(phoneNumber, page, 'failed');
-      }
-    }
-  }
-
-  /// Check if a page needs syncing based on data hash comparison
-  Future<bool> _pageNeedsSync(String phoneNumber, int page, Map<String, dynamic> data) async {
-    final currentHash = await _databaseService.getPageDataHash(phoneNumber, page);
-    final newHash = _calculateDataHash(data);
-
-    return currentHash != newHash;
-  }
-
-  /// Get sync progress summary
-  Future<Map<String, dynamic>> getSyncProgressSummary() async {
-    final totalPages = await _databaseService.getTotalPagesCount();
-    final syncedPages = await _databaseService.getTotalSyncedPagesCount();
-    final pendingPages = await _databaseService.getAllPendingPages().then((pages) => pages.length);
-
-    return {
-      'total_pages': totalPages,
-      'synced_pages': syncedPages,
-      'pending_pages': pendingPages,
-      'progress_percentage': totalPages > 0 ? (syncedPages / totalPages * 100).round() : 0,
-    };
-  }
 
   // Cleanup
   void dispose() {

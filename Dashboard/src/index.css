@@ -1,0 +1,109 @@
+:root{
+  --bg-body: #f8fafc;
+  --card: #ffffff;
+  --muted: #6b7280;
+  --fg: #0f1724;
+  --accent-1: #34d399;
+  --accent-2: #60a5fa;
+  --muted-2: rgba(15,23,36,0.06);
+  --glass: rgba(15,23,36,0.04);
+}
+
+/* App shell */
+html,body,#root{
+  height:100%;
+  margin:0;
+  background: var(--bg-body);
+  color:var(--fg);
+  font-family: Inter, Roboto, Arial, sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+/* Papers / Cards */
+.MuiPaper-root {
+  background: var(--card) !important;
+  border: 1px solid var(--muted-2) !important;
+  box-shadow: 0 6px 18px rgba(15,23,36,0.06) !important;
+  color:var(--fg) !important;
+}
+
+/* Headings & small text */
+h1,h2,h3,h4,h5,h6 { color:var(--fg); margin:0; }
+caption, .MuiTypography-caption { color:var(--muted); }
+
+/* Tabs / controls */
+.MuiTabs-root .MuiTab-root {
+  color:var(--muted);
+  text-transform:none;
+  font-weight:600;
+}
+.MuiTabs-root .Mui-selected { color:var(--accent-1) !important; }
+
+/* DataGrid styling (light, shadcn-like) */
+.MuiDataGrid-root {
+  background: transparent !important;
+  color:var(--fg);
+  border: none !important;
+  font-size:13px;
+}
+.MuiDataGrid-columnHeaders {
+  background: linear-gradient(180deg, #f1f5f9, #ffffff) !important;
+  color:var(--fg) !important;
+  border-bottom: 1px solid var(--muted-2) !important;
+  font-weight:700;
+}
+.MuiDataGrid-cell {
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+}
+.MuiDataGrid-row:hover {
+  background: #f8fafc !important;
+}
+.MuiDataGrid-virtualScroller {
+  background: transparent !important;
+}
+
+/* Toolbar */
+.MuiDataGrid-toolbarContainer {
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+/* Buttons (fallback for inline buttons) */
+button {
+  font-family: inherit;
+  color:var(--fg);
+  background: #ffffff;
+  border: 1px solid var(--muted-2);
+  padding:6px 10px;
+  border-radius:8px;
+  cursor:pointer;
+  box-shadow: 0 2px 8px rgba(15,23,36,0.04);
+}
+button.primary {
+  background: linear-gradient(90deg,var(--accent-1),var(--accent-2));
+  color: white;
+  border: none;
+}
+button:active { transform: translateY(1px); }
+
+/* Dialog content background */
+.MuiDialog-paper {
+  background: var(--card) !important;
+  border: 1px solid var(--muted-2) !important;
+  box-shadow: 0 12px 40px rgba(15,23,36,0.08) !important;
+}
+
+/* Inputs */
+.MuiOutlinedInput-root {
+  background: #ffffff;
+  color:var(--fg);
+  border-radius:8px;
+  border: 1px solid var(--muted-2);
+}
+.MuiOutlinedInput-input { color:var(--fg); }
+
+/* Utility */
+.center { display:flex; align-items:center; justify-content:center; }
+.hidden { display:none !important; }

@@ -101,17 +101,20 @@ class SurveyNotifier extends Notifier<SurveyState> {
           'status': 'in_progress',
           'updated_at': DateTime.now().toIso8601String(),
         };
+        if (sessionPayload['surveyor_email'] == null || sessionPayload['surveyor_email'].toString().isEmpty) {
+          sessionPayload['surveyor_email'] = 'unknown';
+        }
 
         await _databaseService.saveData('family_survey_sessions', sessionPayload);
         await _syncService.syncFamilyPageData(effectivePhone, 0, pageData);
         await _updatePageCompletionStatus(0, true);
-        debugPrint('Successfully upserted session for page 0 (phone: $effectivePhone)');
+        debugPrint('Started family session upsert for page 0 (phone: $effectivePhone) — result will be reported by SyncService');
       } else {
         // All other pages: save and sync immediately. Use effectivePhone as FK for child tables.
         await _savePageDataToDatabase(state.currentPage, pageData, effectivePhone);
         await _updatePageCompletionStatus(state.currentPage, true);
         await _syncService.syncFamilyPageData(effectivePhone, state.currentPage, pageData);
-        debugPrint('Successfully saved and synced data for page ${state.currentPage} (phone: $effectivePhone)');
+        debugPrint('Saved page ${state.currentPage} locally and started cloud sync for phone: $effectivePhone');
       }
     } catch (e) {
       debugPrint('Error saving page data: $e');
@@ -1078,10 +1081,11 @@ class SurveyNotifier extends Notifier<SurveyState> {
               });
             }
           } catch (e) {
-            // Queue via generic SyncService as a fallback
-            await _syncService.queueSyncOperation('sync_session', {
+            // Queue via generic SyncService as a fallback.  `sync_family_survey`
+            // knows how to pull a record from the local database using the
+            // phone number, so we only need to enqueue the key.
+            await _syncService.queueSyncOperation('sync_family_survey', {
               'phone_number': phone,
-              'data': {'surveyor_email': userEmail},
             });
           }
         }
@@ -1143,6 +1147,11 @@ class SurveyNotifier extends Notifier<SurveyState> {
     );
 
     debugPrint('Survey initialized for phone number: $phoneNumber');
+
+    // NOTE: previous versions attempted a background sync here.  The high‑level
+    // network logic is now handled explicitly by SurveyScreen.onNext so that we
+    // can perform step‑by‑step uploads (phone-only then full payload) and avoid
+    // RLS recursion issues.
   }
 }
 
