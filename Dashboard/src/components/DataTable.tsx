@@ -16,7 +16,9 @@ type Props = {
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   onSortModelChange?: (model: GridSortModel) => void;
-  onAction?: (action: "view" | "export", row: any) => void;
+  onAction?: (action: "view" | string, row: any) => void | Promise<void>;
+  /** label for the secondary action button, defaults to "Export" */
+  secondActionLabel?: string;
 };
 
 export default function DataTable({
@@ -31,6 +33,7 @@ export default function DataTable({
   onPageSizeChange,
   onSortModelChange,
   onAction,
+  secondActionLabel,
 }: Props) {
   const gridColumns: GridColDef[] = columns.map((c) => ({
     field: c,
@@ -86,7 +89,7 @@ export default function DataTable({
               cursor: "pointer",
             }}
           >
-            Export
+            {secondActionLabel ?? "Export"}
           </button>
         </Box>
       );
@@ -94,6 +97,10 @@ export default function DataTable({
   });
 
   const rows: GridRowsProp = data.map((r, i) => ({ id: r.id ?? r.session_id ?? r.phone_number ?? i, ...r }));
+
+  // server pagination expects a total row count; if caller didn't provide one
+  // just use the length of the array so the rows are visible locally.
+  const effectiveRowCount = rowCount !== undefined ? rowCount : data.length;
 
   const NoRowsOverlay = () => (
     <Box sx={{ py: 6, textAlign: "center" }}>
@@ -111,7 +118,7 @@ export default function DataTable({
         pagination
         paginationMode="server"
         sortingMode="server"
-        rowCount={rowCount}
+        rowCount={effectiveRowCount}
         pageSizeOptions={[10, 25, 50]}
         paginationModel={{ page, pageSize }}
         onPaginationModelChange={(model) => {
@@ -138,6 +145,8 @@ export default function DataTable({
             zIndex: 1,
           },
           ".MuiDataGrid-cell": { borderBottom: "1px solid #eef2f7", color: "var(--fg)" },
+          // sometimes cells inherit unexpected color; enforce on inner content too
+          ".MuiDataGrid-cellContent": { color: "var(--fg) !important" },
           ".MuiDataGrid-row:hover": { background: "#f8fafc" },
           ".MuiDataGrid-virtualScroller": { background: "transparent" },
           ".MuiDataGrid-viewport": { position: "relative" },

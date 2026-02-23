@@ -106,7 +106,14 @@ class SurveyNotifier extends Notifier<SurveyState> {
         }
 
         await _databaseService.saveData('family_survey_sessions', sessionPayload);
-        await _syncService.syncFamilyPageData(effectivePhone, 0, pageData);
+        // send the full session payload for page 0 so remote receives the
+        // complete session shape (includes surveyor_email, surveyor_name, etc)
+        try {
+          await _syncService.syncFamilyPageData(effectivePhone, 0, sessionPayload);
+        } catch (e, st) {
+          debugPrint('syncFamilyPageData(page=0) failed for $effectivePhone: $e');
+          debugPrint(st.toString());
+        }
         await _updatePageCompletionStatus(0, true);
         debugPrint('Started family session upsert for page 0 (phone: $effectivePhone) — result will be reported by SyncService');
       } else {

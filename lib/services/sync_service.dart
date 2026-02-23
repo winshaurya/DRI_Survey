@@ -7,10 +7,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'database_service.dart';
 import 'supabase_service.dart';
 
-class SyncProgress {
-  final String stage;
+        debugPrint('[SyncService] _upsertFamilyPage start phone=$phoneNumber page=$page; dataKeys=${data.keys}');
+        await _upsertFamilyPage(phoneNumber, page, data);
+        await _databaseService.markFamilyPageSynced(phoneNumber, page);
+        debugPrint('[SyncService] _upsertFamilyPage completed phone=$phoneNumber page=$page');
   final String? surveyId;
-  final String? table;
+        debugPrint('[SyncService] _upsertFamilyPage error for $phoneNumber page=$page: $e');
+        _escalateError('Family page $page sync failed for $phoneNumber: $e', persistent: true);
   final int? current;
   final int? total;
   final String? message;
@@ -19,7 +22,8 @@ class SyncProgress {
   const SyncProgress({
     required this.stage,
     this.surveyId,
-    this.table,
+          debugPrint('[SyncService] fallback collect error for $phoneNumber: $e2');
+          _escalateError('Fallback collect failed for $phoneNumber: $e2', persistent: true);
     this.current,
     this.total,
     this.message,
@@ -296,6 +300,14 @@ class SyncService {
       }
     }
 
+    // fetch local session row to attach common session fields to child/table payloads
+    Map<String, dynamic>? localSessionRow;
+    try {
+      localSessionRow = await _databaseService.getSurveySession(phoneNumber);
+    } catch (e) {
+      debugPrint('[SyncService] failed to read local session for $phoneNumber: $e');
+    }
+
     List<MapEntry<String, Map<String, dynamic>>> toUpload = [];
 
     switch (page) {
@@ -501,9 +513,34 @@ class SyncService {
         break;
     }
 
-    // perform upserts sequentially (mirroring generic sync concurrency pattern is unnecessary here)
+    // perform upserts sequentially. Merge essential session fields into
+    // non-session payloads so remote receives required audit/foreign keys.
     for (var entry in toUpload) {
-      await _supabaseService.saveFamilyData(entry.key, entry.value);
+      final table = entry.key;
+      var payload = Map<String, dynamic>.from(entry.value);
+
+      // merge a small set of session-level fields when available (don't overwrite explicit fields)
+      if (table != 'family_survey_sessions' && localSessionRow != null) {
+        final sessionFields = <String, String>[
+          'surveyor_email', 'surveyor_name', 'village_name', 'status', 'updated_at', 'created_at'
+        ];
+        for (final k in sessionFields) {
+          if (!payload.containsKey(k) && localSessionRow.containsKey(k)) {
+            payload[k] = localSessionRow[k];
+          }
+        }
+      }
+
+      try {
+        debugPrint('[SyncService] upserting table=$table for $phoneNumber; keys=${payload.keys.toList()}');
+        await _supabaseService.saveFamilyData(table, payload);
+      } catch (e, st) {
+        final msg = 'Failed to upsert table $table for $phoneNumber: $e';
+        debugPrint('[SyncService] $msg');
+        debugPrint(st.toString());
+        _escalateError(msg, persistent: true);
+        // continue with other tables (don't rethrow here) so partial failures are tracked
+      }
     }
   }
 
