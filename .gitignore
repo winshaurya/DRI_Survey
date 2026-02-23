@@ -125,3 +125,4 @@ android/local.properties
 # System files
 .metadata
 pubspec.lockDashboard/.env
+build/flutter_assets/assets/.env
