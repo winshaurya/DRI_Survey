@@ -1,4 +1,3 @@
-import React from "react";
 
 /**
  * UsersPage removed — replaced by new App UI.

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -6,7 +6,6 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Paper,
   Button,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -29,6 +28,7 @@ export default function RelatedTables({ tab, pk, keyField, onClose }: Props) {
     async function fetchAll() {
       setLoading(true);
       const villageRelated = [
+        "village_survey_sessions",
         "village_population",
         "village_farm_families",
         "village_housing",
@@ -63,6 +63,7 @@ export default function RelatedTables({ tab, pk, keyField, onClose }: Props) {
         "village_cadastral_maps",
       ];
       const familyRelated = [
+        "family_survey_sessions",
         "family_members",
         "land_holding",
         "irrigation_facilities",

@@ -1,4 +1,3 @@
-import React from "react";
 
 /**
  * SurveyPage removed — replaced by new App UI.

@@ -1,7 +1,6 @@
 /* eslint-disable react/jsx-key */
 // DataTable: server-capable MUI DataGrid wrapper (TypeScript + React)
 
-import * as React from "react";
 import { DataGrid, GridToolbar } from "@mui/x-data-grid";
 import type { GridColDef, GridRowsProp, GridSortModel } from "@mui/x-data-grid";
 import { Box, Typography } from "@mui/material";
