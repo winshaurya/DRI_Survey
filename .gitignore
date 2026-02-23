@@ -124,4 +124,4 @@ android/local.properties
 
 # System files
 .metadata
-pubspec.lock
+pubspec.lockDashboard/.env

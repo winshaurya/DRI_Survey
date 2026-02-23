@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'database_service.dart';
 
 typedef SyncErrorCallback = void Function(String message, {bool persistent});
 
@@ -13,22 +12,7 @@ class SupabaseService {
   static SupabaseService get instance => _instance;
 
   SupabaseService._internal() {
-    // Restore any persisted session
     _initializePersistentSession();
-
-    // Listen to Supabase auth state changes and persist/clear session accordingly
-    Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
-      final AuthChangeEvent event = data.event;
-      final Session? session = data.session;
-
-      if (event == AuthChangeEvent.signedIn && session != null) {
-        await _persistSession(session);
-        debugPrint('SupabaseService: persisted session after sign-in');
-      } else if (event == AuthChangeEvent.signedOut) {
-        await _clearStoredSession();
-        debugPrint('SupabaseService: cleared persisted session after sign-out');
-      }
-    });
   }
 
   SupabaseClient get client => Supabase.instance.client;
@@ -46,9 +30,15 @@ class SupabaseService {
       final expiresAtStr = prefs.getString(_expiresAtKey);
 
       if (jwt != null && refreshToken != null && expiresAtStr != null) {
-        // Always restore session regardless of expiry
-        await Supabase.instance.client.auth.setSession(jwt);
-        debugPrint('Restored persistent Supabase session');
+        final expiresAt = DateTime.parse(expiresAtStr);
+        if (expiresAt.isAfter(DateTime.now())) {
+          // Restore session
+          await Supabase.instance.client.auth.setSession(jwt);
+          debugPrint('Restored persistent Supabase session');
+        } else {
+          // Clear expired session
+          await _clearStoredSession();
+        }
       }
     } catch (e) {
       debugPrint('Failed to restore persistent session: $e');
@@ -65,26 +55,6 @@ class SupabaseService {
       debugPrint('Cleared stored Supabase session');
     } catch (e) {
       debugPrint('Failed to clear stored session: $e');
-    }
-  }
-
-  // Persist Supabase session (access token, refresh token and expiry) to SharedPreferences
-  Future<void> _persistSession(Session session) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jwt = session.accessToken ?? '';
-      final refresh = session.refreshToken ?? '';
-
-      // Supabase Session.expiresAt is seconds since epoch (nullable)
-      // Set expiry to far future to make session infinite
-      String expiresIso = '2099-12-31T23:59:59.000Z';
-
-      await prefs.setString(_jwtKey, jwt);
-      await prefs.setString(_refreshTokenKey, refresh);
-      await prefs.setString(_expiresAtKey, expiresIso);
-      debugPrint('Persisted Supabase session to preferences');
-    } catch (e) {
-      debugPrint('Failed to persist Supabase session: $e');
     }
   }
 
@@ -338,48 +308,6 @@ class SupabaseService {
           normalizedList.add(_normalizeMap(casted));
         }
       }
-
-      // If this table uses sr_no, auto-assign missing sr_no values using local DB state
-      if (columns.contains('sr_no')) {
-        final dbService = DatabaseService();
-        // Map phone -> next available sr_no
-        final Map<String, int> nextSr = {};
-
-        for (final row in normalizedList) {
-          final phoneVal = row['phone_number']?.toString();
-          if (phoneVal == null) continue;
-
-          if (row.containsKey('sr_no') && row['sr_no'] != null) {
-            // ensure nextSr at least that + 1
-            final existing = int.tryParse(row['sr_no'].toString()) ?? (row['sr_no'] is int ? row['sr_no'] as int : 0);
-            final cur = nextSr[phoneVal] ?? 0;
-            if (existing >= cur) nextSr[phoneVal] = existing + 1;
-            continue;
-          }
-
-          // compute start if not cached
-          if (!nextSr.containsKey(phoneVal)) {
-            try {
-              final localRows = await dbService.getData(table, phoneVal);
-              int maxSr = 0;
-              for (final lr in localRows) {
-                if (lr.containsKey('sr_no') && lr['sr_no'] != null) {
-                  final s = int.tryParse(lr['sr_no'].toString()) ?? (lr['sr_no'] is int ? lr['sr_no'] as int : 0);
-                  if (s > maxSr) maxSr = s;
-                }
-              }
-              nextSr[phoneVal] = maxSr + 1;
-            } catch (_) {
-              nextSr[phoneVal] = 1;
-            }
-          }
-
-          // assign and increment
-          row['sr_no'] = nextSr[phoneVal];
-          nextSr[phoneVal] = nextSr[phoneVal]! + 1;
-        }
-      }
-
       filtered = normalizedList;
     } else if (filtered is Map<String, dynamic>) {
       filtered = _normalizeMap(filtered);
@@ -442,8 +370,6 @@ class SupabaseService {
 
   Future<void> signOut() async {
     await client.auth.signOut();
-    // Ensure persisted session cleared immediately
-    await _clearStoredSession();
   }
 
   User? get currentUser {
@@ -490,8 +416,8 @@ class SupabaseService {
     try {
       // Get current user email for audit trail
       final userEmail = currentUser?.email ?? surveyData['surveyor_email'];
-      debugPrint('[Supabase Sync] Authenticated user email: ${currentUser?.email}');
-      debugPrint('[Supabase Sync] surveyData["surveyor_email"]: ${surveyData['surveyor_email']}');
+      debugPrint('[Supabase Sync] Authenticated user email: \\${currentUser?.email}');
+      debugPrint('[Supabase Sync] surveyData["surveyor_email"]: \\${surveyData['surveyor_email']}');
 
       // Insert main survey session data
       try {
@@ -718,38 +644,6 @@ class SupabaseService {
     }
   }
 
-  /// Batch-sync multiple pages for a family; returns per-page results
-  Future<Map<int, Map<String, dynamic>>> syncPageBatch(
-    String phoneNumber,
-    List<Map<String, dynamic>> pagesToSync, {
-    Function(int, dynamic)? onPageSynced,
-  }) async {
-    final results = <int, Map<String, dynamic>>{};
-
-    for (final item in pagesToSync) {
-      final page = (item['page'] is int) ? item['page'] as int : int.tryParse(item['page'].toString()) ?? -1;
-      final data = item['data'] as Map<String, dynamic>? ?? {};
-
-      if (page < 0) {
-        results[page] = {'success': false, 'error': 'invalid_page'};
-        onPageSynced?.call(page, {'success': false, 'error': 'invalid_page'});
-        continue;
-      }
-
-      try {
-        await syncFamilyPageToSupabase(phoneNumber, page, data);
-        results[page] = {'success': true};
-        onPageSynced?.call(page, {'success': true});
-      } catch (e) {
-        final err = e.toString();
-        results[page] = {'success': false, 'error': err};
-        onPageSynced?.call(page, {'success': false, 'error': err});
-      }
-    }
-
-    return results;
-  }
-
   Future<void> syncVillagePageToSupabase(String sessionId, int page, Map<String, dynamic> data) async {
     if (sessionId.isEmpty) return;
 
@@ -829,9 +723,8 @@ class SupabaseService {
 // Helper methods for syncing family survey tables
   Future<void> _syncFamilyMembers(String phoneNumber, List<dynamic>? data) async {
     if (data == null || data.isEmpty) return;
-    final phoneKey = int.tryParse(phoneNumber.toString()) ?? phoneNumber;
     final rows = _normalizeList(
-      data.map((item) => {...item, 'phone_number': phoneKey}).toList(),
+      data.map((item) => {...item, 'phone_number': phoneNumber}).toList(),
     );
     await _upsertWithRetry('family_members', rows);
   }
@@ -1427,8 +1320,8 @@ class SupabaseService {
         debugPrint('[Supabase Sync] Upserting $tableName with session_id=${payload['session_id']}');
       }
       debugPrint('[Supabase Sync] Payload: ' + payload.toString());
-      debugPrint('[Supabase Sync] Authenticated user email: ${currentUser?.email}');
-      debugPrint('[Supabase Sync] payload["surveyor_email"]: ${payload['surveyor_email']}');
+      debugPrint('[Supabase Sync] Authenticated user email: \\${currentUser?.email}');
+      debugPrint('[Supabase Sync] payload["surveyor_email"]: \\${payload['surveyor_email']}');
       await _upsertWithRetry(tableName, _normalizeMap(payload));
     } catch (e) {
       final errMsg = 'ERROR saving $tableName: $e';
