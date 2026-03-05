@@ -67,35 +67,6 @@ The codebase is engineered to survive real-world field friction: bad connectivit
 | Ops & rebuild | capacity, repository blueprint, rebuild contract | [Section 8](#8-capacity-model-current-design), [Section 10](#10-rebuild-blueprint-from-this-folder-alone) |
 | Exhaustive references | full file map + API/function index | [Section 13](#13-exhaustive-file-map-source-of-truth-modules), [Section 14](#14-api--function-index) |
 
-### Chapter Status Wall
-
-| Chapter | Theme | Status |
-|---|---|---|
-| 01 | Ecosystem Snapshot | ■ LOCKED |
-| 02 | Architecture | ■ LOCKED |
-| 03 | Process Flows | ■ LOCKED |
-| 04 | Data Model | ■ LOCKED |
-| 05 | Hard Problems | ■ LOCKED |
-| 06 | Internal Mapping | ■ LOCKED |
-| 07 | End-to-End Workflows | ■ LOCKED |
-| 08 | Capacity Model | ■ LOCKED |
-| 09 | Repository Blueprint | ■ LOCKED |
-| 10 | Rebuild Contract | ■ LOCKED |
-| 11 | Security Notes | ■ LOCKED |
-| 12 | Final Engineering Read | ■ LOCKED |
-| 13 | Exhaustive File Map | ■ LOCKED |
-| 14 | API/Function Index | ■ LOCKED |
-
-### Design Legend
-
-| Symbol | Meaning |
-|---|---|
-| `■` | finalized/locked chapter |
-| `╔═...═╗` | chapter frame |
-| `<details open>` | expandable documentation card |
-| Mermaid blocks | system figures and process maps |
-
----
 
 <div align="center">
 
@@ -212,13 +183,6 @@ sequenceDiagram
 	Q->>L: Update table sync status
 ```
 
-```text
-   ___       _   _   _             
-  / _ \ _ __| |_(_) (_) ___  _ __  
- | | | | '__| __| | | |/ _ \| '_ \ 
- | |_| | |  | |_| | | | (_) | | | |
-  \___/|_|   \__|_|_|_|\___/|_| |_|
-```
 ## 3.1 Auth and session bootstrap
 
 **Entry files**: `lib/main.dart`, `lib/screens/auth/auth_screen.dart`, `lib/services/supabase_service.dart`
@@ -234,14 +198,6 @@ Flow:
 Why this matters:
 - The app can still boot with degraded cloud connectivity.
 - Local capture is decoupled from cloud availability.
-
-```text
-  _____                _ _                 
- |  ___|__  _ __ _   _| | |_ ___  _ __ ___ 
- | |_ / _ \| '__| | | | | __/ _ \| '__/ _ \
- |  _| (_) | |  | |_| | | || (_) | | |  __/
- |_|  \___/|_|   \__,_|_|\__\___/|_|  \___|
-```
 ## 3.2 Family survey capture lifecycle
 
 **Core files**: `lib/providers/survey_provider.dart`, `lib/services/database_service.dart`, `lib/services/sync_service.dart`
@@ -258,13 +214,6 @@ Key architecture behavior:
 - Child-table writes happen per page semantics.
 - Sync initiation never blocks page navigation.
 
-```text
- __     __ _ _ _            
- \ \   / /(_) | | ___  ___  
-  \ \ / / | | | |/ _ \/ __| 
-   \ V /  | | | |  __/\__ \ 
-    \_/   |_|_|_|\___||___/ 
-```
 ## 3.3 Village survey capture lifecycle
 
 **Core files**: `lib/providers/village_survey_provider.dart`, `lib/router.dart`, `lib/screens/village_survey/*`
@@ -277,13 +226,6 @@ Flow:
 
 Route flow is explicitly declared in `AppRouter.villageSurveyFlow` and enforced by helper navigation methods.
 
-```text
-  ____              _        
- / ___|  ___  _   _| |_ ___  
- \___ \ / _ \| | | | __/ _ \ 
-  ___) | (_) | |_| | ||  __/ 
- |____/ \___/ \__,_|\__\___| 
-```
 ## 3.4 Sync engine pipeline
 
 **Core file**: `lib/services/sync_service.dart`
@@ -298,14 +240,6 @@ Design:
 
 This is one of the hardest engineering points solved here: **keeping correctness under partial local data + intermittent network + mixed table cardinalities.**
 
-```text
-  _____                      _     
- / ____|                    | |    
-| (___  _   _ _ __   ___ ___| |__  
- \___ \| | | | '_ \ / __/ _ \ '_ \ 
- ____) | |_| | | | | (_|  __/ |_) |
-|_____/ \__,_|_| |_|\___\___|_.__/ 
-```
 ## 3.5 Supabase normalization and resilient upsert
 
 **Core file**: `lib/services/supabase_service.dart`
@@ -322,13 +256,6 @@ Capabilities:
 Critical outcome:
 - Prevents a large class of runtime sync breakages from schema mismatch and bad-type payloads.
 
-```text
-  _____ _ _       _   __  __       _ 
- |  ___(_) |_ ___| | |  \/  | __ _| |
- | |_  | | __/ _ \ | | |\/| |/ _` | |
- |  _| | | ||  __/ | | |  | | (_| | |
- |_|   |_|\__\___|_| |_|  |_|\__,_|_|
-```
 ## 3.6 File/media upload workflow
 
 **Core file**: `lib/services/file_upload_service.dart`
@@ -340,13 +267,6 @@ Flow:
 4. Upload files into structured Google Drive folders (per SHINE code).
 5. Make files readable and persist share links back to local survey data.
 
-```text
-  _____                    _       
- | ____|_  _____ _ __ ___ (_) ___  
- |  _| \ \/ / _ \ '_ ` _ \| |/ _ \ 
- | |___ >  <  __/ | | | | | | (_) |
- |_____/_/\_\___|_| |_| |_|_|\___/ 
-```
 ## 3.7 Export workflows
 
 **Core files**: `lib/services/excel_service.dart`, `lib/services/xlsx_export_service.dart`, `lib/services/data_export_service.dart`, `lib/screens/export_screen.dart`
@@ -359,13 +279,6 @@ Supported modes:
 
 The export layer supports both table-oriented and consolidated presentation formats.
 
-```text
-  _   _ _ _            _ _          
- | | | (_) | ___  __ _| | | ___ _ __
- | | | | | |/ _ \/ _` | | |/ _ \ '__|
- | |_| | | |  __/ (_| | | |  __/ |   
-  \___/|_|_|\___|\__,_|_|_|\___|_|   
-```
 ## 3.8 History and progress workflows
 
 **Core files**: `lib/screens/history/history_screen.dart`, `lib/services/form_history_service.dart`
@@ -394,13 +307,6 @@ Capabilities:
 
 ## 4) Data Architecture
 
-```text
-  _  __          _     
- | |/ /___ _   _| |__  
- | ' // _ \ | | | '_ \ 
- | . \  __/ |_| | |_) |
- |_|\_\___|\__,_|_.__/ 
-```
 ## 4.1 Primary key strategy
 
 - **Family root key**: `phone_number`.
@@ -410,13 +316,6 @@ Capabilities:
 	- one-to-many by `(root_key, sr_no)`,
 	- map-point style keys (`point_id`, etc.) where required.
 
-```text
-  _____     _ _       
- |_   _|__ | (_) ___  
-   | |/ _ \| | |/ _ \ 
-   | | (_) | | | (_) |
-   |_|\___/|_|_|\___/ 
-```
 ## 4.2 Table ecosystem size
 
 Family domain + village domain include dozens of structured tables (sessions, members, facilities, schemes, social indicators, agriculture, water, health, transport, mapping assets, etc.).
@@ -428,13 +327,6 @@ Canonical source files:
 - `database_supabase_sqlite/schema at supbase.sql`
 - `Dashboard/schema at supbase.sql`
 
-```text
- __  __ _       _               
-|  \/  (_)_ __ (_)_ __   ___ _ __ 
-| |\/| | | '_ \| | '_ \ / _ \ '__|
-| |  | | | | | | | | | |  __/ |   
-|_|  |_|_|_| |_|_|_| |_|\___|_|   
-```
 ## 4.3 Migration and schema correction assets
 
 Location: `database_supabase_sqlite/migrations/`
@@ -701,101 +593,88 @@ This section is a **design-based capacity estimate**, not a synthetic benchmark 
 
 ## 9) Repository Blueprint (File-by-File)
 
-```mermaid
-mindmap
-	root((Repository))
-		Mobile App
-			lib/main.dart
-			providers
-			services
-			screens
-		Dashboard
-			src/App.tsx
-			src/services
-			src/pages
-		Data Layer
-			schema SQL
-			migrations
-			audit artifacts
-		Platform Shells
-			android
-			web
-			assets
-```
+<p>
+<span style="background:#007bff;color:#fff;padding:2px 4px;border-radius:3px">🟦 Root</span>
+<span style="background:#28a745;color:#fff;padding:2px 4px;border-radius:3px">🟩 Mobile</span>
+<span style="background:#6f42c1;color:#fff;padding:2px 4px;border-radius:3px">🟪 Dashboard</span>
+<span style="background:#fd7e14;color:#fff;padding:2px 4px;border-radius:3px">🟧 Data</span>
+<span style="background:#6c757d;color:#fff;padding:2px 4px;border-radius:3px">⬜ Shells</span>
+</p>
 
-This section maps files and folders so a new engineer can rebuild and maintain the system without hidden assumptions.
+> Categories above correspond to the colorized blocks used throughout this
+> section. They are meant to make scanning the repo structure easier.
 
-## 9.1 Root-level control and reference files
+### 9.1 Root-level control and reference files 🟦
 
-- `.env`, `.env.example` — environment contract templates.
-- `pubspec.yaml` — Flutter package manifest, dependencies, asset declarations.
-- `analysis_options.yaml`, `devtools_options.yaml`, `l10n.yaml` — static analysis/devtools/localization configs.
-- `all_family_and_village_tables.md`, `all_table_columns.txt`, `phone_tables.txt` — table universe and column references.
-- `supabase_all_dump.sql`, `supabase_columns.csv`, `unfilled_columns_*.csv` — schema/data audit snapshots.
-- `ff.md` — deep audit and mapping notes.
-- `compare_schema_cli.sh` — schema comparison helper notes.
-- `delete_user_data.sql` — targeted user-related data deletion script.
-- `untranslated_keys.txt` — i18n debt tracker.
-- Office docs/xlsx assets — domain questionnaires and process notes.
+- **`.env`, `.env.example`** — environment contract templates.
+- **`pubspec.yaml`** — Flutter package manifest, dependencies, asset declarations.
+- **`analysis_options.yaml`, `devtools_options.yaml`, `l10n.yaml`** — configuration files.
+- **`all_family_and_village_tables.md`, `all_table_columns.txt`, `phone_tables.txt`** — table/schema references.
+- **`supabase_all_dump.sql`, `supabase_columns.csv`, `unfilled_columns_*.csv`** — schema/audit snapshots.
+- **`ff.md`** — audit and mapping notes.
+- **`compare_schema_cli.sh`** — schema diff helper.
+- **`delete_user_data.sql`** — targeted purge script.
+- **`untranslated_keys.txt`** — i18n backlog tracker.
+- **Office docs / .xlsx assets** — questionnaire templates and process notes.
 
-## 9.2 Mobile app source (`lib/`)
+### 9.2 Mobile app source (`lib/`) 🟩
 
-### Core
+#### Core
 - `main.dart` — bootstrapping, provider setup, app shell.
 - `router.dart` — route constants and flow transitions.
-- `form_template.dart`, `table_template.dart`, `header.dart` — shared scaffolding templates.
+- `form_template.dart`, `table_template.dart`, `header.dart` — shared scaffolding.
 
-### Components (`lib/components/`)
+#### Components (`lib/components/`)
 - `autocomplete_dropdown.dart` — enhanced selection UX.
 - `contextual_help.dart` — in-context user guidance.
 - `enhanced_loading_indicator.dart` — loading UX layer.
-- `form_validation_feedback.dart` — validation presentation widget.
+- `form_validation_feedback.dart` — validation UI.
 - `logo_widget.dart` — branding component.
 
-### Data and models
+#### Data and models
 - `data/india_states_districts.dart`, `data/shine_villages.dart` — lookup datasets.
 - `models/survey_models.dart` — model definitions.
 
-### Localization (`lib/l10n/`)
-- `app_en.arb`, `app_hi.arb` — source locale dictionaries.
-- generated localization classes (`app_localizations*.dart`).
+#### Localization (`lib/l10n/`)
+- `app_en.arb`, `app_hi.arb` — locale dictionaries.
+- generated `app_localizations*.dart` classes.
 
-### Providers
+#### Providers
 - `providers/survey_provider.dart` — family workflow orchestrator.
 - `providers/village_survey_provider.dart` — village workflow orchestrator.
 - `providers/locale_provider.dart`, `providers/font_size_provider.dart` — UX state.
 
-### Database and services
-- `database/database_helper.dart` — schema creation and migration engine.
+#### Database and services
+- `database/database_helper.dart` — schema creation/migrations.
 - `services/database_service.dart` — storage API.
-- `services/sync_service.dart` — queue-based synchronization.
-- `services/supabase_service.dart` — cloud auth/sync abstraction.
-- `services/file_upload_service.dart` — document/image upload pipeline.
-- `services/form_history_service.dart` — versioning and rollback support.
-- `services/excel_service.dart`, `services/xlsx_export_service.dart`, `services/data_export_service.dart` — export stack.
-- `services/location_service.dart` — location helper logic.
-- `services/hardcoded_remote_columns.dart`, `services/hardcoded_primary_keys.dart` — schema/sync control maps.
+- `services/sync_service.dart` — queue sync engine.
+- `services/supabase_service.dart` — cloud abstraction.
+- `services/file_upload_service.dart` — media pipeline.
+- `services/form_history_service.dart` — versioning support.
+- `services/excel_service.dart`, `services/xlsx_export_service.dart`, `services/data_export_service.dart` — export engines.
+- `services/location_service.dart` — location utilities.
+- `services/hardcoded_remote_columns.dart`, `services/hardcoded_primary_keys.dart` — schema control maps.
 
-### Screens
-- `screens/auth/auth_screen.dart` — authentication UI and OAuth trigger.
-- `screens/landing/landing_screen.dart` — app entry navigation hub.
-- `screens/history/history_screen.dart` — survey history and sync status hub.
+#### Screens
+- `screens/auth/auth_screen.dart` — authentication UI.
+- `screens/landing/landing_screen.dart` — main navigation hub.
+- `screens/history/history_screen.dart` — survey history + sync status.
 - `screens/export_screen.dart` — export actions.
 - `screens/village_survey_screen.dart` — village flow launcher.
 
-### Family survey screens
-- `screens/family_survey/survey_screen.dart` — family flow container.
-- `screens/family_survey/pages/*.dart` — all family page modules (location, household, agriculture, schemes, children, migration, training, finance, preview/final).
-- `screens/family_survey/widgets/*.dart` — navigation/progress/shared widgets.
+##### Family survey screens
+- `screens/family_survey/survey_screen.dart` — container.
+- `screens/family_survey/pages/*.dart` — all family page modules.
+- `screens/family_survey/widgets/*.dart` — shared widgets.
 
-### Village survey screens
-- `screens/village_survey/*.dart` — village form, infra, education, water, maps, biodiversity, review, completion.
+##### Village survey screens
+- `screens/village_survey/*.dart` — village form and subpages.
 
-### Utilities
-- `utils/bool_helper.dart` — bool/int coercion helpers.
-- `utils/snackbar_utils.dart` — feedback messaging helpers.
+#### Utilities
+- `utils/bool_helper.dart` — boolean helpers.
+- `utils/snackbar_utils.dart` — feedback helpers.
 
-## 9.3 Dashboard (`Dashboard/`)
+## 9.3 Dashboard (`Dashboard/`) 🟪
 
 ### Build/runtime
 - `package.json`, `vite.config.ts`, `tsconfig*.json`, `eslint.config.js` — frontend build and lint stack.
@@ -814,7 +693,7 @@ This section maps files and folders so a new engineer can rebuild and maintain t
 - `schema at supbase.sql`, `schema at supbase copy.sql`, `public/supbase_SCHEMA.sql` — schema references.
 - `scripts/seed_family.js`, `scripts/seed_village.js` — data seeding utilities.
 
-## 9.4 Database schema assets (`database_supabase_sqlite/`)
+## 9.4 Database schema assets (`database_supabase_sqlite/`) 🟧
 
 - `schema at supbase.sql` — master schema definition snapshot.
 - `migrations/*.sql` — PK and dedup migration scripts.
@@ -906,17 +785,6 @@ Use these files as authoritative checks:
 
 </div>
 
-## 12) Final Engineering Read
-
-This ecosystem is built to absorb field reality: unstable networks, huge questionnaire scope, many child tables, schema evolution, and operational reporting pressure. The architecture is intentionally layered so each concern can fail gracefully without destroying data collection continuity.
-
-In short: this is a serious, production-style survey platform with enough structure and documentation in this repository for a new team to rebuild, audit, and extend it with confidence.
-
-```text
-Build intent: resilient capture > lossless local persistence > deterministic sync > transparent operations.
-```
-
----
 
 </details>
 
