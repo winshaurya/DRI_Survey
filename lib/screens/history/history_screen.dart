@@ -57,36 +57,42 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
     }
   }
 
-  /// Historically this returned information about how many *pages* had
-  /// been uploaded to Supabase.  Since the protocol now syncs the entire
-  /// survey in one shot, we no longer track per-page sync status.  The
-  /// history screen still likes to show some notion of progress, so we
-  /// reuse the page-completion map (which is still maintained during data
-  /// entry) as a proxy: "synced" pages are simply the pages that have been
-  /// filled out locally.
-  Future<Map<String, dynamic>> _getSyncProgress(String phoneNumber) async {
+  /// Uses the new table-level tracking from SyncService v2
+  Future<Map<String, dynamic>> _getSyncProgress(String referenceId, String type) async {
+    // referenceId = phoneNumber (Family) or sessionId (Village)
     try {
-      final databaseService = DatabaseService();
-      final pageStatus = await databaseService.getFamilyPageStatus(phoneNumber);
-      final statusMap = pageStatus['page_completion_status'] as Map<String, dynamic>? ?? {};
+      final db = DatabaseService();
+      
+      // Determine total expected tables based on type
+      // Family: ~56 tables. Village: ~32 tables.
+      // We can either hardcode or fetch from SyncService constants (if public)
+      // Or just trust the counts in sync_tracker? 
+      // Problem: sync_tracker only has entries for *attempted* syncs or *queued* items.
+      // If an item hasn't been queued yet, it won't be there.
+      // BUT: SyncService queues EVERYTHING on first run. 
+      // AND: We want to know "how many tables out of all". 
+      
+      // Let's assume max tables:
+      int totalTables = type == 'family' ? 56 : 32; 
 
-      final totalPages = statusMap.keys.length;
-      final syncedPages = statusMap.values
-          .where((e) => (e as Map)['completed'] == 1)
-          .length;
-
+      final stats = await db.getSyncDetailStats(referenceId);
+      final synced = stats['synced'] ?? 0;
+      final failed = stats['failed'] ?? 0;
+      final pending = stats['pending'] ?? 0;
+      
+      // If no stats found (never synced), everything is pending or unsynced.
+      // But we don't want to show "0/56 synced" if it's brand new. 
+      // We can check if it's "Completed" status first.
+      
       return {
-        'total_pages': totalPages,
-        'synced_pages': syncedPages,
-        'progress_percentage':
-            totalPages > 0 ? ((syncedPages / totalPages) * 100).round() : 0,
+        'total': totalTables,
+        'synced': synced,
+        'failed': failed,
+        'pending': pending,
+        'progress': totalTables > 0 ? (synced / totalTables) : 0.0,
       };
     } catch (e) {
-      return {
-        'total_pages': 0,
-        'synced_pages': 0,
-        'progress_percentage': 0,
-      };
+      return {'total': 0, 'synced': 0, 'failed': 0, 'pending': 0, 'progress': 0.0};
     }
   }
 
@@ -258,75 +264,82 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
 
     try {
       int syncedCount = 0;
-      int totalPages = 0;
+      int totalTables = 0;
+      int failedCount = 0;
 
-      // Use the new page-by-page sync with progress tracking
-      await syncService.syncAllPendingPages(
-        onProgress: (currentSynced, currentTotal) {
-          syncedCount = currentSynced;
-          totalPages = currentTotal;
+      // Listen to progress stream
+      final subscription = syncService.progressStream.listen((status) {
+        syncedCount = status.syncedCount;
+        totalTables = status.totalTables;
+        failedCount = status.failedCount;
 
-          // Update the snackbar with progress
-          messenger.hideCurrentSnackBar();
-          messenger.showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                      value: totalPages > 0 ? syncedCount / totalPages : null,
-                    ),
+        // Update snackbar
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                    value: totalTables > 0 ? syncedCount / totalTables : null,
                   ),
-                  const SizedBox(width: 16),
-                  Text('$syncedCount/$totalPages pages synced'),
-                ],
-              ),
-              duration: const Duration(seconds: 30),
-              backgroundColor: Colors.blue,
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: Text('Syncing: $syncedCount/$totalTables tables processed ($failedCount failed)')),
+              ],
             ),
-          );
-        },
-        onError: (error) {
-          messenger.hideCurrentSnackBar();
-          messenger.showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text('Sync error: $error')),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 5),
-            ),
-          );
-        },
-      );
+            duration: const Duration(seconds: 30),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      });
+
+      // Start sync
+      await syncService.syncAllPendingData();
+      
+      // SyncService now awaits completion within syncAllPendingData()
+      
+      await subscription.cancel();
 
       // Reload sessions to reflect updated sync status
       await _loadSessions();
 
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 8),
-              Text('Sync completed: $syncedCount/$totalPages pages synced'),
-            ],
+      if (failedCount == 0) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Sync completed: $syncedCount tables synced'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+        );
+      } else {
+         messenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Sync finished with $failedCount failures ($syncedCount success)'),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+
     } catch (e) {
-      messenger.hideCurrentSnackBar();
 
       // Handle authentication error specifically
       if (e.toString().contains('Authentication required')) {
@@ -526,69 +539,79 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
               ),
               const Divider(height: 24),
               // Sync Progress Section
-              if (type == 'family') // Only show for family surveys for now
-                FutureBuilder<Map<String, dynamic>>(
-                  future: _getSyncProgress(phoneNumber),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Row(
-                        children: [
-                          Icon(Icons.sync, size: 14, color: Colors.grey.shade500),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Checking sync status...',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                          ),
-                        ],
-                      );
-                    }
-
-                    final progress = snapshot.data ?? {
-                      'synced_pages': 0,
-                      'total_pages': 0,
-                      'progress_percentage': 0,
-                    };
-
-                    final syncedPages = progress['synced_pages'] as int;
-                    final totalPages = progress['total_pages'] as int;
-                    final percentage = progress['progress_percentage'] as int;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              FutureBuilder<Map<String, dynamic>>(
+                future: _getSyncProgress(type == 'family' ? phoneNumber : sessionId, type),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Row(
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              syncedPages == totalPages ? Icons.cloud_done : Icons.cloud_upload,
-                              size: 14,
-                              color: syncedPages == totalPages ? Colors.green : Colors.blue,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                '$syncedPages/$totalPages pages synced',
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: syncedPages == totalPages ? Colors.green : Colors.blue,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        LinearProgressIndicator(
-                          value: totalPages > 0 ? syncedPages / totalPages : 0,
-                          backgroundColor: Colors.grey.shade200,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            syncedPages == totalPages ? Colors.green : Colors.blue,
-                          ),
+                        Icon(Icons.sync, size: 14, color: Colors.grey.shade500),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Checking sync status...',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                         ),
                       ],
                     );
-                  },
-                ),
+                  }
+
+                  final progress = snapshot.data ?? {
+                    'synced': 0,
+                    'total': 0,
+                    'failed': 0,
+                    'pending': 0,
+                    'progress': 0.0,
+                  };
+
+                  final synced = progress['synced'] as int;
+                  final total = progress['total'] as int;
+                  final failed = progress['failed'] as int;
+                  final p = progress['progress'] as double;
+                  
+                  // Don't show progress bar if nothing to show
+                  if (total == 0) return const SizedBox.shrink();
+                  
+                  final isFullySynced = synced >= total && total > 0;
+                  final hasFailures = failed > 0;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            isFullySynced ? Icons.cloud_done : (hasFailures ? Icons.cloud_off : Icons.cloud_upload),
+                            size: 14,
+                            color: isFullySynced ? Colors.green : (hasFailures ? Colors.red : Colors.blue),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              isFullySynced 
+                                ? 'Fully Synced ($synced/$total)' 
+                                : '$synced/$total tables synced${hasFailures ? " ($failed failed)" : ""}',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isFullySynced ? Colors.green : (hasFailures ? Colors.red : Colors.blue),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        value: p,
+                        backgroundColor: Colors.grey.shade200,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isFullySynced ? Colors.green : (hasFailures ? Colors.red : Colors.blue),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

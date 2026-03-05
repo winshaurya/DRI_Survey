@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
+import 'hardcoded_remote_columns.dart';
+import 'hardcoded_primary_keys.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -505,22 +507,41 @@ static Database? _database;
       throw Exception('key value is required for $tableName');
     }
 
-    // Determine primary lookup column for this table (phone_number for family, session_id for village)
-    String keyColumn;
-    if (columns.contains('phone_number')) {
-      keyColumn = 'phone_number';
-    } else if (columns.contains('session_id')) {
-      keyColumn = 'session_id';
+    // Determine primary lookup columns for this table using authoritative PK map when available
+    final pkCols = kHardcodedRemotePrimaryKeys[tableName];
+    String existenceWhere;
+    List<dynamic> existenceArgs = [];
+
+    if (pkCols != null && pkCols.isNotEmpty) {
+      existenceWhere = pkCols.map((c) => '$c = ?').join(' AND ');
+      for (final c in pkCols) {
+        if (c == 'phone_number' || c == 'session_id') {
+          // keyValue represents the primary session/phone identifier passed by caller
+          final parsed = int.tryParse(keyValue) ?? keyValue;
+          existenceArgs.add(parsed);
+        } else {
+          // Prefer explicit value from data (e.g., sr_no), fall back to null
+          existenceArgs.add(data[c] ?? data[c.toString()]);
+        }
+      }
     } else {
-      throw Exception('No recognized key column for $tableName (expected phone_number or session_id)');
+      // Fallback to legacy behaviour
+      String keyColumn;
+      if (columns.contains('phone_number')) {
+        keyColumn = 'phone_number';
+      } else if (columns.contains('session_id')) {
+        keyColumn = 'session_id';
+      } else {
+        throw Exception('No recognized key column for $tableName (expected phone_number or session_id)');
+      }
+
+      // Use composite key when table has sr_no and caller provided it
+      final bool hasSr = columns.contains('sr_no');
+      final bool dataHasSr = data is Map<String, dynamic> && data.containsKey('sr_no');
+
+      existenceWhere = hasSr && dataHasSr ? '$keyColumn = ? AND sr_no = ?' : '$keyColumn = ?';
+      existenceArgs = hasSr && dataHasSr ? [keyValue, data['sr_no']] : [keyValue];
     }
-
-    // Use composite key when table has sr_no and caller provided it
-    final bool hasSr = columns.contains('sr_no');
-    final bool dataHasSr = data is Map<String, dynamic> && data.containsKey('sr_no');
-
-    final String existenceWhere = hasSr && dataHasSr ? '$keyColumn = ? AND sr_no = ?' : '$keyColumn = ?';
-    final List<dynamic> existenceArgs = hasSr && dataHasSr ? [keyValue, data['sr_no']] : [keyValue];
 
     // Check if record exists using computed where-clause
     final existing = await db.query(
@@ -533,16 +554,45 @@ static Database? _database;
     final now = DateTime.now().toIso8601String();
     final dataWithTimestamp = <String, dynamic>{
       ...data,
-      keyColumn: keyValue,
     };
+    // ensure primary id is present in payload when available
+    if (pkCols != null && pkCols.isNotEmpty) {
+      for (final c in pkCols) {
+        if (c == 'phone_number' || c == 'session_id') {
+          final parsed = int.tryParse(keyValue) ?? keyValue;
+          dataWithTimestamp[c] = parsed;
+        } else if (!dataWithTimestamp.containsKey(c) && data[c] != null) {
+          dataWithTimestamp[c] = data[c];
+        }
+      }
+    } else {
+      // legacy single key
+      if (columns.contains('phone_number')) {
+        dataWithTimestamp['phone_number'] = int.tryParse(keyValue) ?? keyValue;
+      } else if (columns.contains('session_id')) {
+        dataWithTimestamp['session_id'] = keyValue;
+      }
+    }
     if (columns.contains('updated_at')) {
       dataWithTimestamp['updated_at'] = now;
     }
 
     // Filter to known columns only
-    final filteredData = Map<String, dynamic>.fromEntries(
+    // Filter to known local columns then order keys to follow remote schema order when available
+    final rawFiltered = Map<String, dynamic>.fromEntries(
       dataWithTimestamp.entries.where((e) => columns.contains(e.key)),
     );
+
+    final ordered = <String, dynamic>{};
+    final remoteCols = kHardcodedRemoteTableColumns[tableName] ?? columns.toList();
+    for (final col in remoteCols) {
+      if (rawFiltered.containsKey(col)) ordered[col] = rawFiltered[col];
+    }
+    // Append any remaining local columns not present in remote list
+    for (final e in rawFiltered.entries) {
+      if (!ordered.containsKey(e.key)) ordered[e.key] = e.value;
+    }
+    final filteredData = ordered;
 
     // Normalize complex values (Maps/Lists) to JSON strings so sqflite can store them
     for (final key in filteredData.keys.toList()) {
@@ -559,11 +609,12 @@ static Database? _database;
 
     try {
       if (existing.isEmpty) {
-        // Insert new
+        // Insert new (use replace on conflict to avoid UNIQUE constraint errors
+        // if a race or type mismatch causes a duplicate key insert attempt).
         if (columns.contains('created_at')) {
           filteredData['created_at'] = now;
         }
-        await db.insert(tableName, filteredData);
+        await db.insert(tableName, filteredData, conflictAlgorithm: ConflictAlgorithm.replace);
       } else {
         // Update existing using same composite where if applicable
         await db.update(
@@ -600,5 +651,79 @@ static Database? _database;
   // etc.) is handled by other parts of this class.
   //
   // This comment replaces the old methods and ensures the class closes properly.
+
+  // --- SYNC TRACKING METHODS ADDED FOR NEW SYNC LOGIC ---
+
+  Future<void> ensureSyncTable() async {
+    final db = await database;
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sync_tracker (
+          reference_key TEXT,
+          table_name TEXT,
+          status TEXT,
+          last_attempt TEXT,
+          error_message TEXT,
+          PRIMARY KEY (reference_key, table_name)
+        )
+      ''');
+    } catch (_) {}
+  }
+
+  /// Updates the sync status for a specific table of a specific session/family
+  Future<void> updateTableSyncStatus(String referenceId, String tableName, String status, {String? error}) async {
+    final db = await database;
+    final row = {
+      'reference_key': referenceId,
+      'table_name': tableName,
+      'status': status,
+      'last_attempt': DateTime.now().toIso8601String(),
+      'error_message': error
+    };
+    await db.insert('sync_tracker', row, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Gets the sync status for a specific table
+  Future<String> getTableSyncStatus(String referenceId, String tableName) async {
+    final db = await database;
+    final res = await db.query('sync_tracker', 
+      columns: ['status'], 
+      where: 'reference_key = ? AND table_name = ?',
+      whereArgs: [referenceId, tableName]
+    );
+    if (res.isNotEmpty) return res.first['status'] as String;
+    return 'pending';
+  }
+
+  // --- NEW METHODS FOR HISTORY SCREEN ---
+  
+  Future<Map<String, int>> getSyncDetailStats(String referenceKey) async {
+    final db = await database;
+    try {
+      final res = await db.rawQuery('SELECT status, COUNT(*) as count FROM sync_tracker WHERE reference_key = ? GROUP BY status', [referenceKey]);
+      
+      final stats = {'pending': 0, 'synced': 0, 'failed': 0};
+      if (res.isNotEmpty) {
+        for (var row in res) {
+           final status = row['status'].toString();
+           final count = row['count'] as int;
+           stats[status] = count;
+        }
+      }
+      return stats;
+    } catch (_) {
+      return {'pending': 0, 'synced': 0, 'failed': 0};
+    }
+  }
+
+  Future<List<String>> getFailedTables(String referenceKey) async {
+    final db = await database;
+    final res = await db.query('sync_tracker', 
+      columns: ['table_name'], 
+      where: 'reference_key = ? AND status = ?',
+      whereArgs: [referenceKey, 'failed']
+    );
+    return res.map((e) => e['table_name'] as String).toList();
+  }
 }
 

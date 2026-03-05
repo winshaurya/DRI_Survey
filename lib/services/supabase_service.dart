@@ -5,6 +5,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'sync_service.dart';
+import 'hardcoded_remote_columns.dart';
+import 'hardcoded_primary_keys.dart';
 
 typedef SyncErrorCallback = void Function(String message, {bool persistent});
 
@@ -238,37 +240,40 @@ class SupabaseService {
   }
 
   Future<Set<String>> _getRemoteTableColumns(String table) async {
+    // Do NOT perform any runtime schema discovery. Always consult the
+    // hardcoded columns map. If the table is not present in the map, return
+    // an empty set and escalate so maintainers can update the hardcoded map.
     try {
-      final now = DateTime.now();
-      final cached = _remoteTableColumnsCache[table];
-      final fetchedAt = _tableCacheFetchedAt[table];
-      if (cached != null && fetchedAt != null && now.difference(fetchedAt) < _tableCacheTtl) {
-        return cached;
+      if (kHardcodedRemoteTableColumns.containsKey(table)) {
+        final cols = kHardcodedRemoteTableColumns[table]!.toSet();
+        _remoteTableColumnsCache[table] = cols;
+        _tableCacheFetchedAt[table] = DateTime.now();
+        return cols;
       }
-
-      // Attempt to fetch a single row to inspect the keys (column names).
-      final res = await _withRetry(() => client.from(table).select().limit(1), operation: 'fetch columns $table');
-      if (res is List && res.isNotEmpty) {
-        final row = res.first as Map<String, dynamic>;
-        final keys = row.keys.map((k) => k.toString()).toSet();
-        _remoteTableColumnsCache[table] = keys;
-        _tableCacheFetchedAt[table] = now;
-        return keys;
-      }
-
-      // If table is empty or no rows returned, store empty set as fetched so we don't spam the server
-      _remoteTableColumnsCache[table] = <String>{};
-      _tableCacheFetchedAt[table] = now;
+      // Table not in hardcoded map — escalate so developers can add it.
+      _escalateError('Table "$table" not found in hardcoded remote columns map', persistent: true);
       return <String>{};
     } catch (e) {
-      _escalateError('Failed to fetch table columns for $table: $e');
+      _escalateError('Error retrieving hardcoded columns for $table: $e', persistent: true);
       return <String>{};
     }
   }
 
   dynamic _filterPayloadToColumns(String table, dynamic data, Set<String> columns) {
     // If we couldn't fetch columns, fall back to original payload
-    if (columns.isEmpty) return data;
+    if (columns.isEmpty) {
+      // Attempt to map common local/UI keys to expected remote column names
+      // to avoid PostgREST errors when the table is empty and schema cache
+      // could not be discovered via a sample row.
+      try {
+        if (data is Map || data is List) {
+          return _mapKnownAliasesToRemote(table, data);
+        }
+      } catch (_) {
+        return data;
+      }
+      return data;
+    }
 
     if (data is List) {
       final filteredList = <Map<String, dynamic>>[];
@@ -296,6 +301,74 @@ class SupabaseService {
     return data;
   }
 
+  // When remote column list cannot be determined, translate common local
+  // field aliases to the expected remote column names for known tables.
+  dynamic _mapKnownAliasesToRemote(String table, dynamic data) {
+    Map<String, String> aliases = {};
+
+    switch (table) {
+      case 'crop_productivity':
+        aliases = {
+          'name': 'crop_name',
+          'area': 'area_hectares',
+          'productivity': 'productivity_quintal_per_hectare',
+          'total_production': 'total_production_quintal',
+          'sold': 'quantity_sold_quintal',
+          'quantity_consumed': 'quantity_consumed_quintal',
+          'srno': 'sr_no',
+          'id': 'sr_no',
+        };
+        break;
+      case 'animals':
+        aliases = {'type': 'animal_type', 'count': 'number_of_animals', 'srno': 'sr_no', 'id': 'sr_no'};
+        break;
+      case 'family_members':
+        aliases = {'srno': 'sr_no', 'father_name': 'fathers_name', 'mother_name': 'mothers_name'};
+        break;
+      default:
+        aliases = {};
+    }
+
+    if (data is Map) {
+      final mapped = <String, dynamic>{};
+      for (final e in data.entries) {
+        final key = e.key.toString();
+        final mappedKey = aliases.containsKey(key) ? aliases[key]! : key;
+        mapped[mappedKey] = e.value;
+      }
+      return mapped;
+    }
+
+    if (data is List) {
+      final list = <Map<String, dynamic>>[];
+      for (final item in data) {
+        if (item is Map) {
+          final mapped = <String, dynamic>{};
+          for (final e in item.entries) {
+            final key = e.key.toString();
+            final mappedKey = aliases.containsKey(key) ? aliases[key]! : key;
+            mapped[mappedKey] = e.value;
+          }
+          list.add(mapped);
+        }
+      }
+      return list;
+    }
+
+    return data;
+  }
+
+  // Resolve known table name aliases when the local table name differs from
+  // the remote table (e.g. legacy names vs merged tables). Update this map
+  // when new mappings are discovered from server errors.
+  String _resolveTableName(String table) {
+    const aliases = <String, String>{
+      'government_schemes': 'merged_govt_schemes',
+      'government_scheme': 'merged_govt_schemes',
+    };
+    return aliases[table] ?? table;
+  }
+
   List<Map<String, dynamic>> _normalizeList(List<dynamic> data) {
     final normalized = <Map<String, dynamic>>[];
     for (final item in data) {
@@ -316,11 +389,14 @@ class SupabaseService {
     if (data == null) return;
     if (data is List && data.isEmpty) return;
 
-    debugPrint('[Supabase Sync] _upsertWithRetry start for $table; payloadType=${data.runtimeType}');
+    // Allow mapping of local table names to remote names (aliases)
+    final resolvedTable = _resolveTableName(table);
 
-    // Fetch and cache remote table columns, then filter payload to known columns to avoid unknown-column errors
-    final columns = await _getRemoteTableColumns(table);
-    var filtered = _filterPayloadToColumns(table, data, columns);
+    debugPrint('[Supabase Sync] _upsertWithRetry start for $table -> $resolvedTable; payloadType=${data.runtimeType}');
+
+    // Fetch and cache remote table columns for the resolved table
+    final columns = await _getRemoteTableColumns(resolvedTable);
+    var filtered = _filterPayloadToColumns(resolvedTable, data, columns);
 
     // Normalize values (booleans -> 0/1, strings -> trimmed, numbers parsed when applicable)
     if (filtered is List) {
@@ -347,93 +423,152 @@ class SupabaseService {
       filtered = _normalizeMap(casted);
     }
 
-    // determine conflict target for upsert to satisfy PK requirements
-    String? conflictTarget;
-    // try using cached column list first, fall back to payload keys if empty
-    Set<String> detectCols = columns;
-    if (detectCols.isEmpty) {
-      if (filtered is Map<String, dynamic>) {
-        detectCols = filtered.keys.toSet();
-      } else if (filtered is List && filtered.isNotEmpty && filtered.first is Map) {
-        detectCols = (filtered.first as Map<String, dynamic>).keys.toSet();
+    // Remove server-managed fields that should be created by the DB.
+    final serverGeneratedKeys = {
+      'created_at',
+      'updated_at',
+      'created_by',
+      'updated_by',
+      'last_edited_at',
+    };
+    if (filtered is List) {
+      for (final item in filtered) {
+        if (item is Map<String, dynamic>) {
+          for (final k in serverGeneratedKeys) {
+            item.remove(k);
+          }
+        }
+      }
+    } else if (filtered is Map<String, dynamic>) {
+      for (final k in serverGeneratedKeys) {
+        filtered.remove(k);
       }
     }
-    if (detectCols.contains('phone_number')) {
-      conflictTarget = detectCols.contains('sr_no') ? 'phone_number,sr_no' : 'phone_number';
-    }
-    if (conflictTarget == null && table == 'family_survey_sessions') {
-      debugPrint('Upsert $table without conflict target, payload=$filtered');
+
+    // If the table has an sr_no column, ensure every list row has a non-null sr_no
+    if (filtered is List && columns.contains('sr_no')) {
+      int auto = 1;
+      for (final item in filtered) {
+        if (item is Map<String, dynamic>) {
+          if (item['sr_no'] == null) {
+            item['sr_no'] = auto;
+          }
+          auto++;
+        }
+      }
     }
 
-      await _withRetry(() async {
-      // Ensure PostgREST returns the upserted rows so we can detect RLS/permission failures.
-      // .select() forces the server to return the affected rows.
-      final res = await (conflictTarget != null
-          ? client.from(table).upsert(filtered, onConflict: conflictTarget).select()
-          : client.from(table).upsert(filtered).select());
+    // determine conflict target for upsert to satisfy PK requirements
+    String? conflictTarget;
+    // Prefer authoritative PK map if available
+    final pkCols = kHardcodedRemotePrimaryKeys[resolvedTable];
+    if (pkCols != null && pkCols.isNotEmpty) {
+      conflictTarget = pkCols.join(',');
+    } else {
+      // try using cached column list first, fall back to payload keys if empty
+      Set<String> detectCols = columns;
+      if (detectCols.isEmpty) {
+        if (filtered is Map<String, dynamic>) {
+          detectCols = filtered.keys.toSet();
+        } else if (filtered is List && filtered.isNotEmpty && filtered.first is Map) {
+          detectCols = (filtered.first as Map<String, dynamic>).keys.toSet();
+        }
+      }
+      if (detectCols.contains('phone_number')) {
+        conflictTarget = detectCols.contains('sr_no') ? 'phone_number,sr_no' : 'phone_number';
+      }
+    }
+    if (conflictTarget == null && resolvedTable == 'family_survey_sessions') {
+      debugPrint('Upsert $resolvedTable without conflict target, payload=$filtered');
+    }
 
-      // Defensive inspection of the Supabase response: some RLS/permission
-      // configurations can result in an empty/no-data response without an
-      // explicit error. Treat empty responses for session-like tables as
-      // failures so callers will retry/queue and we can surface the issue.
+    // Prepare a safe payload snapshot for logging in case of failure
+    String _payloadSnapshot(dynamic p) {
+      try {
+        return jsonEncode(p);
+      } catch (_) {
+        return p.toString();
+      }
+    }
+
+    await _withRetry(() async {
+      dynamic res;
+      try {
+        if (conflictTarget != null) {
+          res = await client.from(resolvedTable).upsert(filtered, onConflict: conflictTarget).select();
+        } else {
+          res = await client.from(resolvedTable).upsert(filtered).select();
+        }
+      } catch (e) {
+        final es = e.toString();
+        if (conflictTarget != null && (es.contains('ON CONFLICT') || es.contains('no unique or exclusion constraint') || es.contains('42P10'))) {
+          debugPrint('[Supabase Sync] onConflict failed for $resolvedTable with target $conflictTarget; retrying without onConflict: $e');
+          // Retry without onConflict
+          res = await client.from(resolvedTable).upsert(filtered).select();
+        } else {
+          // Log payload for diagnostics before rethrowing
+          final payloadStr = _payloadSnapshot(filtered);
+          final msg = '[Supabase Sync] Upsert exception for $resolvedTable: $e; payload=$payloadStr';
+          _escalateError(msg, persistent: true);
+          rethrow;
+        }
+      }
+
       final dynamic dyn = res;
-      debugPrint('[Supabase Sync] Raw upsert response for $table: $dyn');
+      debugPrint('[Supabase Sync] Raw upsert response for $resolvedTable: $dyn');
       try {
         debugPrint('[Supabase Sync] Auth session present: ${client.auth.currentSession != null}');
         debugPrint('[Supabase Sync] Access token present: ${client.auth.currentSession?.accessToken != null}');
       } catch (_) {}
-      final dynamic respError = (dyn?.error ?? (dyn as dynamic).error);
-      final dynamic respData = (dyn is Map ? (dyn['data'] ?? dyn['body'] ?? dyn) : (dyn?.data ?? (dyn as dynamic).data));
-      final dynamic respStatus = (dyn?.status ?? (dyn as dynamic).status);
+
+      dynamic respError;
+      dynamic respData;
+      dynamic respStatus;
+
+      if (dyn is Map) {
+        respError = dyn['error'] ?? dyn['error_description'];
+        respData = dyn['data'] ?? dyn['body'] ?? dyn;
+        respStatus = dyn['status'];
+      } else {
+        respError = null;
+        respData = dyn;
+        respStatus = null;
+      }
 
       if (respError != null) {
-        final msg = '[Supabase Sync] upsert error for $table: ${respError?.message ?? respError}';
+        final payloadStr = _payloadSnapshot(filtered);
+        final msg = '[Supabase Sync] upsert error for $resolvedTable: ${respError?.message ?? respError}; payload=$payloadStr';
         _escalateError(msg, persistent: true);
         throw Exception(msg);
       }
 
       if (respData == null || (respData is List && respData.isEmpty) || (respData is Map && respData.isEmpty)) {
-        // For session tables and other top-level tables we expect at least
-        // one returned row from an upsert. If none returned, escalate.
-        if (table == 'family_survey_sessions' || table.endsWith('_sessions') || table == 'village_survey_sessions') {
-          final msg = '[Supabase Sync] upsert returned empty data for $table; status=$respStatus; data=$respData';
+        final payloadStr = _payloadSnapshot(filtered);
+        if (resolvedTable == 'family_survey_sessions' || resolvedTable.endsWith('_sessions') || resolvedTable == 'village_survey_sessions') {
+          final msg = '[Supabase Sync] upsert returned empty data for $resolvedTable; status=$respStatus; data=$respData; payload=$payloadStr';
           _escalateError(msg, persistent: true);
           throw Exception(msg);
         } else {
-          debugPrint('[Supabase Sync] upsert returned empty data for $table; continuing; status=$respStatus; data=$respData');
+          debugPrint('[Supabase Sync] upsert returned empty data for $resolvedTable; continuing; status=$respStatus; data=$respData; payload=$payloadStr');
         }
       }
 
-      debugPrint('[Supabase Sync] upsert success for $table; data=$respData; status=$respStatus');
+      debugPrint('[Supabase Sync] upsert success for $resolvedTable; data=$respData; status=$respStatus');
       return res;
-    }, operation: 'upsert $table');
+    }, operation: 'upsert $resolvedTable');
   }
 
   Future<Map<String, String>> validateSchema(List<String> tableNames) async {
     final errors = <String, String>{};
 
+    // Validation now runs against the hardcoded map only. No network calls
+    // are performed — missing tables are reported as errors so the map can
+    // be updated.
     for (final table in tableNames) {
-      try {
-        // Try to select a stable natural key column if available to avoid
-        // assuming an `id` column exists. Prefer `phone_number`, then
-        // `session_id`, then `id`, finally fallback to `*`.
-        final cols = await _getRemoteTableColumns(table);
-        String selectCol = '*';
-        if (cols.contains('phone_number')) {
-          selectCol = 'phone_number';
-        } else if (cols.contains('session_id')) {
-          selectCol = 'session_id';
-        } else if (cols.contains('id')) {
-          selectCol = 'id';
-        }
-
-        await _withRetry(
-          () => client.from(table).select(selectCol).limit(1),
-          operation: 'schema check $table',
-        );
-      } catch (e) {
-        errors[table] = e.toString();
-        _escalateError('Schema validation failed for table $table: $e', persistent: true);
+      if (!kHardcodedRemoteTableColumns.containsKey(table)) {
+        final msg = 'Table "$table" not present in hardcoded remote columns map';
+        errors[table] = msg;
+        _escalateError('Schema validation: $msg', persistent: true);
       }
     }
 

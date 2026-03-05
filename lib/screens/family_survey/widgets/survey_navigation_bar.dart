@@ -33,8 +33,13 @@ class _SurveyNavigationBarState extends ConsumerState<SurveyNavigationBar> {
     try {
       final surveyNotifier = ref.read(surveyProvider.notifier);
 
-      // Save current page data before navigating
-      await surveyNotifier.saveCurrentPageData();
+      // Save current page data before navigating. Keep page-0 behavior
+      // (await) unchanged; for other pages start save in background.
+      if (widget.currentPageIndex == 0) {
+        await surveyNotifier.saveCurrentPageData();
+      } else {
+        surveyNotifier.saveCurrentPageData();
+      }
 
       // Navigate to previous page
       final newPageIndex = widget.currentPageIndex - 1;
@@ -63,8 +68,12 @@ class _SurveyNavigationBarState extends ConsumerState<SurveyNavigationBar> {
     try {
       final surveyNotifier = ref.read(surveyProvider.notifier);
 
-      // Save current page data
-      await surveyNotifier.saveCurrentPageData();
+      // Save current page data. Keep page-0 synchronous; other pages fire-and-forget.
+      if (widget.currentPageIndex == 0) {
+        await surveyNotifier.saveCurrentPageData();
+      } else {
+        surveyNotifier.saveCurrentPageData();
+      }
 
       if (widget.isLastPage) {
         // Complete survey

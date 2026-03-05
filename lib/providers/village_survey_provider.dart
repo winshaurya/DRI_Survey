@@ -319,6 +319,75 @@ class VillageSurveyNotifier extends Notifier<VillageSurveyState> {
       case 12: // Biodiversity Register
         await _databaseService.insertOrUpdate('village_biodiversity_register', data, sessionId);
         break;
+      case 13: // Crop Productivity
+        if (data['crops'] is List) {
+          final list = data['crops'] as List;
+          for (int i = 0; i < list.length; i++) {
+            final item = list[i];
+            if (item is Map<String, dynamic>) {
+              item['sr_no'] ??= (i + 1);
+              await _databaseService.insertOrUpdate('village_crop_productivity', item, sessionId);
+            }
+          }
+        }
+        break;
+      case 14: // Animals
+        if (data['animals'] is List) {
+          final list = data['animals'] as List;
+          for (int i = 0; i < list.length; i++) {
+             final item = list[i];
+             if (item is Map<String, dynamic>) {
+                item['sr_no'] ??= (i + 1);
+                await _databaseService.insertOrUpdate('village_animals', item, sessionId);
+             }
+          }
+        }
+        break;
+      case 15: // Agricultural Implements
+        await _databaseService.insertOrUpdate('village_agricultural_implements', data, sessionId);
+        break;
+      case 16: // Drinking Water
+        await _databaseService.insertOrUpdate('village_drinking_water', data, sessionId);
+        break;
+      case 17: // Transport
+        await _databaseService.insertOrUpdate('village_transport', data, sessionId);
+        break;
+      case 18: // Entertainment
+        await _databaseService.insertOrUpdate('village_entertainment', data, sessionId);
+        break;
+      case 19: // Medical Treatment
+        await _databaseService.insertOrUpdate('village_medical_treatment', data, sessionId);
+        break;
+      case 20: // Disputes
+        await _databaseService.insertOrUpdate('village_disputes', data, sessionId);
+        break;
+      case 21: // Social Consciousness
+        await _databaseService.insertOrUpdate('village_social_consciousness', data, sessionId);
+        break;
+      case 22: // Children Data
+        await _databaseService.insertOrUpdate('village_children_data', data, sessionId);
+        break;
+      case 23: // Malnutrition Data
+        if (data['malnutrition'] is List) {
+           final list = data['malnutrition'] as List;
+           for (int i = 0; i < list.length; i++) {
+              final item = list[i];
+              if (item is Map<String, dynamic>) {
+                 item['sr_no'] ??= (i + 1);
+                 await _databaseService.insertOrUpdate('village_malnutrition_data', item, sessionId);
+              }
+           }
+        }
+        break;
+      case 24: // BPL Families
+        await _databaseService.insertOrUpdate('village_bpl_families', data, sessionId);
+        break;
+      case 25: // Kitchen Gardens
+        await _databaseService.insertOrUpdate('village_kitchen_gardens', data, sessionId);
+        break;
+      case 26: // Unemployment
+        await _databaseService.insertOrUpdate('village_unemployment', data, sessionId);
+        break;
       default:
         print('Unknown screen index: $screenIndex');
     }

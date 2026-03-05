@@ -1,4 +1,0 @@
-schemaname,tablename,policyname,permissive,roles,qual,with_check
-public,family_survey_sessions,Family survey - Users access own sessions,PERMISSIVE,{public},(auth.role() = 'authenticated'::text),(auth.role() = 'authenticated'::text)
-public,family_survey_sessions,allow_authenticated_insert,PERMISSIVE,{authenticated},"",(surveyor_email = (auth.jwt() ->> 'email'::text))
-public,family_survey_sessions,users_select_update_delete_own_rows,PERMISSIVE,{authenticated},(surveyor_email = (auth.jwt() ->> 'email'::text)),(surveyor_email = (auth.jwt() ->> 'email'::text))

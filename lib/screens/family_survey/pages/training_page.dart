@@ -51,16 +51,37 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   }
 
   void _loadExistingData() {
-    // Separate taken vs needed
-    final rawTrainings = List<Map<String, dynamic>>.from(widget.pageData['training_members'] ?? []);
-    
+    // Training data can be present either as a nested map under 'training'
+    // (preferred shape used when pages write back) or as flattened keys
+    // (older/flattened state). Support both shapes for robustness.
+    final nested = widget.pageData['training'] as Map<String, dynamic>?;
+
+    final rawTrainings = <Map<String, dynamic>>[];
+    if (nested != null && nested['training_members'] is List) {
+      rawTrainings.addAll(List<Map<String, dynamic>>.from(nested['training_members']));
+    } else if (widget.pageData['training_members'] is List) {
+      rawTrainings.addAll(List<Map<String, dynamic>>.from(widget.pageData['training_members']));
+    }
+
     _trainingsTaken = rawTrainings.where((t) => t['status'] == 'taken' || t['status'] == null).toList();
     _trainingsNeeded = rawTrainings.where((t) => t['status'] == 'needed').toList();
-    
-    _needTraining = widget.pageData['want_training'] == true || _trainingsNeeded.isNotEmpty;
 
-    _shgMembers = List<Map<String, dynamic>>.from(widget.pageData['shg_members'] ?? []);
-    _fpoMembers = List<Map<String, dynamic>>.from(widget.pageData['fpo_members'] ?? []);
+    // want_training may live under nested map or at top-level
+    _needTraining = (nested != null && nested['want_training'] == true) ||
+        (widget.pageData['want_training'] == true) ||
+        _trainingsNeeded.isNotEmpty;
+
+    if (nested != null && nested['shg_members'] is List) {
+      _shgMembers = List<Map<String, dynamic>>.from(nested['shg_members']);
+    } else {
+      _shgMembers = List<Map<String, dynamic>>.from(widget.pageData['shg_members'] ?? []);
+    }
+
+    if (nested != null && nested['fpo_members'] is List) {
+      _fpoMembers = List<Map<String, dynamic>>.from(nested['fpo_members']);
+    } else {
+      _fpoMembers = List<Map<String, dynamic>>.from(widget.pageData['fpo_members'] ?? []);
+    }
   }
 
   @override

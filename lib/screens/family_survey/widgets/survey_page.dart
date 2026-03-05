@@ -248,8 +248,17 @@ offset: const Offset(0, -0.8),
     debugPrint('[SurveyPage] form valid=$isValid for page ${widget.pageIndex}');
     if (isValid) {
       _formKey.currentState?.save();
-      // Save current page data locally before navigating (family survey only)
-      await ref.read(surveyProvider.notifier).saveCurrentPageData();
+      // For page 0 we must wait for the save flow to complete; for other
+      // pages we start the save but don't await the remote sync so the UI
+      // can navigate immediately.
+      if (widget.pageIndex == 0) {
+        await ref.read(surveyProvider.notifier).saveCurrentPageData();
+      } else {
+        // fire-and-forget save (local DB writes are awaited inside provider,
+        // but provider now starts remote sync without awaiting it)
+        ref.read(surveyProvider.notifier).saveCurrentPageData();
+      }
+
       widget.onNext(_pageData);
     } else {
       debugPrint('[SurveyPage] Validation failed for page ${widget.pageIndex}');

@@ -6,7 +6,7 @@ import 'package:location/location.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/location_service.dart';
 import '../../../data/india_states_districts.dart';
-import '../../../data/shine_villages.dart';
+import 'package:dri_survey/data/shine_villages.dart';
 
 class LocationPage extends StatefulWidget {
   final Map<String, dynamic> pageData;
@@ -225,14 +225,14 @@ class _LocationPageState extends State<LocationPage> {
       villageNameController.text = shineVillage.revenueVillage;
       panchayatController.text = shineVillage.panchayat;
       blockController.text = shineVillage.block;
-      tehsilController.text = shineVillage.block; // Using block as tehsil
+      tehsilController.text = shineVillage.tehsil;
 
       // Update pageData
       widget.pageData['shine_code'] = shineVillage.shineCode;
       widget.pageData['village_name'] = shineVillage.revenueVillage;
       widget.pageData['panchayat'] = shineVillage.panchayat;
       widget.pageData['block'] = shineVillage.block;
-      widget.pageData['tehsil'] = shineVillage.block; // Using block as tehsil
+      widget.pageData['tehsil'] = shineVillage.tehsil;
 
       // Handle State
       String tempState = shineVillage.state;

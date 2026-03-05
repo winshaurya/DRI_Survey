@@ -15,7 +15,7 @@ import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../data/india_states_districts.dart';
-import '../../data/shine_villages.dart';
+import 'package:dri_survey/data/shine_villages.dart';
 import '../../form_template.dart';
 import '../../services/location_service.dart';
 import '../../providers/village_survey_provider.dart';

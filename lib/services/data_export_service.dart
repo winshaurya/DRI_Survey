@@ -4,6 +4,7 @@ import 'package:excel/excel.dart';
 
 import '../services/database_service.dart';
 import '../services/excel_service.dart';
+import '../services/xlsx_export_service.dart';
 
 /// Service for exporting survey data to Excel format
 /// Saves directly to device storage
@@ -27,7 +28,9 @@ class DataExportService {
   /// Export a single survey by phone number to Excel file and save to storage
   Future<void> exportCompleteSurveyData(String phoneNumber) async {
     try {
-      await ExcelService().exportCompleteSurveyToExcel(phoneNumber);
+      // Use XLSX exporter (single consolidated sheet, keys-first template)
+      final fileName = 'family_survey_${phoneNumber}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+      await XlsxExportService().exportSurveyToXlsx(phoneNumber, fileName);
     } catch (e) {
       throw Exception('Failed to export survey: $e');
     }

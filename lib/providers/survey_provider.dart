@@ -106,22 +106,29 @@ class SurveyNotifier extends Notifier<SurveyState> {
         }
 
         await _databaseService.saveData('family_survey_sessions', sessionPayload);
-        // send the full session payload for page 0 so remote receives the
-        // complete session shape (includes surveyor_email, surveyor_name, etc)
-        try {
-          await _syncService.syncFamilyPageData(effectivePhone, 0, sessionPayload);
-        } catch (e, st) {
-          debugPrint('syncFamilyPageData(page=0) failed for $effectivePhone: $e');
-          debugPrint(st.toString());
-        }
+        await _syncService.syncFamilyPageData(effectivePhone, 0, pageData);
         await _updatePageCompletionStatus(0, true);
         debugPrint('Started family session upsert for page 0 (phone: $effectivePhone) — result will be reported by SyncService');
       } else {
-        // All other pages: save and sync immediately. Use effectivePhone as FK for child tables.
+        // All other pages: save locally and start a background cloud sync.
+        // We await the local DB work to ensure durability, but do not await
+        // the remote upsert so navigation is not blocked.
         await _savePageDataToDatabase(state.currentPage, pageData, effectivePhone);
         await _updatePageCompletionStatus(state.currentPage, true);
-        await _syncService.syncFamilyPageData(effectivePhone, state.currentPage, pageData);
-        debugPrint('Saved page ${state.currentPage} locally and started cloud sync for phone: $effectivePhone');
+
+        // Fire-and-forget remote sync; log any startup errors but don't await.
+        try {
+          _syncService.syncFamilyPageData(effectivePhone, state.currentPage, pageData)
+              .catchError((e, st) {
+            debugPrint('Background syncFamilyPageData failed to start for $effectivePhone page ${state.currentPage}: $e');
+            debugPrint(st.toString());
+          });
+        } catch (e, st) {
+          debugPrint('Failed to initiate background syncFamilyPageData: $e');
+          debugPrint(st.toString());
+        }
+
+        debugPrint('Saved page ${state.currentPage} locally and started background cloud sync for phone: $effectivePhone');
       }
     } catch (e) {
       debugPrint('Error saving page data: $e');
@@ -502,6 +509,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         break;
       case 21: // Children
         await _saveChildren(pageData['children'], phoneNumber);
+        await _saveMalnourishedChildrenData(pageData['malnourished_children_data'], phoneNumber);
         break;
       case 22: // Migration
         await _saveMigration(pageData['migration'], phoneNumber);
@@ -717,14 +725,50 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
   Future<void> _saveCropProductivity(dynamic crops, String phoneNumber) async {
     if (crops is! List) return;
-    for (final crop in crops) {
-      if (crop is Map<String, dynamic>) {
-        try {
-          await _databaseService.insertOrUpdate('crop_productivity', crop, phoneNumber);
-        } catch (e, st) {
-          debugPrint('Failed to save crop_productivity for $phoneNumber: $e');
-          debugPrint(st.toString());
-        }
+    for (var i = 0; i < crops.length; i++) {
+      final crop = crops[i];
+      if (crop is! Map<String, dynamic>) continue;
+
+      final row = Map<String, dynamic>.from(crop);
+
+      // Ensure sr_no exists (primary key with phone_number)
+      final sr = row['sr_no'] ?? row['srno'] ?? row['id'] ?? row['index'];
+      if (sr is String) {
+        row['sr_no'] = int.tryParse(sr) ?? (i + 1);
+      } else if (sr is num) {
+        row['sr_no'] = sr.toInt();
+      } else {
+        row['sr_no'] = i + 1;
+      }
+
+      // Map common UI/local keys to DB column names
+      if (row.containsKey('name') && !row.containsKey('crop_name')) {
+        row['crop_name'] = row['name'];
+      }
+      if (row.containsKey('area') && !row.containsKey('area_hectares')) {
+        row['area_hectares'] = row['area'];
+      }
+      if (row.containsKey('productivity') && !row.containsKey('productivity_quintal_per_hectare')) {
+        row['productivity_quintal_per_hectare'] = row['productivity'];
+      }
+      if (row.containsKey('total_production') && !row.containsKey('total_production_quintal')) {
+        row['total_production_quintal'] = row['total_production'];
+      }
+      if (row.containsKey('sold') && !row.containsKey('quantity_sold_quintal')) {
+        row['quantity_sold_quintal'] = row['sold'];
+      }
+      if (row.containsKey('quantity_consumed') && !row.containsKey('quantity_consumed_quintal')) {
+        row['quantity_consumed_quintal'] = row['quantity_consumed'];
+      }
+
+      // Ensure phone_number present
+      row['phone_number'] = phoneNumber;
+
+      try {
+        await _databaseService.insertOrUpdate('crop_productivity', row, phoneNumber);
+      } catch (e, st) {
+        debugPrint('Failed to save crop_productivity for $phoneNumber: $e');
+        debugPrint(st.toString());
       }
     }
   }
@@ -737,16 +781,36 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
   Future<void> _saveAnimals(dynamic animals, String phoneNumber) async {
     if (animals is! List) return;
-    for (final animal in animals) {
+    for (int i = 0; i < animals.length; i++) {
+      final animal = animals[i];
       if (animal is Map<String, dynamic>) {
+        // Ensure sr_no exists
+        final sr = animal['sr_no'] ?? animal['srno'] ?? animal['id'];
+        if (sr is String) {
+          animal['sr_no'] = int.tryParse(sr) ?? (i + 1);
+        } else if (sr is num) {
+          animal['sr_no'] = sr.toInt();
+        } else {
+          animal['sr_no'] = i + 1;
+        }
+        
         await _databaseService.insertOrUpdate('animals', animal, phoneNumber);
       }
     }
   }
 
   Future<void> _saveAgriculturalEquipment(dynamic equipment, String phoneNumber) async {
-    if (equipment is! List) return;
-    for (final item in equipment) {
+    // agricultural_equipment was migrated to single-row per phone_number table
+    // but the UI might still send a list. Take the first item or iterate if the DB supports it?
+    // DB schema: CREATE TABLE agricultural_equipment (phone_number INTEGER PRIMARY KEY...)
+    // So distinct rows by equipment type are NOT supported anymore unless migrated back.
+    // Assuming UI sends one combined object or list of ONE object.
+    
+    if (equipment is Map<String, dynamic>) {
+        await _databaseService.insertOrUpdate('agricultural_equipment', equipment, phoneNumber);
+    } else if (equipment is List && equipment.isNotEmpty) {
+      // Take first item if list
+      final item = equipment.first;
       if (item is Map<String, dynamic>) {
         await _databaseService.insertOrUpdate('agricultural_equipment', item, phoneNumber);
       }
@@ -766,10 +830,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> _saveDrinkingWaterSources(dynamic sources, String phoneNumber) async {
-    if (sources is! List) return;
-    for (final source in sources) {
-      if (source is Map<String, dynamic>) {
-        await _databaseService.insertOrUpdate('drinking_water_sources', source, phoneNumber);
+    // drinking_water_sources was migrated to single-row
+    if (sources is Map<String, dynamic>) {
+        await _databaseService.insertOrUpdate('drinking_water_sources', sources, phoneNumber);
+    } else if (sources is List && sources.isNotEmpty) {
+      final item = sources.first;
+      if (item is Map<String, dynamic>) {
+        await _databaseService.insertOrUpdate('drinking_water_sources', item, phoneNumber);
       }
     }
   }
@@ -823,16 +890,42 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> _saveChildren(dynamic children, String phoneNumber) async {
+    // Only process lists
     if (children is! List) return;
-    for (final child in children) {
-      if (child is Map<String, dynamic>) {
-        await _databaseService.insertOrUpdate('children_data', child, phoneNumber);
-      }
+    
+    for (int i = 0; i < children.length; i++) {
+        final child = children[i];
+        if (child is Map<String, dynamic>) {
+            final sr = child['sr_no'];
+            if (sr is String) {
+               child['sr_no'] = int.tryParse(sr) ?? (i + 1);
+            } else if (sr is num) {
+               child['sr_no'] = sr.toInt();
+            } else {
+               child['sr_no'] = i + 1;
+            }
+            await _databaseService.insertOrUpdate('children_data', child, phoneNumber);
+        }
+    }
+  }
+
+  Future<void> _saveMalnourishedChildrenData(dynamic data, String phoneNumber) async {
+    if (data is! List) return;
+    for (int i = 0; i < data.length; i++) {
+        final item = data[i];
+        if (item is Map<String, dynamic>) {
+            item['sr_no'] = i + 1;
+            await _databaseService.insertOrUpdate('malnourished_children_data', item, phoneNumber);
+        }
     }
   }
 
   Future<void> _saveMigration(dynamic data, String phoneNumber) async {
     if (data is Map<String, dynamic>) {
+      if (data.containsKey('migrated_members')) {
+        data['migrated_members_json'] = data['migrated_members'];
+      }
+      data['sr_no'] = 1;
       await _databaseService.insertOrUpdate('migration_data', data, phoneNumber);
     }
   }

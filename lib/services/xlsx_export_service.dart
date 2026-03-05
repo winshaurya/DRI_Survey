@@ -5,6 +5,82 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:dri_survey/services/database_service.dart';
 
 class XlsxExportService {
+
+  String _prettyLabel(String key) {
+    final words = key.replaceAll('_', ' ').split(' ');
+    return words.map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
+  }
+
+  // Mapping of internal keys → UI question labels (common/important keys).
+  // This list is sourced from lib/screens/family_survey/pages (UI labels).
+  final Map<String, String> _labelMap = {
+    // Session / location
+    'phone_number': 'Phone Number',
+    'village_name': 'Village Name',
+    'panchayat': 'Panchayat',
+    'block': 'Block',
+    'tehsil': 'Tehsil',
+    'district': 'District',
+    'postal_address': 'Postal Address',
+    'pin_code': 'Pin Code',
+    'shine_code': 'Shine Code',
+    'latitude': 'Latitude',
+    'longitude': 'Longitude',
+    'surveyor_name': 'Surveyor Name',
+
+    // Family member fields
+    'sr_no': 'Sr. No.',
+    'name': 'Name',
+    'fathers_name': "Father's Name",
+    'mothers_name': "Mother's Name",
+    'relationship_with_head': 'Relationship with Head',
+    'age': 'Age',
+    'sex': 'Sex',
+    'physically_fit': 'Physically Fit/Unfit',
+    'physically_fit_cause': 'Cause of Unfitness',
+    'educational_qualification': 'Educational Qualification',
+    'inclination_self_employment': 'Inclination Toward Self Employment',
+    'occupation': 'Occupation',
+    'days_employed': 'No. of Days Employed',
+    'income': 'Income',
+    'awareness_about_village': 'Awareness About the Village',
+    'participate_gram_sabha': 'Participate in Gram Sabha Meetings',
+    'insured': 'Insured',
+    'insurance_company': 'Insurance Company',
+
+    // Land & crops
+    'irrigated_area': 'Irrigated Area',
+    'cultivable_area': 'Cultivable Area',
+    'crop_name': 'Crop Name',
+    'crop_type': 'Crop Type',
+    'area_hectares': 'Area (hectares)',
+    'total_production_quintal': 'Total Production (quintal)',
+    'quantity_sold_quintal': 'Quantity Sold (quintal)',
+    'rate': 'Rate',
+
+    // Animals
+    'animal_type': 'Animal Type',
+    'number_of_animals': 'Number of Animals',
+    'breed': 'Breed',
+    'production_per_animal': 'Production per Animal',
+
+    // Schemes / bank
+    'account_number': 'Account Number',
+    'bank_name': 'Bank Name',
+    'ifsc_code': 'IFSC Code',
+
+    // Generic known fields
+    'head_of_family': 'Head of Family',
+    'family_id': 'Family ID',
+  };
+
+  String _labelForKey(String key) {
+    if (key == null) return '';
+    final k = key.toString();
+    if (_labelMap.containsKey(k)) return _labelMap[k]!;
+    return _prettyLabel(k);
+  }
+
   /// Export village survey identified by [sessionId] to an XLSX file
   /// saved at the app documents directory with name [fileName].
   Future<String> exportVillageSurveyToXlsx(String sessionId, String fileName) async {
@@ -72,9 +148,9 @@ class XlsxExportService {
         continue;
       }
 
-      // Use keys of first row as header
+      // Use keys of first row as header (mapped labels)
       final headerKeys = rows.first.keys.toList();
-      final header = headerKeys.map((k) => TextCellValue(k.toString())).toList();
+      final header = headerKeys.map((k) => TextCellValue(_labelForKey(k.toString()))).toList();
       sheet.appendRow(header);
 
       for (final row in rows) {
@@ -107,7 +183,7 @@ class XlsxExportService {
     // Load session data
     final session = await db.getSurveySession(sessionId) ?? {};
 
-    // Tables to export (add/remove as desired)
+    // Tables to export in approximate page order (one-to-many grids will become tables)
     final tableNames = <String>[
       'family_members',
       'social_consciousness',
@@ -156,33 +232,41 @@ class XlsxExportService {
 
     final excel = Excel.createExcel();
 
-    // Session sheet (key / value)
-    final sessionSheet = excel['Session'];
-    sessionSheet.appendRow([TextCellValue('Field'), TextCellValue('Value')]);
+    // Single consolidated sheet for family survey export
+    final sheet = excel['FamilySurvey'];
+
+    // 1) Session / top-level key-values (kept as Section = Session, Field, Value)
+    sheet.appendRow([TextCellValue('Section'), TextCellValue('Field'), TextCellValue('Value')]);
     session.forEach((k, v) {
-      sessionSheet.appendRow([TextCellValue(k), TextCellValue(v?.toString() ?? '')]);
+      sheet.appendRow([TextCellValue('Session'), TextCellValue(k.toString()), TextCellValue(v?.toString() ?? '')]);
     });
 
-    // Other tables: create sheet per table
+    // Blank row separator
+    sheet.appendRow([TextCellValue('')]);
+
+    // 2) Page-wise sections and one-to-many tables (grid)
     for (final table in tableNames) {
       final rows = await db.getData(table, sessionId);
-      final sheetName = table.length <= 31 ? table : table.substring(0, 31);
-      final sheet = excel[sheetName];
 
+      // Section header: Table name (keeps page order as defined above)
+      sheet.appendRow([TextCellValue('Section'), TextCellValue(table)]);
       if (rows.isEmpty) {
-        sheet.appendRow([TextCellValue('No data')]);
+        sheet.appendRow([TextCellValue('Info'), TextCellValue('No data')]);
+        sheet.appendRow([TextCellValue('')]); // spacer
         continue;
       }
 
-      // Use keys of first row as header
+      // If rows are maps (repeating records) write a header row with keys then rows
       final headerKeys = rows.first.keys.toList();
-      final header = headerKeys.map((k) => TextCellValue(k.toString())).toList();
-      sheet.appendRow(header);
+      // Header row: put a marker in first column then human-friendly question labels
+      sheet.appendRow([TextCellValue('Header'), ...headerKeys.map((k) => TextCellValue(_labelForKey(k.toString()))).toList()]);
 
       for (final row in rows) {
-        final values = headerKeys.map((key) => TextCellValue(row[key] != null ? row[key].toString() : '')).toList();
-        sheet.appendRow(values);
+        sheet.appendRow([TextCellValue('Row'), ...headerKeys.map((key) => TextCellValue(row[key] != null ? row[key].toString() : '')).toList()]);
       }
+
+      // Spacer between sections
+      sheet.appendRow([TextCellValue('')]);
     }
 
     // Encode and write file to application documents directory

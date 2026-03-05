@@ -55,7 +55,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 44, // bump for training_needs table
+      version: 45, // bump for village PK migration
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -97,6 +97,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 44) {
       await _ensureTrainingNeedsTable(db);
+    }
+    if (oldVersion < 45) {
+      await _migrateVillageTablesPrimaryKey(db);
     }
   }
 
@@ -684,19 +687,19 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS shg_members (phone_number INTEGER NOT NULL, member_name TEXT NOT NULL, shg_name TEXT, purpose TEXT, agency TEXT, position TEXT, monthly_saving REAL, created_at TEXT, PRIMARY KEY (phone_number, member_name))');
 
     // FPO Members
-    await db.execute('CREATE TABLE IF NOT EXISTS fpo_members (phone_number INTEGER NOT NULL, member_name TEXT, fpo_name TEXT, purpose TEXT, agency TEXT, share_capital REAL, created_at TEXT, PRIMARY KEY (phone_number, created_at))');
+    await db.execute('CREATE TABLE IF NOT EXISTS fpo_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, fpo_name TEXT, purpose TEXT, agency TEXT, share_capital REAL, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
 
     // Children Data
     await db.execute('CREATE TABLE IF NOT EXISTS children_data (phone_number INTEGER PRIMARY KEY, births_last_3_years INTEGER, infant_deaths_last_3_years INTEGER, malnourished_children INTEGER, created_at TEXT)');
 
     // Malnourished Children Data
-    await db.execute('CREATE TABLE IF NOT EXISTS malnourished_children_data (phone_number INTEGER NOT NULL, child_id TEXT, child_name TEXT, height REAL, weight REAL, created_at TEXT NOT NULL, PRIMARY KEY (phone_number, created_at))');
+    await db.execute('CREATE TABLE IF NOT EXISTS malnourished_children_data (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, child_id TEXT, child_name TEXT, height REAL, weight REAL, created_at TEXT NOT NULL, PRIMARY KEY (phone_number, sr_no))');
     
     // Child Diseases
     await db.execute('CREATE TABLE IF NOT EXISTS child_diseases (phone_number INTEGER NOT NULL, child_id TEXT, disease_name TEXT, sr_no INTEGER, created_at TEXT NOT NULL, PRIMARY KEY (phone_number, child_id, sr_no))');
 
     // Migration Data
-    await db.execute('CREATE TABLE IF NOT EXISTS migration_data (phone_number INTEGER NOT NULL, family_members_migrated INTEGER, no_migration INTEGER DEFAULT 0, reason TEXT, duration TEXT, destination TEXT, migrated_members_json TEXT, created_at TEXT NOT NULL, PRIMARY KEY (phone_number, created_at))');
+    await db.execute('CREATE TABLE IF NOT EXISTS migration_data (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, family_members_migrated INTEGER, no_migration INTEGER DEFAULT 0, reason TEXT, duration TEXT, destination TEXT, migrated_members_json TEXT, created_at TEXT NOT NULL, PRIMARY KEY (phone_number, sr_no))');
     
     // Tribal Questions
     await db.execute('CREATE TABLE IF NOT EXISTS tribal_questions (phone_number INTEGER PRIMARY KEY, deity_name TEXT, festival_name TEXT, dance_name TEXT, language TEXT, created_at TEXT)');
@@ -912,7 +915,6 @@ class DatabaseHelper {
     // Village Crop Productivity
     await db.execute('''
       CREATE TABLE IF NOT EXISTS village_crop_productivity (
-        id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         sr_no INTEGER NOT NULL,
@@ -921,20 +923,21 @@ class DatabaseHelper {
         productivity_quintal_per_hectare REAL,
         total_production_quintal REAL,
         quantity_consumed_quintal REAL,
-        quantity_sold_quintal REAL
+        quantity_sold_quintal REAL,
+        PRIMARY KEY (session_id, sr_no)
       )
     ''');
 
     // Village Animals
     await db.execute('''
       CREATE TABLE IF NOT EXISTS village_animals (
-        id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         sr_no INTEGER NOT NULL,
         animal_type TEXT,
         total_count INTEGER,
-        breed TEXT
+        breed TEXT,
+        PRIMARY KEY (session_id, sr_no)
       )
     ''');
 
@@ -1105,7 +1108,6 @@ class DatabaseHelper {
     // Village Malnutrition Data
     await db.execute('''
       CREATE TABLE IF NOT EXISTS village_malnutrition_data (
-        id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         sr_no INTEGER NOT NULL,
@@ -1114,7 +1116,8 @@ class DatabaseHelper {
         age INTEGER,
         height_feet REAL,
         weight_kg REAL,
-        disease_cause TEXT
+        disease_cause TEXT,
+        PRIMARY KEY (session_id, sr_no)
       )
     ''');
     
@@ -1155,8 +1158,7 @@ class DatabaseHelper {
     // Village Biodiversity Register (Updated)
     await db.execute('''
       CREATE TABLE IF NOT EXISTS village_biodiversity_register (
-        id TEXT PRIMARY KEY,
-        session_id TEXT NOT NULL,
+        session_id TEXT PRIMARY KEY,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         status TEXT,
         details TEXT,
@@ -1168,13 +1170,13 @@ class DatabaseHelper {
     // Village Traditional Occupations
     await db.execute('''
       CREATE TABLE IF NOT EXISTS village_traditional_occupations (
-        id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         sr_no INTEGER NOT NULL,
         occupation_name TEXT,
         families_engaged INTEGER,
-        average_income REAL
+        average_income REAL,
+        PRIMARY KEY (session_id, sr_no)
       )
     ''');
 
@@ -1388,6 +1390,58 @@ class DatabaseHelper {
         total_unemployed INTEGER DEFAULT 0
       )
     ''');
+  }
+
+  Future<void> _migrateVillageTablesPrimaryKey(Database db) async {
+    // Village Crop Productivity (id -> session_id, sr_no)
+    try {
+      final cpCols = await db.rawQuery('PRAGMA table_info(village_crop_productivity)');
+      if (cpCols.any((c) => c['name'] == 'id')) {
+        await db.execute('CREATE TABLE IF NOT EXISTS village_crop_productivity_new (session_id TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, sr_no INTEGER NOT NULL, crop_name TEXT, area_hectares REAL, productivity_quintal_per_hectare REAL, total_production_quintal REAL, quantity_consumed_quintal REAL, quantity_sold_quintal REAL, PRIMARY KEY (session_id, sr_no))');
+        await db.execute('INSERT INTO village_crop_productivity_new (session_id, created_at, sr_no, crop_name, area_hectares, productivity_quintal_per_hectare, total_production_quintal, quantity_consumed_quintal, quantity_sold_quintal) SELECT session_id, created_at, sr_no, crop_name, area_hectares, productivity_quintal_per_hectare, total_production_quintal, quantity_consumed_quintal, quantity_sold_quintal FROM village_crop_productivity');
+        await db.execute('DROP TABLE village_crop_productivity');
+        await db.execute('ALTER TABLE village_crop_productivity_new RENAME TO village_crop_productivity');
+      }
+
+      // Village Animals (id -> session_id, sr_no)
+      final vaCols = await db.rawQuery('PRAGMA table_info(village_animals)');
+      if (vaCols.any((c) => c['name'] == 'id')) {
+        await db.execute('CREATE TABLE IF NOT EXISTS village_animals_new (session_id TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, sr_no INTEGER NOT NULL, animal_type TEXT, total_count INTEGER, breed TEXT, PRIMARY KEY (session_id, sr_no))');
+        await db.execute('INSERT INTO village_animals_new (session_id, created_at, sr_no, animal_type, total_count, breed) SELECT session_id, created_at, sr_no, animal_type, total_count, breed FROM village_animals');
+        await db.execute('DROP TABLE village_animals');
+        await db.execute('ALTER TABLE village_animals_new RENAME TO village_animals');
+      }
+
+      // Village Traditional Occupations (id -> session_id, sr_no)
+      final vtoCols = await db.rawQuery('PRAGMA table_info(village_traditional_occupations)');
+      if (vtoCols.any((c) => c['name'] == 'id')) {
+        await db.execute('CREATE TABLE IF NOT EXISTS village_traditional_occupations_new (session_id TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, sr_no INTEGER NOT NULL, occupation_name TEXT, families_engaged INTEGER, average_income REAL, PRIMARY KEY (session_id, sr_no))');
+        await db.execute('INSERT INTO village_traditional_occupations_new (session_id, created_at, sr_no, occupation_name, families_engaged, average_income) SELECT session_id, created_at, sr_no, occupation_name, families_engaged, average_income FROM village_traditional_occupations');
+        await db.execute('DROP TABLE village_traditional_occupations');
+        await db.execute('ALTER TABLE village_traditional_occupations_new RENAME TO village_traditional_occupations');
+      }
+      
+      // Village Malnutrition Data (id -> session_id, sr_no)
+      final vnmCols = await db.rawQuery('PRAGMA table_info(village_malnutrition_data)');
+       if (vnmCols.any((c) => c['name'] == 'id')) {
+        await db.execute('CREATE TABLE IF NOT EXISTS village_malnutrition_data_new (session_id TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, sr_no INTEGER NOT NULL, name TEXT, sex TEXT, age INTEGER, height_feet REAL, weight_kg REAL, disease_cause TEXT, PRIMARY KEY (session_id, sr_no))');
+        await db.execute('INSERT INTO village_malnutrition_data_new (session_id, created_at, sr_no, name, sex, age, height_feet, weight_kg, disease_cause) SELECT session_id, created_at, sr_no, name, sex, age, height_feet, weight_kg, disease_cause FROM village_malnutrition_data');
+        await db.execute('DROP TABLE village_malnutrition_data');
+        await db.execute('ALTER TABLE village_malnutrition_data_new RENAME TO village_malnutrition_data');
+      }
+
+      // Village Biodiversity Register (id -> session_id PK)
+      final vbrCols = await db.rawQuery('PRAGMA table_info(village_biodiversity_register)');
+      if (vbrCols.any((c) => c['name'] == 'id')) {
+         await db.execute('CREATE TABLE IF NOT EXISTS village_biodiversity_register_new (session_id TEXT PRIMARY KEY, created_at TEXT DEFAULT CURRENT_TIMESTAMP, status TEXT, details TEXT, components TEXT, knowledge TEXT)');
+         await db.execute('INSERT OR REPLACE INTO village_biodiversity_register_new (session_id, created_at, status, details, components, knowledge) SELECT session_id, created_at, status, details, components, knowledge FROM village_biodiversity_register');
+         await db.execute('DROP TABLE village_biodiversity_register');
+         await db.execute('ALTER TABLE village_biodiversity_register_new RENAME TO village_biodiversity_register');
+      }
+
+    } catch (e) {
+      print('Error migrating village tables: $e');
+    }
   }
 
   // Close database

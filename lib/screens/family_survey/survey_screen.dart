@@ -345,13 +345,16 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     final total = ref.read(surveyProvider).totalPages;
     if (pageIndex < 0 || pageIndex >= total) return;
 
-    // Before moving off the current page we save & sync its contents.  the
-    // call to `saveCurrentPageData` will persist to local db and dispatch a
-    // family‑survey sync operation; that operation in turn collects the entire
-    // survey (including the session row) and ships it to Supabase.  this means
-    // as soon as the user navigates, their previous page is already en route
-    // to the backend.
-    await surveyNotifier.saveCurrentPageData();
+    // Before moving off the current page we save its contents. Keep page-0
+    // behavior unchanged (await the full flow). For other pages we start the
+    // save but do not await the remote upsert so navigation is instant.
+    final current = ref.read(surveyProvider).currentPage;
+    if (current == 0) {
+      await surveyNotifier.saveCurrentPageData();
+    } else {
+      // fire-and-forget: provider will persist locally and begin background sync
+      surveyNotifier.saveCurrentPageData();
+    }
 
     // Jump the PageView (instant) and keep provider state in sync
     _pageController.jumpToPage(pageIndex);
