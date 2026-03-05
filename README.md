@@ -1,5 +1,11 @@
 <div align="center">
 
+<img src="https://img.shields.io/badge/FLUTTER-Mobile_App-1f6feb?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter"/>
+<img src="https://img.shields.io/badge/SUPABASE-Cloud_Sync-0f766e?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/>
+<img src="https://img.shields.io/badge/SQLITE-Offline_First-6b7280?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"/>
+<img src="https://img.shields.io/badge/REACT-Dashboard-7c3aed?style=for-the-badge&logo=react&logoColor=white" alt="React"/>
+<img src="https://img.shields.io/badge/XLSX-Export_Engine-9a3412?style=for-the-badge&logo=microsoftexcel&logoColor=white" alt="XLSX"/>
+
 # DRI SURVEY APP AND DASHBOARD
 
 ```text
@@ -42,6 +48,10 @@ The codebase is engineered to survive real-world field friction: bad connectivit
 |---|---|---|---|
 | ██████████ | ██████████ | ██████████ | ██████████ |
 
+| Visual Theme | System Mood |
+|---|---|
+| Terminal + Neon Cards + Engineering Atlas | Dense, confident, field-hardened |
+
 </div>
 
 ---
@@ -61,20 +71,29 @@ The codebase is engineered to survive real-world field friction: bad connectivit
 
 | Chapter | Theme | Status |
 |---|---|---|
-| 01 | Ecosystem Snapshot | ✅ Locked |
-| 02 | Architecture | ✅ Locked |
-| 03 | Process Flows | ✅ Locked |
-| 04 | Data Model | ✅ Locked |
-| 05 | Hard Problems | ✅ Locked |
-| 06 | Internal Mapping | ✅ Locked |
-| 07 | End-to-End Workflows | ✅ Locked |
-| 08 | Capacity Model | ✅ Locked |
-| 09 | Repository Blueprint | ✅ Locked |
-| 10 | Rebuild Contract | ✅ Locked |
-| 11 | Security Notes | ✅ Locked |
-| 12 | Final Engineering Read | ✅ Locked |
-| 13 | Exhaustive File Map | ✅ Locked |
-| 14 | API/Function Index | ✅ Locked |
+| 01 | Ecosystem Snapshot | ■ LOCKED |
+| 02 | Architecture | ■ LOCKED |
+| 03 | Process Flows | ■ LOCKED |
+| 04 | Data Model | ■ LOCKED |
+| 05 | Hard Problems | ■ LOCKED |
+| 06 | Internal Mapping | ■ LOCKED |
+| 07 | End-to-End Workflows | ■ LOCKED |
+| 08 | Capacity Model | ■ LOCKED |
+| 09 | Repository Blueprint | ■ LOCKED |
+| 10 | Rebuild Contract | ■ LOCKED |
+| 11 | Security Notes | ■ LOCKED |
+| 12 | Final Engineering Read | ■ LOCKED |
+| 13 | Exhaustive File Map | ■ LOCKED |
+| 14 | API/Function Index | ■ LOCKED |
+
+### Design Legend
+
+| Symbol | Meaning |
+|---|---|
+| `■` | finalized/locked chapter |
+| `╔═...═╗` | chapter frame |
+| `<details open>` | expandable documentation card |
+| Mermaid blocks | system figures and process maps |
 
 ---
 
@@ -193,6 +212,13 @@ sequenceDiagram
 	Q->>L: Update table sync status
 ```
 
+```text
+   ___       _   _   _             
+  / _ \ _ __| |_(_) (_) ___  _ __  
+ | | | | '__| __| | | |/ _ \| '_ \ 
+ | |_| | |  | |_| | | | (_) | | | |
+  \___/|_|   \__|_|_|_|\___/|_| |_|
+```
 ## 3.1 Auth and session bootstrap
 
 **Entry files**: `lib/main.dart`, `lib/screens/auth/auth_screen.dart`, `lib/services/supabase_service.dart`
@@ -209,6 +235,13 @@ Why this matters:
 - The app can still boot with degraded cloud connectivity.
 - Local capture is decoupled from cloud availability.
 
+```text
+  _____                _ _                 
+ |  ___|__  _ __ _   _| | |_ ___  _ __ ___ 
+ | |_ / _ \| '__| | | | | __/ _ \| '__/ _ \
+ |  _| (_) | |  | |_| | | || (_) | | |  __/
+ |_|  \___/|_|   \__,_|_|\__\___/|_|  \___|
+```
 ## 3.2 Family survey capture lifecycle
 
 **Core files**: `lib/providers/survey_provider.dart`, `lib/services/database_service.dart`, `lib/services/sync_service.dart`
@@ -225,6 +258,13 @@ Key architecture behavior:
 - Child-table writes happen per page semantics.
 - Sync initiation never blocks page navigation.
 
+```text
+ __     __ _ _ _            
+ \ \   / /(_) | | ___  ___  
+  \ \ / / | | | |/ _ \/ __| 
+   \ V /  | | | |  __/\__ \ 
+    \_/   |_|_|_|\___||___/ 
+```
 ## 3.3 Village survey capture lifecycle
 
 **Core files**: `lib/providers/village_survey_provider.dart`, `lib/router.dart`, `lib/screens/village_survey/*`
@@ -237,6 +277,13 @@ Flow:
 
 Route flow is explicitly declared in `AppRouter.villageSurveyFlow` and enforced by helper navigation methods.
 
+```text
+  ____              _        
+ / ___|  ___  _   _| |_ ___  
+ \___ \ / _ \| | | | __/ _ \ 
+  ___) | (_) | |_| | ||  __/ 
+ |____/ \___/ \__,_|\__\___| 
+```
 ## 3.4 Sync engine pipeline
 
 **Core file**: `lib/services/sync_service.dart`
@@ -251,6 +298,14 @@ Design:
 
 This is one of the hardest engineering points solved here: **keeping correctness under partial local data + intermittent network + mixed table cardinalities.**
 
+```text
+  _____                      _     
+ / ____|                    | |    
+| (___  _   _ _ __   ___ ___| |__  
+ \___ \| | | | '_ \ / __/ _ \ '_ \ 
+ ____) | |_| | | | | (_|  __/ |_) |
+|_____/ \__,_|_| |_|\___\___|_.__/ 
+```
 ## 3.5 Supabase normalization and resilient upsert
 
 **Core file**: `lib/services/supabase_service.dart`
@@ -267,6 +322,13 @@ Capabilities:
 Critical outcome:
 - Prevents a large class of runtime sync breakages from schema mismatch and bad-type payloads.
 
+```text
+  _____ _ _       _   __  __       _ 
+ |  ___(_) |_ ___| | |  \/  | __ _| |
+ | |_  | | __/ _ \ | | |\/| |/ _` | |
+ |  _| | | ||  __/ | | |  | | (_| | |
+ |_|   |_|\__\___|_| |_|  |_|\__,_|_|
+```
 ## 3.6 File/media upload workflow
 
 **Core file**: `lib/services/file_upload_service.dart`
@@ -278,6 +340,13 @@ Flow:
 4. Upload files into structured Google Drive folders (per SHINE code).
 5. Make files readable and persist share links back to local survey data.
 
+```text
+  _____                    _       
+ | ____|_  _____ _ __ ___ (_) ___  
+ |  _| \ \/ / _ \ '_ ` _ \| |/ _ \ 
+ | |___ >  <  __/ | | | | | | (_) |
+ |_____/_/\_\___|_| |_| |_|_|\___/ 
+```
 ## 3.7 Export workflows
 
 **Core files**: `lib/services/excel_service.dart`, `lib/services/xlsx_export_service.dart`, `lib/services/data_export_service.dart`, `lib/screens/export_screen.dart`
@@ -290,6 +359,13 @@ Supported modes:
 
 The export layer supports both table-oriented and consolidated presentation formats.
 
+```text
+  _   _ _ _            _ _          
+ | | | (_) | ___  __ _| | | ___ _ __
+ | | | | | |/ _ \/ _` | | |/ _ \ '__|
+ | |_| | | |  __/ (_| | | |  __/ |   
+  \___/|_|_|\___|\__,_|_|_|\___|_|   
+```
 ## 3.8 History and progress workflows
 
 **Core files**: `lib/screens/history/history_screen.dart`, `lib/services/form_history_service.dart`
@@ -318,6 +394,13 @@ Capabilities:
 
 ## 4) Data Architecture
 
+```text
+  _  __          _     
+ | |/ /___ _   _| |__  
+ | ' // _ \ | | | '_ \ 
+ | . \  __/ |_| | |_) |
+ |_|\_\___|\__,_|_.__/ 
+```
 ## 4.1 Primary key strategy
 
 - **Family root key**: `phone_number`.
@@ -327,6 +410,13 @@ Capabilities:
 	- one-to-many by `(root_key, sr_no)`,
 	- map-point style keys (`point_id`, etc.) where required.
 
+```text
+  _____     _ _       
+ |_   _|__ | (_) ___  
+   | |/ _ \| | |/ _ \ 
+   | | (_) | | | (_) |
+   |_|\___/|_|_|\___/ 
+```
 ## 4.2 Table ecosystem size
 
 Family domain + village domain include dozens of structured tables (sessions, members, facilities, schemes, social indicators, agriculture, water, health, transport, mapping assets, etc.).
@@ -338,6 +428,13 @@ Canonical source files:
 - `database_supabase_sqlite/schema at supbase.sql`
 - `Dashboard/schema at supbase.sql`
 
+```text
+ __  __ _       _               
+|  \/  (_)_ __ (_)_ __   ___ _ __ 
+| |\/| | | '_ \| | '_ \ / _ \ '__|
+| |  | | | | | | | | | |  __/ |   
+|_|  |_|_|_| |_|_|_| |_|\___|_|   
+```
 ## 4.3 Migration and schema correction assets
 
 Location: `database_supabase_sqlite/migrations/`
@@ -560,8 +657,7 @@ SYSTEM LOAD SHAPE (PRACTICAL)
 
 Capture Layer      ████████████████████  (high tolerance)
 Local Persist      ████████████████████  (very high)
-Sync Throughput    ████████████░░░░░░░░  (network dependent)
-Dashboard Query    ██████████░░░░░░░░░░  (needs bounded windows)
+Sync               █████████████████░░░  (network dependent)
 ```
 
 This section is a **design-based capacity estimate**, not a synthetic benchmark report.
@@ -809,32 +905,6 @@ Use these files as authoritative checks:
 ```
 
 </div>
-
-<details open>
-<summary><b>Open Chapter 11 · Security and Risk Notes</b></summary>
-
-## 11) Security and Risk Notes
-
-- Dashboard currently uses service-role key in client-side runtime; this is powerful and should stay in controlled environments only.
-- Local form storage can contain sensitive survey data; apply device-level protections and secure distribution channels.
-- Google Drive credentials must be rotated and scoped appropriately.
-
----
-
-</details>
-
-<div align="center">
-
-```text
-╔══════════════════════════════════════════════════════════════════╗
-║ CHAPTER 12 · FINAL ENGINEERING READ                             ║
-╚══════════════════════════════════════════════════════════════════╝
-```
-
-</div>
-
-<details open>
-<summary><b>Open Chapter 12 · Final Engineering Read</b></summary>
 
 ## 12) Final Engineering Read
 
