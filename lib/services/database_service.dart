@@ -670,6 +670,27 @@ static Database? _database;
     } catch (_) {}
   }
 
+  /// Seed sync_tracker rows for a given session with provided tables as 'pending'.
+  Future<void> seedSyncTracker(String referenceId, List<String> tables) async {
+    final db = await database;
+    final batch = db.batch();
+    final now = DateTime.now().toIso8601String();
+    for (final t in tables) {
+      batch.insert(
+        'sync_tracker',
+        {
+          'reference_key': referenceId,
+          'table_name': t,
+          'status': 'pending',
+          'last_attempt': now,
+          'error_message': null,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
   /// Updates the sync status for a specific table of a specific session/family
   Future<void> updateTableSyncStatus(String referenceId, String tableName, String status, {String? error}) async {
     final db = await database;
@@ -693,6 +714,26 @@ static Database? _database;
     );
     if (res.isNotEmpty) return res.first['status'] as String;
     return 'pending';
+  }
+
+  /// Returns counts of pending/synced/failed for a session across all tables.
+  Future<Map<String, int>> getSyncSummary(String referenceKey) async {
+    final db = await database;
+    try {
+      final rows = await db.rawQuery(
+        'SELECT status, COUNT(*) as count FROM sync_tracker WHERE reference_key = ? GROUP BY status',
+        [referenceKey],
+      );
+      final summary = {'pending': 0, 'synced': 0, 'failed': 0};
+      for (final r in rows) {
+        final s = r['status']?.toString() ?? 'pending';
+        final c = (r['count'] as int?) ?? 0;
+        summary[s] = c;
+      }
+      return summary;
+    } catch (_) {
+      return {'pending': 0, 'synced': 0, 'failed': 0};
+    }
   }
 
   // --- NEW METHODS FOR HISTORY SCREEN ---

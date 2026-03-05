@@ -92,6 +92,9 @@ class SyncService {
     'village_transport_facilities', 'village_unemployment'
   ];
 
+  int get _familyTableTotal => _familyTables.length;
+  int get _villageTableTotal => _villageTables.length;
+
   // Identifies tables that use composite primary keys.
   // Supabase upsert requires knowing the conflict columns if they differ from the default PK.
   // Most 'members' tables use (phone_number, sr_no).
@@ -214,6 +217,9 @@ class SyncService {
       return;
     }
 
+    // Reset any leftover queue to avoid reprocessing stale tasks.
+    _syncQueue.clear();
+
     _progressController.add(const SyncProgress(stage: 'start', message: 'Starting sync...'));
 
     try {
@@ -222,6 +228,16 @@ class SyncService {
       final villageSessions = await _databaseService.getAllVillageSurveySessions();
 
       debugPrint('[SyncService] Found ${familySessions.length} family sessions, ${villageSessions.length} village sessions local.');
+
+      // Seed sync tracker entries so progress UI can count pending/failed/synced per session.
+      for (final session in familySessions) {
+        final phone = session['phone_number'].toString();
+        await _databaseService.seedSyncTracker(phone, _familyTables);
+      }
+      for (final session in villageSessions) {
+        final id = session['session_id'].toString();
+        await _databaseService.seedSyncTracker(id, _villageTables);
+      }
 
       // 2. Queue Family Data
       for (final session in familySessions) {
@@ -255,6 +271,9 @@ class SyncService {
   // --- QUEUE LOGIC ---
 
   Future<void> _queueSessionData(String type, String id, List<String> tables) async {
+    // Ensure tracker rows exist for this session before enqueuing.
+    await _databaseService.seedSyncTracker(id, tables);
+
     // 1. Check Parent Status First
     final parentTable = tables.first; // Convention: First item is parent
     final parentStatus = await _databaseService.getTableSyncStatus(id, parentTable);
@@ -275,6 +294,9 @@ class SyncService {
       // Double check: Does local data exist? (Don't sync empty tables if no data)
       if (await _hasLocalData(table, id, type)) {
         _addToQueue(SyncTask(referenceId: id, table: table, type: type));
+      } else {
+        // If there is no local data to send, mark as synced so progress math stays correct.
+        await _databaseService.updateTableSyncStatus(id, table, 'synced');
       }
     }
   }
@@ -299,6 +321,7 @@ class SyncService {
 
     // Use loop with index 0 to process as queue
     while (_syncQueue.isNotEmpty && _isOnline) {
+      if (!_isOnline) break;
       final task = _syncQueue.first;
       int currentTotal = syncedCount + failedCount + _syncQueue.length;
       
@@ -311,6 +334,7 @@ class SyncService {
           failedCount: failedCount
         ));
         debugPrint('[SyncService] Processing: ${task.type} ${task.referenceId} -> ${task.table}');
+        await _databaseService.updateTableSyncStatus(task.referenceId, task.table, 'pending');
         
         // 1. Fetch Data
         final data = await _fetchDataForTable(task);
@@ -359,6 +383,7 @@ class SyncService {
            failedCount++;
            _syncQueue.removeAt(0); // Move ahead
         } else {
+            await _databaseService.updateTableSyncStatus(task.referenceId, task.table, 'pending', error: e.toString());
            _syncQueue.removeAt(0);
            _syncQueue.add(task); // Move to end (retry later)
         }
@@ -381,14 +406,18 @@ class SyncService {
     final db = await _databaseService.database;
     // Determine key column
     String keyCol = type == 'family' ? 'phone_number' : 'session_id';
-
-    if (keyCol == 'phone_number') {
-      final key = int.tryParse(id) ?? id; 
-      final res = await db.query(table, where: 'phone_number = ?', whereArgs: [key], limit: 1);
-      return res.isNotEmpty;
-    } else {
-      final res = await db.query(table, where: 'session_id = ?', whereArgs: [id], limit: 1);
-      return res.isNotEmpty;
+    try {
+      if (keyCol == 'phone_number') {
+        final key = int.tryParse(id) ?? id; 
+        final res = await db.query(table, where: 'phone_number = ?', whereArgs: [key], limit: 1);
+        return res.isNotEmpty;
+      } else {
+        final res = await db.query(table, where: 'session_id = ?', whereArgs: [id], limit: 1);
+        return res.isNotEmpty;
+      }
+    } catch (e) {
+      debugPrint('[SyncService] _hasLocalData skipped table=$table (likely missing locally): $e');
+      return false;
     }
   }
 
@@ -397,21 +426,19 @@ class SyncService {
     String keyCol = task.type == 'family' ? 'phone_number' : 'session_id';
     dynamic keyVal = task.referenceId;
     if (task.type == 'family') keyVal = int.tryParse(task.referenceId) ?? task.referenceId;
-
-    final res = await db.query(task.table, where: '$keyCol = ?', whereArgs: [keyVal]);
-    return res;
+    try {
+      final res = await db.query(task.table, where: '$keyCol = ?', whereArgs: [keyVal]);
+      return res;
+    } catch (e) {
+      debugPrint('[SyncService] _fetchDataForTable skipped table=${task.table} (missing locally?): $e');
+      return null;
+    }
   }
 
   Future<void> _performUpsert(SyncTask task, dynamic data) async {
-    final client = _supabaseService.client;
-    
-    // Explicitly handle conflict resolution for known composite key tables
-    if (_compositeKeyTables.containsKey(task.table)) {
-      final conflict = _compositeKeyTables[task.table]!;
-      await client.from(task.table).upsert(data, onConflict: conflict);
-    } else {
-      await client.from(task.table).upsert(data);
-    }
+    // Reuse the normalized, column-filtered upsert with retries
+    // from SupabaseService to avoid schema mismatch errors.
+    await _supabaseService.upsertNormalized(task.table, data);
   }
   
   // -- COMPATIBILITY METHODS ---
@@ -435,6 +462,26 @@ class SyncService {
   
   Future<void> syncFamilyPageData(String phone, int page, Map<String, dynamic> data) async {}
   Future<void> syncVillagePageData(String id, int page, Map<String, dynamic> data) async {}
+
+  Future<Map<String, int>> getSessionSyncSummary(String referenceId) async {
+    return _databaseService.getSyncSummary(referenceId);
+  }
+
+  /// Returns totals for UI progress bars (total, synced, failed, pending) per session.
+  Future<Map<String, int>> getSessionProgress(String referenceId, String type) async {
+    final totals = await _databaseService.getSyncSummary(referenceId);
+    final synced = totals['synced'] ?? 0;
+    final failed = totals['failed'] ?? 0;
+    final totalTables = type == 'family' ? _familyTableTotal : _villageTableTotal;
+    final pendingCalc = totalTables - synced - failed;
+    final pending = pendingCalc < 0 ? 0 : pendingCalc;
+    return {
+      'total': totalTables,
+      'synced': synced,
+      'failed': failed,
+      'pending': pending,
+    };
+  }
 
 
   void dispose() {

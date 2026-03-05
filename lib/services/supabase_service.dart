@@ -543,19 +543,25 @@ class SupabaseService {
       }
 
       if (respData == null || (respData is List && respData.isEmpty) || (respData is Map && respData.isEmpty)) {
+        // Treat empty responses as failure so the caller can retry and keep the
+        // table in 'failed' status. We rely on Supabase returning the
+        // representation when `.select()` is used; an empty body likely means
+        // the row did not persist (or RLS blocked it).
         final payloadStr = _payloadSnapshot(filtered);
-        if (resolvedTable == 'family_survey_sessions' || resolvedTable.endsWith('_sessions') || resolvedTable == 'village_survey_sessions') {
-          final msg = '[Supabase Sync] upsert returned empty data for $resolvedTable; status=$respStatus; data=$respData; payload=$payloadStr';
-          _escalateError(msg, persistent: true);
-          throw Exception(msg);
-        } else {
-          debugPrint('[Supabase Sync] upsert returned empty data for $resolvedTable; continuing; status=$respStatus; data=$respData; payload=$payloadStr');
-        }
+        final msg = '[Supabase Sync] upsert returned empty data for $resolvedTable; status=$respStatus; data=$respData; payload=$payloadStr';
+        _escalateError(msg, persistent: true);
+        throw Exception(msg);
       }
 
       debugPrint('[Supabase Sync] upsert success for $resolvedTable; data=$respData; status=$respStatus');
       return res;
     }, operation: 'upsert $resolvedTable');
+  }
+
+  /// Public wrapper so other services (e.g., SyncService) can reuse the
+  /// normalized, column-filtered upsert logic with retries.
+  Future<void> upsertNormalized(String table, dynamic data) async {
+    await _upsertWithRetry(table, data);
   }
 
   Future<Map<String, String>> validateSchema(List<String> tableNames) async {

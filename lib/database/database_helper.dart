@@ -55,7 +55,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 45, // bump for village PK migration
+      version: 46, // v46 relaxes surveyor_email nullability and aligns family_survey_sessions with remote schema
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -100,6 +100,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 45) {
       await _migrateVillageTablesPrimaryKey(db);
+    }
+    if (oldVersion < 46) {
+      await _migrateFamilySurveySessionsV46(db);
     }
   }
 
@@ -301,6 +304,99 @@ class DatabaseHelper {
     }
   }
 
+  /// v46: Recreate family_survey_sessions to allow NULL surveyor_email and align with remote schema.
+  Future<void> _migrateFamilySurveySessionsV46(Database db) async {
+    // Check current columns to avoid unnecessary work.
+    final cols = await db.rawQuery('PRAGMA table_info(family_survey_sessions)');
+    final hasNotNullSurveyor = cols.any((r) => r['name'] == 'surveyor_email' && (r['notnull'] as int? ?? 0) == 1);
+
+    if (!hasNotNullSurveyor) {
+      return; // already relaxed / aligned
+    }
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS family_survey_sessions_v46 (
+        phone_number INTEGER PRIMARY KEY,
+        surveyor_email TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        village_name TEXT,
+        village_number TEXT,
+        panchayat TEXT,
+        block TEXT,
+        tehsil TEXT,
+        district TEXT,
+        postal_address TEXT,
+        pin_code TEXT,
+        shine_code TEXT,
+        latitude REAL,
+        longitude REAL,
+        location_timestamp TEXT,
+        survey_date TEXT DEFAULT CURRENT_DATE,
+        surveyor_name TEXT,
+        status TEXT DEFAULT 'in_progress' CHECK (status IN ('in_progress','completed','exported')),
+        sync_status TEXT DEFAULT 'pending',
+        device_info TEXT,
+        app_version TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        is_deleted INTEGER DEFAULT 0,
+        last_synced_at TEXT,
+        current_version INTEGER DEFAULT 1,
+        last_edited_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        page_completion_status TEXT DEFAULT '{}',
+        sync_pending INTEGER DEFAULT 0,
+        state TEXT
+      )
+    ''');
+
+    await db.execute('''
+      INSERT OR REPLACE INTO family_survey_sessions_v46 (
+        phone_number, surveyor_email, created_at, updated_at, village_name, village_number,
+        panchayat, block, tehsil, district, postal_address, pin_code, shine_code,
+        latitude, longitude, location_timestamp, survey_date, surveyor_name, status,
+        sync_status, device_info, app_version, created_by, updated_by, is_deleted,
+        last_synced_at, current_version, last_edited_at, page_completion_status, sync_pending, state
+      )
+      SELECT
+        phone_number,
+        surveyor_email,
+        created_at,
+        updated_at,
+        village_name,
+        village_number,
+        panchayat,
+        block,
+        tehsil,
+        district,
+        postal_address,
+        pin_code,
+        shine_code,
+        latitude,
+        longitude,
+        location_timestamp,
+        survey_date,
+        surveyor_name,
+        status,
+        sync_status,
+        device_info,
+        app_version,
+        created_by,
+        updated_by,
+        is_deleted,
+        last_synced_at,
+        current_version,
+        last_edited_at,
+        page_completion_status,
+        sync_pending,
+        state
+      FROM family_survey_sessions
+    ''');
+
+    await db.execute('DROP TABLE family_survey_sessions');
+    await db.execute('ALTER TABLE family_survey_sessions_v46 RENAME TO family_survey_sessions');
+  }
+
   Future<void> _ensurePageTrackingColumns(Database db) async {
     // Remove old page completion status - we don't need it anymore
     // await _addColumnIfMissing(db, 'family_survey_sessions', 'page_completion_status', "TEXT DEFAULT '{}'");
@@ -420,23 +516,20 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS family_survey_sessions (
         phone_number INTEGER PRIMARY KEY,
-        surveyor_email TEXT NOT NULL,
+        surveyor_email TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         village_name TEXT,
         village_number TEXT,
-        state TEXT,
         panchayat TEXT,
         block TEXT,
         tehsil TEXT,
         district TEXT,
         postal_address TEXT,
         pin_code TEXT,
-        lgd_code TEXT,
         shine_code TEXT,
-        latitude DECIMAL(10,8),
-        longitude DECIMAL(11,8),
-        location_accuracy DECIMAL(5,2),
+        latitude REAL,
+        longitude REAL,
         location_timestamp TEXT,
         survey_date TEXT DEFAULT CURRENT_DATE,
         surveyor_name TEXT,
@@ -451,7 +544,8 @@ class DatabaseHelper {
         current_version INTEGER DEFAULT 1,
         last_edited_at TEXT DEFAULT CURRENT_TIMESTAMP,
         page_completion_status TEXT DEFAULT '{}',
-        sync_pending INTEGER DEFAULT 0
+        sync_pending INTEGER DEFAULT 0,
+        state TEXT
       )
     ''');
 
