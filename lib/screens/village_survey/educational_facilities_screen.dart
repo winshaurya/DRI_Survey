@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
@@ -86,7 +85,6 @@ class _EducationalFacilitiesScreenState extends State<EducationalFacilitiesScree
     }
 
     final data = {
-      'id': const Uuid().v4(),
       'session_id': sessionId,
       'primary_schools': int.tryParse(primarySchoolsController.text) ?? 0,
       'middle_schools': int.tryParse(middleSchoolsController.text) ?? 0,

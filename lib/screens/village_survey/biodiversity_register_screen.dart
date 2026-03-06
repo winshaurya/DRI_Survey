@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import 'forest_map_screen.dart'; // Import the previous screen
 import 'village_survey_preview_page.dart';
@@ -211,7 +210,6 @@ class _BiodiversityRegisterScreenState extends State<BiodiversityRegisterScreen>
     }
 
     final data = {
-      'id': const Uuid().v4(),
       'session_id': _currentSessionId,
       'status': statusController.text,
       'details': detailsController.text,

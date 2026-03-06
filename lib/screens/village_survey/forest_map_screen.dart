@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../services/supabase_service.dart';
@@ -75,7 +74,6 @@ class _ForestMapScreenState extends State<ForestMapScreen> {
     }
 
     final data = {
-      'id': const Uuid().v4(),
       'session_id': sessionId,
       'forest_area': forestAreaController.text,
       'forest_types': forestTypesController.text,

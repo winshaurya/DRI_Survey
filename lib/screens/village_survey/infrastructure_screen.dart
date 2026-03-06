@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
@@ -89,7 +88,6 @@ class _InfrastructureScreenState extends State<InfrastructureScreen> {
     }
 
     final data = {
-      'id': const Uuid().v4(),
       'session_id': sessionId,
       'approach_roads_available': _hasApproachRoads ? 1 : 0,
       'num_approach_roads': int.tryParse(_numApproachRoads),

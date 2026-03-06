@@ -778,7 +778,7 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS training_needs (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, wants_training INTEGER, preferred_training TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (phone_number, sr_no))');
 
     // SHG Members
-    await db.execute('CREATE TABLE IF NOT EXISTS shg_members (phone_number INTEGER NOT NULL, member_name TEXT NOT NULL, shg_name TEXT, purpose TEXT, agency TEXT, position TEXT, monthly_saving REAL, created_at TEXT, PRIMARY KEY (phone_number, member_name))');
+    await db.execute('CREATE TABLE IF NOT EXISTS shg_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, shg_name TEXT, purpose TEXT, agency TEXT, position TEXT, monthly_saving REAL, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
 
     // FPO Members
     await db.execute('CREATE TABLE IF NOT EXISTS fpo_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, fpo_name TEXT, purpose TEXT, agency TEXT, share_capital REAL, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');

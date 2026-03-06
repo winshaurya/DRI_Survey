@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
-import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../database/database_helper.dart';
@@ -181,7 +180,6 @@ class _DetailedMapScreenState extends State<DetailedMapScreen> {
       final List<Map<String, dynamic>> pointsPayload = [];
       for (var point in _mapPoints) {
         final data = {
-          'id': const Uuid().v4(),
           'session_id': sessionId,
           'latitude': point.position.latitude,
           'longitude': point.position.longitude,

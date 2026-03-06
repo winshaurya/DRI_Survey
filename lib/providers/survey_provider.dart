@@ -932,7 +932,39 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
   Future<void> _saveTraining(dynamic data, String phoneNumber) async {
     if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('training_data', data, phoneNumber);
+      // Save training members (both taken and needed separately)
+      if (data['training_members'] is List) {
+        for (final item in data['training_members']) {
+          if (item is Map<String, dynamic>) {
+            final status = item['status'];
+            if (status == 'taken') {
+              // Save to training_data table
+              await _databaseService.insertOrUpdate('training_data', item, phoneNumber);
+            } else if (status == 'needed') {
+              // Save to training_needs table
+              await _databaseService.insertOrUpdate('training_needs', item, phoneNumber);
+            }
+          }
+        }
+      }
+      
+      // Save SHG members
+      if (data['shg_members'] is List) {
+        for (final item in data['shg_members']) {
+          if (item is Map<String, dynamic>) {
+            await _databaseService.insertOrUpdate('shg_members', item, phoneNumber);
+          }
+        }
+      }
+      
+      // Save FPO members
+      if (data['fpo_members'] is List) {
+        for (final item in data['fpo_members']) {
+          if (item is Map<String, dynamic>) {
+            await _databaseService.insertOrUpdate('fpo_members', item, phoneNumber);
+          }
+        }
+      }
     }
   }
 

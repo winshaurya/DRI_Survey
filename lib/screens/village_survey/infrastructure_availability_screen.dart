@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
@@ -118,7 +117,6 @@ class _InfrastructureAvailabilityScreenState extends State<InfrastructureAvailab
     }
 
     final data = {
-      'id': const Uuid().v4(),
       'session_id': sessionId,
       'has_primary_school': _hasPrimarySchool ? 1 : 0,
       'primary_school_distance': primarySchoolDistanceController.text,

@@ -59,6 +59,7 @@ class SyncService {
   bool get isSyncing => _isProcessingQueue;
 
   // --- HARDCODED TABLE LISTS (Based on Schema) ---
+  // CRITICAL: First table in each list MUST be the parent (session) table due to foreign key constraints
   
   static const List<String> _familyTables = [
     'family_survey_sessions', // PARENT - MUST BE FIRST
@@ -74,7 +75,7 @@ class SyncService {
     'pm_kisan_samman_members', 'pm_kisan_samman_nidhi', 'ration_card', 'ration_scheme_members', 
     'samagra_id', 'samagra_scheme_members', 'shg_members', 'social_consciousness', 
     'training_data', 'training_needs', 'transport_facilities', 'tribal_card', 
-    'tribal_questions', 'tribal_scheme_members', 'vb_gram', 'vb_gram_members', 
+    'tribal_questions', 'tribal_scheme_members', 'tulsi_plants', 'vb_gram', 'vb_gram_members', 
     'widow_allowance', 'widow_scheme_members'
   ];
 
@@ -89,50 +90,11 @@ class SyncService {
     'village_malnutrition_data', 'village_map_points', 'village_medical_treatment', 
     'village_population', 'village_seed_clubs', 'village_signboards', 'village_social_consciousness', 
     'village_social_maps', 'village_survey_details', 'village_traditional_occupations', 
-    'village_transport_facilities', 'village_unemployment'
+    'village_transport', 'village_transport_facilities', 'village_unemployment'
   ];
 
   int get _familyTableTotal => _familyTables.length;
   int get _villageTableTotal => _villageTables.length;
-
-  // Identifies tables that use composite primary keys.
-  // Supabase upsert requires knowing the conflict columns if they differ from the default PK.
-  // Most 'members' tables use (phone_number, sr_no).
-  static const Map<String, String> _compositeKeyTables = {
-    'aadhaar_info': 'phone_number',
-    'aadhaar_scheme_members': 'phone_number, sr_no',
-    'animals': 'phone_number, sr_no',
-    'ayushman_scheme_members': 'phone_number, sr_no',
-    'bank_accounts': 'phone_number, sr_no',
-    'child_diseases': 'phone_number, sr_no',
-    'crop_productivity': 'phone_number, sr_no',
-    'diseases': 'phone_number, sr_no',
-    'family_id_scheme_members': 'phone_number, sr_no',
-    'family_members': 'phone_number, sr_no',
-    'handicapped_scheme_members': 'phone_number, sr_no',
-    'pension_scheme_members': 'phone_number, sr_no',
-    'pm_kisan_members': 'phone_number, sr_no',
-    'pm_kisan_samman_members': 'phone_number, sr_no',
-    
-    // Additional tables identified from schema
-    'ration_scheme_members': 'phone_number, sr_no',
-    'samagra_scheme_members': 'phone_number, sr_no',
-    'training_needs': 'phone_number, sr_no',
-    'tribal_scheme_members': 'phone_number, sr_no',
-    'vb_gram_members': 'phone_number, sr_no',
-    'widow_scheme_members': 'phone_number, sr_no',
-    'shg_members': 'phone_number, member_name',
-    'village_map_points': 'session_id, point_id',
-    'fpo_members': 'phone_number, sr_no',
-    'malnourished_children_data': 'phone_number, sr_no',
-    'migration_data': 'phone_number, sr_no',
-
-    // Village Tables with SR_NO
-    'village_animals': 'session_id, sr_no',
-    'village_crop_productivity': 'session_id, sr_no',
-    'village_malnutrition_data': 'session_id, sr_no',
-    'village_traditional_occupations': 'session_id, sr_no'
-  };
 
   SyncService._internal() {
     _initConnectionListener();
@@ -142,15 +104,20 @@ class SyncService {
   void _initConnectionListener() async {
     final result = await Connectivity().checkConnectivity();
     _isOnline = result != ConnectivityResult.none;
+    debugPrint('[SyncService] 🌐 Initial connectivity status: ${_isOnline ? "ONLINE" : "OFFLINE"}');
     
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((result) {
       bool wasOffline = !_isOnline;
       _isOnline = result != ConnectivityResult.none;
       
+      debugPrint('[SyncService] 🌐 Network status changed: ${_isOnline ? "ONLINE" : "OFFLINE"}');
+      
       // Auto-trigger sync when network returns
       if (wasOffline && _isOnline) {
-        debugPrint('[SyncService] Network restored. Auto-triggering sync.');
+        debugPrint('[SyncService] ✅ Network restored. Auto-triggering sync...');
         syncAllPendingData();
+      } else if (!_isOnline) {
+        debugPrint('[SyncService] ⚠️ Network lost. Sync operations will be queued.');
       }
     });
 
@@ -207,15 +174,17 @@ class SyncService {
     bool highPriority = false,
   }) async {
     if (!_isOnline) {
-      debugPrint('[SyncService] Offline. Skipping sync.');
+      debugPrint('[SyncService] ❌ Offline. Skipping sync. Will auto-sync when network returns.');
       onError?.call('Offline. Sync skipped.');
       return;
     }
     
     if (_isProcessingQueue) {
-      debugPrint('[SyncService] Already syncing. Skipping trigger.');
+      debugPrint('[SyncService] ⏳ Already syncing. Skipping duplicate trigger.');
       return;
     }
+    
+    debugPrint('[SyncService] 🚀 Starting comprehensive sync operation...');
 
     // Reset any leftover queue to avoid reprocessing stale tasks.
     _syncQueue.clear();
@@ -227,9 +196,13 @@ class SyncService {
       final familySessions = await _databaseService.getAllSurveySessions();
       final villageSessions = await _databaseService.getAllVillageSurveySessions();
 
-      debugPrint('[SyncService] Found ${familySessions.length} family sessions, ${villageSessions.length} village sessions local.');
+      debugPrint('[SyncService] 📊 Session inventory:');
+      debugPrint('[SyncService]    - Family surveys: ${familySessions.length}');
+      debugPrint('[SyncService]    - Village surveys: ${villageSessions.length}');
+      debugPrint('[SyncService]    - Total sessions: ${familySessions.length + villageSessions.length}');
 
       // Seed sync tracker entries so progress UI can count pending/failed/synced per session.
+      debugPrint('[SyncService] 🌱 Seeding sync tracker for all sessions...');
       for (final session in familySessions) {
         final phone = session['phone_number'].toString();
         await _databaseService.seedSyncTracker(phone, _familyTables);
@@ -238,6 +211,7 @@ class SyncService {
         final id = session['session_id'].toString();
         await _databaseService.seedSyncTracker(id, _villageTables);
       }
+      debugPrint('[SyncService] ✅ Sync tracker seeded successfully');
 
       // 2. Queue Family Data
       for (final session in familySessions) {
@@ -253,16 +227,19 @@ class SyncService {
         await _queueSessionData('village', id, _villageTables);
       }
 
-      debugPrint('[SyncService] Queued ${_syncQueue.length} items. Starting process...');
+      debugPrint('[SyncService] 📋 Queue built: ${_syncQueue.length} tables to sync');
+      debugPrint('[SyncService] 🔄 Starting queue processor...');
       
       // 4. Process
       await _processQueue();
       
       onProgress?.call(100, 100);
+      debugPrint('[SyncService] ✅ Sync operation completed successfully');
       _progressController.add(const SyncProgress(stage: 'complete', message: 'Sync completed'));
 
-    } catch (e) {
-      debugPrint('[SyncService] FATAL ERROR in syncAllPendingData: $e');
+    } catch (e, stackTrace) {
+      debugPrint('[SyncService] ❌ FATAL ERROR in syncAllPendingData: $e');
+      debugPrint('[SyncService] Stack trace: $stackTrace');
       onError?.call(e.toString());
       _progressController.add(SyncProgress(stage: 'error', message: e.toString(), isError: true));
     }
@@ -280,9 +257,12 @@ class SyncService {
     
     if (parentStatus != 'synced') {
       // Parent not synced? Queue ONLY parent first. Children depend on it.
+      debugPrint('[SyncService] 🔼 Queuing parent table first: $parentTable for $type/$id');
       _addToQueue(SyncTask(referenceId: id, table: parentTable, type: type));
       return; 
     }
+    
+    debugPrint('[SyncService] ✅ Parent $parentTable already synced for $type/$id, queuing children...');
 
     // 2. If parent synced, check all children
     for (final table in tables) {
@@ -296,6 +276,7 @@ class SyncService {
         _addToQueue(SyncTask(referenceId: id, table: table, type: type));
       } else {
         // If there is no local data to send, mark as synced so progress math stays correct.
+        debugPrint('[SyncService] ⏭️  Skipping empty table: $table (no local data)');
         await _databaseService.updateTableSyncStatus(id, table, 'synced');
       }
     }
@@ -318,6 +299,8 @@ class SyncService {
 
     int syncedCount = 0;
     int failedCount = 0;
+    final startTime = DateTime.now();
+    debugPrint('[SyncService] ⚙️  Queue processor started at ${startTime.toIso8601String()}');
 
     // Use loop with index 0 to process as queue
     while (_syncQueue.isNotEmpty && _isOnline) {
@@ -333,18 +316,22 @@ class SyncService {
           totalTables: currentTotal,
           failedCount: failedCount
         ));
-        debugPrint('[SyncService] Processing: ${task.type} ${task.referenceId} -> ${task.table}');
+        debugPrint('[SyncService] 🔄 Processing [${syncedCount + failedCount + 1}/${currentTotal}]: ${task.table} (${task.type}/${task.referenceId})');
         await _databaseService.updateTableSyncStatus(task.referenceId, task.table, 'pending');
         
         // 1. Fetch Data
         final data = await _fetchDataForTable(task);
         if (data == null || (data is List && data.isEmpty)) {
            // No data actually found? Mark synced so we don't retry.
+           debugPrint('[SyncService] ⏭️  No data found for ${task.table}, marking as synced');
            await _databaseService.updateTableSyncStatus(task.referenceId, task.table, 'synced');
            syncedCount++; // Ideally count as success
            _syncQueue.removeAt(0);
            continue;
         }
+        
+        final rowCount = data is List ? data.length : 1;
+        debugPrint('[SyncService] 📤 Upserting $rowCount row(s) to ${task.table}...');
 
         // 2. Upsert to Supabase
         await _performUpsert(task, data);
@@ -364,33 +351,52 @@ class SyncService {
            );
         }
 
-        debugPrint('[SyncService] SUCCESS: ${task.table}');
+        debugPrint('[SyncService] ✅ SUCCESS: ${task.table} synced successfully');
         syncedCount++;
         _syncQueue.removeAt(0);
         
-        // If Parent Succeded -> Trigger immediate check for children? 
+        // If Parent Succeeded -> Trigger immediate check for children
         if (task.table == 'family_survey_sessions' || task.table == 'village_survey_sessions') {
+           debugPrint('[SyncService] 👨‍👩‍👧‍👦 Parent table synced, queuing child tables...');
            final tableList = task.type == 'family' ? _familyTables : _villageTables;
            await _queueSessionData(task.type, task.referenceId, tableList);
         }
 
-      } catch (e) {
-        debugPrint('[SyncService] FAILED: ${task.table} Error: $e');
+      } catch (e, stackTrace) {
+        debugPrint('[SyncService] ❌ FAILED: ${task.table} (Attempt ${task.retryCount + 1}/3)');
+        debugPrint('[SyncService]    Error: $e');
+        if (kDebugMode) {
+          debugPrint('[SyncService]    Stack: ${stackTrace.toString().split('\n').take(5).join('\n')}');
+        }
         
         task.retryCount++;
         if (task.retryCount >= 3) {
+           // After 3 failed attempts, mark as failed and move on
            await _databaseService.updateTableSyncStatus(task.referenceId, task.table, 'failed', error: e.toString());
            failedCount++;
-           _syncQueue.removeAt(0); // Move ahead
-        } else {
-            await _databaseService.updateTableSyncStatus(task.referenceId, task.table, 'pending', error: e.toString());
            _syncQueue.removeAt(0);
-           _syncQueue.add(task); // Move to end (retry later)
+           debugPrint('[SyncService] 🚫 PERMANENTLY FAILED after 3 attempts: ${task.table}');
+           debugPrint('[SyncService]    Error stored for debugging: ${e.toString().substring(0, e.toString().length > 100 ? 100 : e.toString().length)}...');
+        } else {
+           // Retry: update status to pending with retry count and add back to queue
+           await _databaseService.updateTableSyncStatus(task.referenceId, task.table, 'pending', error: 'Retry ${task.retryCount}/3: ${e.toString()}');
+           _syncQueue.removeAt(0);
+           _syncQueue.add(task); // Move to end for retry
+           debugPrint('[SyncService] 🔁 Will retry ${task.table} (${3 - task.retryCount} attempts remaining)');
         }
       }
     }
 
     _isProcessingQueue = false;
+    final endTime = DateTime.now();
+    final duration = endTime.difference(startTime);
+    
+    debugPrint('[SyncService] 🏁 Queue processing complete:');
+    debugPrint('[SyncService]    ✅ Synced: $syncedCount tables');
+    debugPrint('[SyncService]    ❌ Failed: $failedCount tables');
+    debugPrint('[SyncService]    ⏱️  Duration: ${duration.inSeconds}s');
+    debugPrint('[SyncService]    📊 Success rate: ${syncedCount + failedCount > 0 ? ((syncedCount / (syncedCount + failedCount)) * 100).toStringAsFixed(1) : 0}%');
+    
     _progressController.add(SyncProgress(
       stage: 'complete', 
       message: 'Queue processing complete',
@@ -410,13 +416,21 @@ class SyncService {
       if (keyCol == 'phone_number') {
         final key = int.tryParse(id) ?? id; 
         final res = await db.query(table, where: 'phone_number = ?', whereArgs: [key], limit: 1);
-        return res.isNotEmpty;
+        final hasData = res.isNotEmpty;
+        if (!hasData) {
+          debugPrint('[SyncService] 📭 No local data in $table for $type/$id');
+        }
+        return hasData;
       } else {
         final res = await db.query(table, where: 'session_id = ?', whereArgs: [id], limit: 1);
-        return res.isNotEmpty;
+        final hasData = res.isNotEmpty;
+        if (!hasData) {
+          debugPrint('[SyncService] 📭 No local data in $table for $type/$id');
+        }
+        return hasData;
       }
     } catch (e) {
-      debugPrint('[SyncService] _hasLocalData skipped table=$table (likely missing locally): $e');
+      debugPrint('[SyncService] ⚠️  _hasLocalData check failed for table=$table (likely missing locally): $e');
       return false;
     }
   }

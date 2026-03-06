@@ -731,14 +731,16 @@ CREATE TABLE IF NOT EXISTS training_data (
 );
 
 CREATE TABLE IF NOT EXISTS shg_members (
-    phone_number bigint PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    phone_number bigint NOT NULL REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE,
+    sr_no INTEGER NOT NULL,
     member_name TEXT,
     shg_name TEXT,
     purpose TEXT,
     agency TEXT,
     position TEXT,
     monthly_saving DECIMAL(10,2),
-    created_at TEXT DEFAULT NOW()::TEXT
+    created_at TEXT DEFAULT NOW()::TEXT,
+    PRIMARY KEY (phone_number, sr_no)
 );
 
 CREATE TABLE IF NOT EXISTS fpo_members (

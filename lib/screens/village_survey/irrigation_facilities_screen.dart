@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../services/supabase_service.dart';
@@ -76,7 +75,6 @@ class _IrrigationFacilitiesScreenState extends State<IrrigationFacilitiesScreen>
     }
 
     final data = {
-      'id': const Uuid().v4(),
       'session_id': sessionId,
       'canal_available': _hasCanal == true ? 1 : 0,
       'tube_well_available': _hasTubeWell == true ? 1 : 0,

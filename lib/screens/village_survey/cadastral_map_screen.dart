@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../services/supabase_service.dart';
@@ -112,7 +111,6 @@ class _CadastralMapScreenState extends State<CadastralMapScreen> {
     }
 
     final data = {
-      'id': const Uuid().v4(),
       'session_id': sessionId,
       'has_cadastral_map': hasCadastralMap ? 1 : 0,
       'map_details': mapDetailsController.text,

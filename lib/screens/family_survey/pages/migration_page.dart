@@ -82,6 +82,7 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
   void _addMigratedMember() {
     setState(() {
       _migratedMembers.add({
+        'sr_no': _migratedMembers.length + 1,
         'member_name': '',
         'permanent_distance': '',
         'permanent_job': '',
@@ -97,6 +98,10 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
   void _removeMember(int index) {
     setState(() {
       _migratedMembers.removeAt(index);
+      // Re-index sr_no for remaining members
+      for (int i = 0; i < _migratedMembers.length; i++) {
+        _migratedMembers[i]['sr_no'] = i + 1;
+      }
     });
     _updateData();
   }

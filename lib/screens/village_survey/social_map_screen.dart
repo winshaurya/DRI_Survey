@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import 'signboards_screen.dart';
 import 'survey_details_screen.dart';
@@ -237,7 +236,6 @@ class _SocialMapScreenState extends State<SocialMapScreen> {
     }
 
     final data = {
-      'id': const Uuid().v4(),
       'session_id': _currentSessionId,
       'remarks': _remarksController.text,
       'topography_file_link': _existingLink('topography_file_link'),

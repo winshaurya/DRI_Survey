@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
 import 'hardcoded_remote_columns.dart';
@@ -667,7 +668,10 @@ static Database? _database;
           PRIMARY KEY (reference_key, table_name)
         )
       ''');
-    } catch (_) {}
+      debugPrint('[DatabaseService] ✅ Sync tracker table ensured');
+    } catch (e) {
+      debugPrint('[DatabaseService] ⚠️  Failed to create sync_tracker table: $e');
+    }
   }
 
   /// Seed sync_tracker rows for a given session with provided tables as 'pending'.
@@ -675,6 +679,8 @@ static Database? _database;
     final db = await database;
     final batch = db.batch();
     final now = DateTime.now().toIso8601String();
+    int newSeeds = 0;
+    
     for (final t in tables) {
       batch.insert(
         'sync_tracker',
@@ -687,8 +693,11 @@ static Database? _database;
         },
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
+      newSeeds++;
     }
+    
     await batch.commit(noResult: true);
+    debugPrint('[DatabaseService] 🌱 Seeded $newSeeds table trackers for $referenceId');
   }
 
   /// Updates the sync status for a specific table of a specific session/family
@@ -702,6 +711,15 @@ static Database? _database;
       'error_message': error
     };
     await db.insert('sync_tracker', row, conflictAlgorithm: ConflictAlgorithm.replace);
+    
+    if (status == 'failed' && error != null) {
+      debugPrint('[DatabaseService] ❌ Table sync failed: $tableName for $referenceId');
+      debugPrint('[DatabaseService]    Error: ${error.length > 100 ? error.substring(0, 100) + "..." : error}');
+    } else if (status == 'synced') {
+      debugPrint('[DatabaseService] ✅ Table sync success: $tableName for $referenceId');
+    } else if (status == 'pending') {
+      debugPrint('[DatabaseService] 🔄 Table sync pending: $tableName for $referenceId');
+    }
   }
 
   /// Gets the sync status for a specific table
@@ -730,8 +748,11 @@ static Database? _database;
         final c = (r['count'] as int?) ?? 0;
         summary[s] = c;
       }
+      
+      debugPrint('[DatabaseService] 📊 Sync summary for $referenceKey: ${summary["synced"]} synced, ${summary["pending"]} pending, ${summary["failed"]} failed');
       return summary;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[DatabaseService] ⚠️  Failed to get sync summary for $referenceKey: $e');
       return {'pending': 0, 'synced': 0, 'failed': 0};
     }
   }

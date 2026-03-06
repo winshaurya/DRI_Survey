@@ -102,7 +102,7 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
       setState(() {
         final newId = _crops.length + 1;
         _crops.add({
-          'id': newId,
+          'sr_no': newId,
           'season': 'Kharif',
           'name': 'Rice',
           'area': '',
@@ -122,6 +122,10 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
         _crops.removeAt(index);
         _cropNameControllers[index].dispose();
         _cropNameControllers.removeAt(index);
+        // Re-index sr_no for remaining crops
+        for (int i = 0; i < _crops.length; i++) {
+          _crops[i]['sr_no'] = i + 1;
+        }
       });
       _updateData();
     }

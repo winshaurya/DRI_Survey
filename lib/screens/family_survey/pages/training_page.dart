@@ -141,6 +141,7 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   void _addTrainingNeeded() {
     setState(() {
       _trainingsNeeded.add({
+        'sr_no': _trainingsNeeded.length + 1,
         'member_name': '',
         'training_type': '',
         'status': 'needed',
@@ -152,6 +153,7 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   void _addShgMember() {
     setState(() {
       _shgMembers.add({
+        'sr_no': _shgMembers.length + 1,
         'member_name': '',
         'shg_name': '',
         'purpose': '',
@@ -164,6 +166,7 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   void _addFpoMember() {
     setState(() {
       _fpoMembers.add({
+        'sr_no': _fpoMembers.length + 1,
         'member_name': '',
         'fpo_name': '',
         'purpose': '',
@@ -184,6 +187,10 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   void _removeTrainingNeeded(int index) {
     setState(() {
       _trainingsNeeded.removeAt(index);
+      // Re-index sr_no for remaining items
+      for (int i = 0; i < _trainingsNeeded.length; i++) {
+        _trainingsNeeded[i]['sr_no'] = i + 1;
+      }
     });
     _updateData();
   }
@@ -191,6 +198,10 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   void _removeShgMember(int index) {
     setState(() {
       _shgMembers.removeAt(index);
+      // Re-index sr_no for remaining members
+      for (int i = 0; i < _shgMembers.length; i++) {
+        _shgMembers[i]['sr_no'] = i + 1;
+      }
     });
     _updateData();
   }
@@ -198,6 +209,10 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   void _removeFpoMember(int index) {
     setState(() {
       _fpoMembers.removeAt(index);
+      // Re-index sr_no for remaining members
+      for (int i = 0; i < _fpoMembers.length; i++) {
+        _fpoMembers[i]['sr_no'] = i + 1;
+      }
     });
     _updateData();
   }

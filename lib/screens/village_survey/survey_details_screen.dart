@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../services/sync_service.dart';
@@ -77,7 +76,6 @@ class _SurveyDetailsScreenState extends State<SurveyDetailsScreen> {
     }
 
     final data = {
-      'id': const Uuid().v4(),
       'session_id': sessionId,
       'forest_details': getDetails('Forest'),
       'wasteland_details': getDetails('Wasteland'),

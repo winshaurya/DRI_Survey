@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/database_service.dart';
 import '../../services/sync_service.dart';
-import '../../l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import '../family_survey/pages/family_survey_preview_page.dart';
 import '../village_survey/village_survey_preview_page.dart';
@@ -57,41 +57,24 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
     }
   }
 
-  /// Uses the new table-level tracking from SyncService v2
+  /// Uses the new table-level tracking from SyncService
   Future<Map<String, dynamic>> _getSyncProgress(String referenceId, String type) async {
-    // referenceId = phoneNumber (Family) or sessionId (Village)
     try {
-      final db = DatabaseService();
-      
-      // Determine total expected tables based on type
-      // Family: ~56 tables. Village: ~32 tables.
-      // We can either hardcode or fetch from SyncService constants (if public)
-      // Or just trust the counts in sync_tracker? 
-      // Problem: sync_tracker only has entries for *attempted* syncs or *queued* items.
-      // If an item hasn't been queued yet, it won't be there.
-      // BUT: SyncService queues EVERYTHING on first run. 
-      // AND: We want to know "how many tables out of all". 
-      
-      // Let's assume max tables:
-      int totalTables = type == 'family' ? 56 : 32; 
-
-      final stats = await db.getSyncDetailStats(referenceId);
-      final synced = stats['synced'] ?? 0;
-      final failed = stats['failed'] ?? 0;
-      final pending = stats['pending'] ?? 0;
-      
-      // If no stats found (never synced), everything is pending or unsynced.
-      // But we don't want to show "0/56 synced" if it's brand new. 
-      // We can check if it's "Completed" status first.
+      // Use SyncService's comprehensive progress tracking
+      final syncService = SyncService.instance;
+      final progress = await syncService.getSessionProgress(referenceId, type);
       
       return {
-        'total': totalTables,
-        'synced': synced,
-        'failed': failed,
-        'pending': pending,
-        'progress': totalTables > 0 ? (synced / totalTables) : 0.0,
+        'total': progress['total'] ?? 0,
+        'synced': progress['synced'] ?? 0,
+        'failed': progress['failed'] ?? 0,
+        'pending': progress['pending'] ?? 0,
+        'progress': (progress['total'] ?? 0) > 0 
+            ? (progress['synced'] ?? 0) / (progress['total'] ?? 1)
+            : 0.0,
       };
     } catch (e) {
+      debugPrint('[HistoryScreen] Error getting sync progress: $e');
       return {'total': 0, 'synced': 0, 'failed': 0, 'pending': 0, 'progress': 0.0};
     }
   }
@@ -127,9 +110,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Survey History', style: TextStyle(fontWeight: FontWeight.bold)),

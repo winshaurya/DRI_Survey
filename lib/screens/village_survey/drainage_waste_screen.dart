@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
 import '../../form_template.dart';
 import '../../services/database_service.dart';
@@ -113,7 +112,6 @@ class _DrainageWasteScreenState extends State<DrainageWasteScreen> {
     try {
       // Prepare drainage data
       final drainageData = {
-        'id': const Uuid().v4(),
         'session_id': sessionId,
         'drainage_system_available': _selectedDrainageTypes.values.any((selected) => selected) ? 1 : 0,
         'waste_management_system': (_hasWasteCollection || _hasWasteSegregation) ? 1 : 0,

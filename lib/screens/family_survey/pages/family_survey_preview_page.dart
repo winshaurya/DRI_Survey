@@ -50,269 +50,178 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
     }
 
     try {
-      print('Loading survey data from database');
+      final db = DatabaseService();
 
+      // Build a map of named futures so we can execute DB queries in parallel.
+      final futures = <String, Future<dynamic>>{
+        'session': db.getSurveySession(widget.phoneNumber),
+        'family_members': db.getData('family_members', widget.phoneNumber),
+        'social_consciousness': db.getData('social_consciousness', widget.phoneNumber),
+        'tribal_questions': db.getData('tribal_questions', widget.phoneNumber),
+        'land_holding': db.getData('land_holding', widget.phoneNumber),
+        'irrigation': db.getData('irrigation_facilities', widget.phoneNumber),
+        'crops': db.getData('crop_productivity', widget.phoneNumber),
+        'fertilizer': db.getData('fertilizer_usage', widget.phoneNumber),
+        'animals': db.getData('animals', widget.phoneNumber),
+        'equipment': db.getData('agricultural_equipment', widget.phoneNumber),
+        'entertainment': db.getData('entertainment_facilities', widget.phoneNumber),
+        'transport': db.getData('transport_facilities', widget.phoneNumber),
+        'water_sources': db.getData('drinking_water_sources', widget.phoneNumber),
+        'medical': db.getData('medical_treatment', widget.phoneNumber),
+        'disputes': db.getData('disputes', widget.phoneNumber),
+        'house': db.getData('house_conditions', widget.phoneNumber),
+        'facilities': db.getData('house_facilities', widget.phoneNumber),
+        'diseases': db.getData('diseases', widget.phoneNumber),
+        'merged_govt_schemes': db.getData('merged_govt_schemes', widget.phoneNumber),
+        'aadhaar_info': db.getData('aadhaar_info', widget.phoneNumber),
+        'ayushman_card': db.getData('ayushman_card', widget.phoneNumber),
+        'family_id': db.getData('family_id', widget.phoneNumber),
+        'ration_card': db.getData('ration_card', widget.phoneNumber),
+        'samagra_id': db.getData('samagra_id', widget.phoneNumber),
+        'tribal_card': db.getData('tribal_card', widget.phoneNumber),
+        'handicapped_allowance': db.getData('handicapped_allowance', widget.phoneNumber),
+        'pension_allowance': db.getData('pension_allowance', widget.phoneNumber),
+        'widow_allowance': db.getData('widow_allowance', widget.phoneNumber),
+        'vb_gram': db.getData('vb_gram', widget.phoneNumber),
+        'pm_kisan_nidhi': db.getData('pm_kisan_nidhi', widget.phoneNumber),
+        'pm_kisan_samman_nidhi': db.getData('pm_kisan_samman_nidhi', widget.phoneNumber),
+        'children_data': db.getData('children_data', widget.phoneNumber),
+        'migration_data': db.getData('migration_data', widget.phoneNumber),
+        'training_data': db.getData('training_data', widget.phoneNumber),
+        'bank_accounts': db.getData('bank_accounts', widget.phoneNumber),
+        'health_programmes': db.getData('health_programmes', widget.phoneNumber),
+        'folklore_medicine': db.getData('folklore_medicine', widget.phoneNumber),
+        'vb_gram_members': db.getData('vb_gram_members', widget.phoneNumber),
+        'pm_kisan_members': db.getData('pm_kisan_members', widget.phoneNumber),
+        'pm_kisan_samman_members': db.getData('pm_kisan_samman_members', widget.phoneNumber),
+        'aadhaar_scheme_members': db.getData('aadhaar_scheme_members', widget.phoneNumber),
+        'tribal_scheme_members': db.getData('tribal_scheme_members', widget.phoneNumber),
+        'pension_scheme_members': db.getData('pension_scheme_members', widget.phoneNumber),
+        'widow_scheme_members': db.getData('widow_scheme_members', widget.phoneNumber),
+        'ayushman_scheme_members': db.getData('ayushman_scheme_members', widget.phoneNumber),
+        'ration_scheme_members': db.getData('ration_scheme_members', widget.phoneNumber),
+        'family_id_scheme_members': db.getData('family_id_scheme_members', widget.phoneNumber),
+        'samagra_scheme_members': db.getData('samagra_scheme_members', widget.phoneNumber),
+        'handicapped_scheme_members': db.getData('handicapped_scheme_members', widget.phoneNumber),
+        'shg_members': db.getData('shg_members', widget.phoneNumber),
+        'fpo_members': db.getData('fpo_members', widget.phoneNumber),
+        'malnourished_children_data': db.getData('malnourished_children_data', widget.phoneNumber),
+        'child_diseases': db.getData('child_diseases', widget.phoneNumber),
+      };
+
+      // Resolve all futures in parallel and collect them into a map
+      final entryFutures = futures.entries
+          .map((e) => e.value.then((v) => MapEntry<String, dynamic>(e.key, v)))
+          .toList();
+
+      final resolved = await Future.wait(entryFutures);
+      final results = Map<String, dynamic>.fromEntries(resolved);
+
+      // Helper normalizers
       Map<String, dynamic> _normRow(dynamic r) {
         if (r is Map<String, dynamic>) return Map<String, dynamic>.from(r);
         if (r is Map) return r.map((k, v) => MapEntry(k.toString(), v));
         return <String, dynamic>{};
       }
 
-      List<Map<String, dynamic>> _normList(List<dynamic> lst) {
-        return lst.map((e) => _normRow(e)).toList();
+      List<Map<String, dynamic>> _normList(dynamic lst) {
+        if (lst is! List) return [];
+        return lst.map<Map<String, dynamic>>((e) {
+          if (e is Map<String, dynamic>) return Map<String, dynamic>.from(e);
+          if (e is Map) return e.map((k, v) => MapEntry(k.toString(), v));
+          return <String, dynamic>{};
+        }).toList();
       }
 
-      // Otherwise, load from database as before
-      final db = DatabaseService();
       final Map<String, dynamic> allData = {};
 
-      // Load session data
-      final session = await db.getSurveySession(widget.phoneNumber);
-      if (session != null) {
-        allData.addAll(session);
+      // Map single-row tables
+      if (results['session'] != null) allData.addAll(_normRow(results['session']));
+      if ((results['social_consciousness'] as List?)?.isNotEmpty ?? false) allData.addAll(_normRow((results['social_consciousness'] as List).first));
+      if ((results['tribal_questions'] as List?)?.isNotEmpty ?? false) allData['tribal_questions'] = _normRow((results['tribal_questions'] as List).first);
+      if ((results['land_holding'] as List?)?.isNotEmpty ?? false) allData.addAll(_normRow((results['land_holding'] as List).first));
+      if ((results['irrigation'] as List?)?.isNotEmpty ?? false) allData['irrigation'] = _normRow((results['irrigation'] as List).first);
+      if ((results['fertilizer'] as List?)?.isNotEmpty ?? false) allData['fertilizer'] = _normRow((results['fertilizer'] as List).first);
+      if ((results['entertainment'] as List?)?.isNotEmpty ?? false) allData['entertainment'] = _normRow((results['entertainment'] as List).first);
+      if ((results['transport'] as List?)?.isNotEmpty ?? false) allData['transport'] = _normRow((results['transport'] as List).first);
+      if ((results['water_sources'] as List?)?.isNotEmpty ?? false) allData['water_sources'] = _normRow((results['water_sources'] as List).first);
+      if ((results['medical'] as List?)?.isNotEmpty ?? false) allData['medical'] = _normRow((results['medical'] as List).first);
+      if ((results['disputes'] as List?)?.isNotEmpty ?? false) allData['disputes'] = _normRow((results['disputes'] as List).first);
+      if ((results['house'] as List?)?.isNotEmpty ?? false) allData['house'] = _normRow((results['house'] as List).first);
+      if ((results['facilities'] as List?)?.isNotEmpty ?? false) allData['facilities'] = _normRow((results['facilities'] as List).first);
+      if ((results['merged_govt_schemes'] as List?)?.isNotEmpty ?? false) allData['merged_govt_schemes'] = _normRow((results['merged_govt_schemes'] as List).first);
+
+      // Map lists
+      final listKeys = {
+        'family_members': 'family_members',
+        'crops': 'crops',
+        'animals': 'animals',
+        'equipment': 'equipment',
+        'diseases': 'diseases',
+        'children_data': 'children',
+        'training_data': 'training',
+        'bank_accounts': 'bank_accounts',
+        'vb_gram_members': 'vb_gram_members',
+        'pm_kisan_members': 'pm_kisan_members',
+        'pm_kisan_samman_members': 'pm_kisan_samman_members',
+        'aadhaar_scheme_members': 'aadhaar_members',
+        'tribal_scheme_members': 'tribal_members',
+        'pension_scheme_members': 'pension_members',
+        'widow_scheme_members': 'widow_members',
+        'ayushman_scheme_members': 'ayushman_members',
+        'ration_scheme_members': 'ration_members',
+        'family_id_scheme_members': 'family_id_members',
+        'samagra_scheme_members': 'samagra_members',
+        'handicapped_scheme_members': 'handicapped_members',
+        'shg_members': 'shg_members',
+        'fpo_members': 'fpo_members',
+        'malnourished_children_data': 'malnourished_children',
+        'child_diseases': 'child_diseases',
+      };
+
+      for (final entry in listKeys.entries) {
+        final val = results[entry.key];
+        if (val is List && val.isNotEmpty) {
+          allData[entry.value] = _normList(val);
+        }
       }
 
-      // Load family members
-      final familyMembers = await db.getData('family_members', widget.phoneNumber);
-      if (familyMembers.isNotEmpty) {
-        allData['family_members'] = _normList(familyMembers);
+      // Map single-value tables that should be objects
+      final singleAsFirst = {
+        'aadhaar_info': 'aadhaar_info',
+        'ayushman_card': 'ayushman_card',
+        'family_id': 'family_id',
+        'ration_card': 'ration_card',
+        'samagra_id': 'samagra_id',
+        'tribal_card': 'tribal_card',
+        'handicapped_allowance': 'handicapped_allowance',
+        'pension_allowance': 'pension_allowance',
+        'widow_allowance': 'widow_allowance',
+        'vb_gram': 'vb_gram',
+        'pm_kisan_nidhi': 'pm_kisan_nidhi',
+        'pm_kisan_samman_nidhi': 'pm_kisan_samman_nidhi',
+        'health_programmes': 'health_programmes',
+        'folklore_medicine': 'folklore_medicine',
+      };
+
+      for (final e in singleAsFirst.entries) {
+        final val = results[e.key];
+        if (val is List && val.isNotEmpty) {
+          allData[e.value] = _normRow(val.first);
+        }
       }
-
-      // Load social consciousness
-      final social = await db.getData('social_consciousness', widget.phoneNumber);
-      if (social.isNotEmpty) {
-        allData.addAll(_normRow(social.first));
-      }
-
-      // Load tribal questions
-      final tribal = await db.getData('tribal_questions', widget.phoneNumber);
-      if (tribal.isNotEmpty) {
-        allData['tribal_questions'] = _normRow(tribal.first);
-      }
-
-      // Load land holding
-      final land = await db.getData('land_holding', widget.phoneNumber);
-      if (land.isNotEmpty) {
-        allData.addAll(_normRow(land.first));
-      }
-
-      // Load irrigation
-      final irrigation = await db.getData('irrigation_facilities', widget.phoneNumber);
-      if (irrigation.isNotEmpty) {
-        allData['irrigation'] = _normRow(irrigation.first);
-      }
-
-      // Load crops
-      final crops = await db.getData('crop_productivity', widget.phoneNumber);
-      if (crops.isNotEmpty) {
-        allData['crops'] = _normList(crops);
-      }
-
-      // Load fertilizer usage
-      final fertilizer = await db.getData('fertilizer_usage', widget.phoneNumber);
-      if (fertilizer.isNotEmpty) {
-        allData['fertilizer'] = _normRow(fertilizer.first);
-      }
-
-      // Load animals
-      final animals = await db.getData('animals', widget.phoneNumber);
-      if (animals.isNotEmpty) {
-        allData['animals'] = _normList(animals);
-      }
-
-      // Load equipment
-      final equipment = await db.getData('agricultural_equipment', widget.phoneNumber);
-      if (equipment.isNotEmpty) {
-        allData['equipment'] = _normList(equipment);
-      }
-
-      // Load entertainment
-      final entertainment = await db.getData('entertainment_facilities', widget.phoneNumber);
-      if (entertainment.isNotEmpty) {
-        allData['entertainment'] = _normRow(entertainment.first);
-      }
-
-      // Load transport
-      final transport = await db.getData('transport_facilities', widget.phoneNumber);
-      if (transport.isNotEmpty) {
-        allData['transport'] = _normRow(transport.first);
-      }
-
-      // Load water sources
-      final water = await db.getData('drinking_water_sources', widget.phoneNumber);
-      if (water.isNotEmpty) {
-        allData['water_sources'] = _normRow(water.first);
-      }
-
-      // Load medical treatment
-      final medical = await db.getData('medical_treatment', widget.phoneNumber);
-      if (medical.isNotEmpty) {
-        allData['medical'] = _normRow(medical.first);
-      }
-
-      // Load disputes
-      final disputes = await db.getData('disputes', widget.phoneNumber);
-      if (disputes.isNotEmpty) {
-        allData['disputes'] = _normRow(disputes.first);
-      }
-
-      // Load house conditions
-      final house = await db.getData('house_conditions', widget.phoneNumber);
-      if (house.isNotEmpty) {
-        allData['house'] = _normRow(house.first);
-      }
-
-      // Load house facilities
-      final facilities = await db.getData('house_facilities', widget.phoneNumber);
-      if (facilities.isNotEmpty) {
-        allData['facilities'] = _normRow(facilities.first);
-      }
-
-      // Load diseases
-      final diseases = await db.getData('diseases', widget.phoneNumber);
-      if (diseases.isNotEmpty) {
-        allData['diseases'] = _normList(diseases);
-      }
-
-      // Load merged government schemes (JSON)
-      final schemes = await db.getData('merged_govt_schemes', widget.phoneNumber);
-      if (schemes.isNotEmpty) {
-        allData['merged_govt_schemes'] = _normRow(schemes.first);
-      }
-
-      // Load government scheme info tables
-      final aadhaarInfo = await db.getData('aadhaar_info', widget.phoneNumber);
-      if (aadhaarInfo.isNotEmpty) allData['aadhaar_info'] = _normRow(aadhaarInfo.first);
-
-      final ayushmanCard = await db.getData('ayushman_card', widget.phoneNumber);
-      if (ayushmanCard.isNotEmpty) allData['ayushman_card'] = _normRow(ayushmanCard.first);
-
-      final familyId = await db.getData('family_id', widget.phoneNumber);
-      if (familyId.isNotEmpty) allData['family_id'] = _normRow(familyId.first);
-
-      final rationCard = await db.getData('ration_card', widget.phoneNumber);
-      if (rationCard.isNotEmpty) allData['ration_card'] = _normRow(rationCard.first);
-
-      final samagraId = await db.getData('samagra_id', widget.phoneNumber);
-      if (samagraId.isNotEmpty) allData['samagra_id'] = _normRow(samagraId.first);
-
-      final tribalCard = await db.getData('tribal_card', widget.phoneNumber);
-      if (tribalCard.isNotEmpty) allData['tribal_card'] = _normRow(tribalCard.first);
-
-      final handicappedAllowance = await db.getData('handicapped_allowance', widget.phoneNumber);
-      if (handicappedAllowance.isNotEmpty) allData['handicapped_allowance'] = _normRow(handicappedAllowance.first);
-
-      final pensionAllowance = await db.getData('pension_allowance', widget.phoneNumber);
-      if (pensionAllowance.isNotEmpty) allData['pension_allowance'] = _normRow(pensionAllowance.first);
-
-      final widowAllowance = await db.getData('widow_allowance', widget.phoneNumber);
-      if (widowAllowance.isNotEmpty) allData['widow_allowance'] = _normRow(widowAllowance.first);
-
-      final vbGram = await db.getData('vb_gram', widget.phoneNumber);
-      if (vbGram.isNotEmpty) allData['vb_gram'] = _normRow(vbGram.first);
-
-      final pmKisan = await db.getData('pm_kisan_nidhi', widget.phoneNumber);
-      if (pmKisan.isNotEmpty) allData['pm_kisan_nidhi'] = _normRow(pmKisan.first);
-
-      final pmSamman = await db.getData('pm_kisan_samman_nidhi', widget.phoneNumber);
-      if (pmSamman.isNotEmpty) allData['pm_kisan_samman_nidhi'] = _normRow(pmSamman.first);
-
-      // Load children data
-      final children = await db.getData('children_data', widget.phoneNumber);
-      if (children.isNotEmpty) {
-        allData['children'] = _normList(children);
-      }
-
-      // Load migration
-      final migration = await db.getData('migration_data', widget.phoneNumber);
-      if (migration.isNotEmpty) {
-        allData['migration'] = _normRow(migration.first);
-      }
-
-      // Load training
-      final training = await db.getData('training_data', widget.phoneNumber);
-      if (training.isNotEmpty) {
-        allData['training'] = training;
-      }
-
-      // Load bank accounts
-      final bankAccounts = await db.getData('bank_accounts', widget.phoneNumber);
-      if (bankAccounts.isNotEmpty) {
-        allData['bank_accounts'] = bankAccounts;
-      }
-
-      // Load health programmes
-      final healthProgrammes = await db.getData('health_programmes', widget.phoneNumber);
-      if (healthProgrammes.isNotEmpty) {
-        allData['health_programmes'] = healthProgrammes.first;
-      }
-
-      // Load folklore medicine
-      final folkloreMedicine = await db.getData('folklore_medicine', widget.phoneNumber);
-      if (folkloreMedicine.isNotEmpty) {
-        allData['folklore_medicine'] = folkloreMedicine;
-      }
-
-      final vbGramMembers = await db.getData('vb_gram_members', widget.phoneNumber);
-      if (vbGramMembers.isNotEmpty) allData['vb_gram_members'] = vbGramMembers;
-
-      final pmKisanMembers = await db.getData('pm_kisan_members', widget.phoneNumber);
-      if (pmKisanMembers.isNotEmpty) allData['pm_kisan_members'] = pmKisanMembers;
-
-      final pmSammanMembers = await db.getData('pm_kisan_samman_members', widget.phoneNumber);
-      if (pmSammanMembers.isNotEmpty) allData['pm_kisan_samman_members'] = pmSammanMembers;
-
-      // Load scheme members data
-      final aadhaarMembers = await db.getData('aadhaar_scheme_members', widget.phoneNumber);
-      if (aadhaarMembers.isNotEmpty) allData['aadhaar_members'] = aadhaarMembers;
-
-      final tribalMembers = await db.getData('tribal_scheme_members', widget.phoneNumber);
-      if (tribalMembers.isNotEmpty) allData['tribal_members'] = tribalMembers;
-
-      final pensionMembers = await db.getData('pension_scheme_members', widget.phoneNumber);
-      if (pensionMembers.isNotEmpty) allData['pension_members'] = pensionMembers;
-
-      final widowMembers = await db.getData('widow_scheme_members', widget.phoneNumber);
-      if (widowMembers.isNotEmpty) allData['widow_members'] = widowMembers;
-
-      final ayushmanMembers = await db.getData('ayushman_scheme_members', widget.phoneNumber);
-      if (ayushmanMembers.isNotEmpty) allData['ayushman_members'] = ayushmanMembers;
-
-      final rationMembers = await db.getData('ration_scheme_members', widget.phoneNumber);
-      if (rationMembers.isNotEmpty) allData['ration_members'] = rationMembers;
-
-      final familyIdMembers = await db.getData('family_id_scheme_members', widget.phoneNumber);
-      if (familyIdMembers.isNotEmpty) allData['family_id_members'] = familyIdMembers;
-
-      final samagraMembers = await db.getData('samagra_scheme_members', widget.phoneNumber);
-      if (samagraMembers.isNotEmpty) allData['samagra_members'] = samagraMembers;
-
-      final handicappedMembers = await db.getData('handicapped_scheme_members', widget.phoneNumber);
-      if (handicappedMembers.isNotEmpty) allData['handicapped_members'] = handicappedMembers;
-
-      // Load SHG and FPO members
-      final shgMembers = await db.getData('shg_members', widget.phoneNumber);
-      if (shgMembers.isNotEmpty) allData['shg_members'] = shgMembers;
-
-      final fpoMembers = await db.getData('fpo_members', widget.phoneNumber);
-      if (fpoMembers.isNotEmpty) allData['fpo_members'] = fpoMembers;
-
-      // Load malnourished children
-      final malnourishedChildren = await db.getData('malnourished_children_data', widget.phoneNumber);
-      if (malnourishedChildren.isNotEmpty) allData['malnourished_children'] = malnourishedChildren;
-
-      final childDiseases = await db.getData('child_diseases', widget.phoneNumber);
-      if (childDiseases.isNotEmpty) allData['child_diseases'] = childDiseases;
 
       setState(() {
         _surveyData = _normalizeSurveyDataForPreview(allData);
         _isLoading = false;
       });
-    } catch (e) {
-      print('Error loading survey data: $e');
-      setState(() => _isLoading = false);
+    } catch (e, st) {
+      // Log the error and unblock the UI
+      debugPrint('Error loading survey data (parallel): $e');
+      debugPrint(st.toString());
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
-}
 
   Map<String, dynamic> _normalizeSurveyDataForPreview(Map<String, dynamic> raw) {
     final data = Map<String, dynamic>.from(raw);

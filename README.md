@@ -1,5 +1,39 @@
 <div align="center">
 
+---
+
+## 2026 Migration & Refactor Summary
+
+**Date:** March 6, 2026
+
+### Major Changes (2026)
+
+- **Primary Key Migration:** All multi-row family tables now use composite PK `(phone_number, sr_no)` (except `training_data`, which uses `(phone_number, created_at)`).
+- **Schema Alignment:** Supabase and local SQLite schemas updated; migration scripts executed to enforce PKs and make `member_name` nullable in `shg_members`.
+- **Frontend Refactor:** All family survey screens now generate and re-index `sr_no` for list items; removed legacy `id`/UUID fields; fixed add/remove logic for training, migration, SHG, FPO, and crop tables.
+- **Backend/Provider Fixes:** Provider logic now persists all child tables locally before sync; hardcoded PK and export column maps updated.
+- **Preview Loader Optimization:** Family survey preview page now loads all DB tables in parallel, normalizes results, and prevents UI hangs for large surveys.
+- **End-to-End QA:** Validated schema, code, and sync flow; Supabase PKs confirmed; static analysis run; all critical errors resolved.
+
+---
+
+### How to Use This Repo (Post-Migration)
+
+1. **Start a new survey:** All list/table screens will auto-generate `sr_no` for each entry.
+2. **Save and sync:** Data is saved locally first, then synced to Supabase with correct PKs.
+3. **Preview and export:** The preview page loads instantly, even for large surveys; exports include `sr_no` for all relevant tables.
+4. **Schema checks:** Use the provided migration scripts and schema files to validate DB structure.
+
+---
+
+### Migration Audit Reference
+
+- See `ff.md` for a full audit log and mapping of all family survey screens, data variables, and storage paths.
+- Migration scripts: `database_supabase_sqlite/migrations/refactor_pk_sr_no.sql` and related assets.
+- All changes validated against Supabase and local DB; QA checklist completed.
+
+---
+
 <img src="https://img.shields.io/badge/FLUTTER-Mobile_App-1f6feb?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter"/>
 <img src="https://img.shields.io/badge/SUPABASE-Cloud_Sync-0f766e?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/>
 <img src="https://img.shields.io/badge/SQLITE-Offline_First-6b7280?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite"/>
@@ -7,6 +41,17 @@
 <img src="https://img.shields.io/badge/XLSX-Export_Engine-9a3412?style=for-the-badge&logo=microsoftexcel&logoColor=white" alt="XLSX"/>
 
 # DRI SURVEY APP AND DASHBOARD
+
+---
+
+**2026 Update:**
+
+- All multi-row family tables use `(phone_number, sr_no)` as PK.
+- Frontend, backend, and Supabase schemas are fully aligned.
+- Preview page refactored for reliability and speed.
+- See below for full architecture and file map.
+
+---
 
 ```text
 ██████╗ ██████╗ ██╗    ███████╗██╗   ██╗██████╗ ██╗   ██╗███████╗██╗   ██╗
@@ -307,13 +352,21 @@ Capabilities:
 
 ## 4) Data Architecture
 
+### 2026 PK Migration
+
+- All multi-row family tables now use composite PK `(phone_number, sr_no)`.
+- `training_data` uses `(phone_number, created_at)` for timestamped entries.
+- Migration scripts and schema files updated; Supabase and local DB are synchronized.
+
+---
+
 ## 4.1 Primary key strategy
 
 - **Family root key**: `phone_number`.
 - **Village root key**: `session_id` (+ `shine_code` identity semantics at business level).
 - **Child table patterns**:
 	- one-to-one by root key,
-	- one-to-many by `(root_key, sr_no)`,
+	- one-to-many by `(root_key, sr_no)` (2026 migration: all family tables except training_data),
 	- map-point style keys (`point_id`, etc.) where required.
 
 ## 4.2 Table ecosystem size
@@ -334,6 +387,8 @@ Location: `database_supabase_sqlite/migrations/`
 - `cleanup_duplicates_add_pks.sql`
 - `fix_all_missing_pks.sql`
 - `refactor_pk_sr_no.sql`
+
+2026 migration scripts ensure all PKs are correct and `sr_no` is present for all multi-row tables.
 
 Purpose:
 - remove duplicates,

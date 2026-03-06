@@ -484,6 +484,7 @@ const Map<String, List<String>> kHardcodedRemoteTableColumns = {
     'phone_number',
   ],
   'shg_members': [
+    'sr_no',
     'member_name',
     'shg_name',
     'purpose',

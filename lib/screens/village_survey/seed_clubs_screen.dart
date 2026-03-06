@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
 import '../../services/database_service.dart';
 import '../../services/supabase_service.dart';
@@ -75,7 +74,6 @@ class _SeedClubsScreenState extends State<SeedClubsScreen> {
     final int clubsCount = int.tryParse(_seedClubsController.text) ?? 0;
 
     final data = {
-      'id': const Uuid().v4(),
       'session_id': sessionId,
       'total_clubs': clubsCount,
       'clubs_available': clubsCount > 0 ? 1 : 0,
