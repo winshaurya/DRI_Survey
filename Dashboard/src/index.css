@@ -15,7 +15,8 @@ html,body,#root{
   margin:0;
   background: var(--bg-body);
   color:var(--fg);
-  font-family: Inter, Roboto, Arial, sans-serif;
+  font-family: 'Inter', 'Roboto', 'Arial', sans-serif;
+  font-size: clamp(14px, 2vw, 17px);
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
 }

@@ -73,8 +73,8 @@ export default function App() {
     : ["phone_number", "village_name", "district", "status", "survey_date", "created_at"];
 
   return (
-    <Box sx={{ minHeight: "100vh", p: 4, background: "var(--bg-body)" }}>
-      <Box sx={{ maxWidth: 1200, mx: "auto" }}>
+    <Box sx={{ minHeight: "100vh", p: { xs: 1, md: 4 }, background: "var(--bg-body)" }}>
+      <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 1, md: 0 } }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
           <Box
             sx={{
@@ -107,7 +107,7 @@ export default function App() {
           )}
         </Box>
 
-        <Paper sx={{ p: 2 }}>
+        <Paper sx={{ p: { xs: 1, md: 2 } }}>
           <Box sx={{ display: "flex", gap: 2, alignItems: "center", mb: 2 }}>
             <Tabs value={section} onChange={(_, v) => setSection(v as Section)}>
               <Tab label="Village" value="village" />
@@ -123,7 +123,7 @@ export default function App() {
                 placeholder="Search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                sx={{ width: 320 }}
+                sx={{ width: { xs: "100%", md: 320 } }}
               />
             )}
           </Box>
@@ -137,7 +137,7 @@ export default function App() {
           ) : (
             <>
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Inter, Roboto, Arial, sans-serif", fontSize: "clamp(13px, 2vw, 16px)" }}>
                   <thead>
                     <tr>
                       {columns.map((c) => (
