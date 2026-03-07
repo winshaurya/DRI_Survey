@@ -205,6 +205,16 @@ class SurveyNotifier extends Notifier<SurveyState> {
     return value.map<Map<String, dynamic>>((item) => _asMap(item)).toList();
   }
 
+  bool _isTruthy(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final text = value.toString().trim().toLowerCase();
+    return text == 'yes' || text == 'true' || text == '1';
+  }
+
+  String _toYesNo(dynamic value) => _isTruthy(value) ? 'yes' : 'no';
+
   // Extract data for a specific page from survey data
   Map<String, dynamic> _extractPageData(int pageIndex) {
     // helper to pick flat keys from state.surveyData
@@ -430,7 +440,20 @@ class SurveyNotifier extends Notifier<SurveyState> {
         return result;
 
       case 17: // Diseases
-        return {'diseases': state.surveyData['diseases']};
+        final diseaseData = state.surveyData['diseases'];
+        if (diseaseData is Map || diseaseData is List) {
+          return {'diseases': diseaseData};
+        }
+        final flatMembers = _asMapList(state.surveyData['members']);
+        if (flatMembers.isNotEmpty) {
+          return {
+            'diseases': {
+              'is_beneficiary': state.surveyData['is_beneficiary'] ?? true,
+              'members': flatMembers,
+            }
+          };
+        }
+        return {'diseases': const <Map<String, dynamic>>[]};
 
       case 18: // Government Schemes
         if (state.surveyData['government_schemes'] is Map<String, dynamic>) {
@@ -522,7 +545,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         };
 
       case 24: // VB-G RAM-G
-        return {'vb_g_ram_g_beneficiary': state.surveyData['vb_g_ram_g_beneficiary']};
+        return {'vb_gram': state.surveyData['vb_gram'] ?? state.surveyData['vb_g_ram_g_beneficiary']};
 
       case 25: // PM Kisan Nidhi
         return {'pm_kisan_nidhi': state.surveyData['pm_kisan_nidhi']};
@@ -534,7 +557,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         return {'kisan_credit_card': state.surveyData['kisan_credit_card']};
 
       case 28: // Swachh Bharat
-        return {'swachh_bharat_mission': state.surveyData['swachh_bharat_mission']};
+        return {'swachh_bharat_mission': state.surveyData['swachh_bharat_mission'] ?? state.surveyData['swachh_bharat']};
 
       case 29: // Fasal Bima
         return {'fasal_bima': state.surveyData['fasal_bima']};
@@ -639,7 +662,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _saveTraining(pageData['training'] ?? pageData, phoneNumber);
         break;
       case 24: // VB-G RAM-G
-        await _saveVbGRamGBeneficiary(pageData['vb_g_ram_g_beneficiary'], phoneNumber);
+        await _saveVbGRamGBeneficiary(pageData['vb_gram'] ?? pageData['vb_g_ram_g_beneficiary'], phoneNumber);
         break;
       case 25: // PM Kisan Nidhi
         await _savePmKisanNidhi(pageData['pm_kisan_nidhi'], phoneNumber);
@@ -845,23 +868,59 @@ class SurveyNotifier extends Notifier<SurveyState> {
           }
         };
       case 24: // VB-G RAM-G
-        final vbG = await _databaseService.getData('vb_gram', phoneNumber);
-        return {'vb_g_ram_g_beneficiary': vbG.isNotEmpty ? vbG.first : {}};
+        return {
+          'vb_gram': await _loadSchemeWithMembers(
+            phoneNumber: phoneNumber,
+            summaryTable: 'vb_gram',
+            membersTable: 'vb_gram_members',
+            beneficiaryKeys: const ['is_member', 'is_beneficiary'],
+          )
+        };
       case 25: // PM Kisan Nidhi
-        final pmKisan = await _databaseService.getData('pm_kisan_nidhi', phoneNumber);
-        return {'pm_kisan_nidhi': pmKisan.isNotEmpty ? pmKisan.first : {}};
+        return {
+          'pm_kisan_nidhi': await _loadSchemeWithMembers(
+            phoneNumber: phoneNumber,
+            summaryTable: 'pm_kisan_nidhi',
+            membersTable: 'pm_kisan_members',
+            beneficiaryKeys: const ['is_beneficiary'],
+          )
+        };
       case 26: // PM Kisan Samman
-        final pmKisanSamman = await _databaseService.getData('pm_kisan_samman_nidhi', phoneNumber);
-        return {'pm_kisan_samman_nidhi': pmKisanSamman.isNotEmpty ? pmKisanSamman.first : {}};
+        return {
+          'pm_kisan_samman_nidhi': await _loadSchemeWithMembers(
+            phoneNumber: phoneNumber,
+            summaryTable: 'pm_kisan_samman_nidhi',
+            membersTable: 'pm_kisan_samman_members',
+            beneficiaryKeys: const ['is_beneficiary'],
+          )
+        };
       case 27: // Kisan Credit Card
-        final kcc = await _databaseService.getData('kisan_credit_card', phoneNumber);
-        return {'kisan_credit_card': kcc.isNotEmpty ? kcc.first : {}};
+        return {
+          'kisan_credit_card': await _loadSchemeWithMembers(
+            phoneNumber: phoneNumber,
+            summaryTable: 'kisan_credit_card',
+            membersTable: 'kisan_credit_card_members',
+            beneficiaryKeys: const ['has_card', 'is_beneficiary'],
+          )
+        };
       case 28: // Swachh Bharat
-        final swachh = await _databaseService.getData('swachh_bharat_mission', phoneNumber);
-        return {'swachh_bharat_mission': swachh.isNotEmpty ? swachh.first : {}};
+        return {
+          'swachh_bharat_mission': await _loadSchemeWithMembers(
+            phoneNumber: phoneNumber,
+            summaryTable: 'swachh_bharat_mission',
+            membersTable: 'swachh_bharat_mission_members',
+            beneficiaryKeys: const ['has_toilet', 'is_beneficiary'],
+          )
+        };
       case 29: // Fasal Bima
-        final fasal = await _databaseService.getData('fasal_bima', phoneNumber);
-        return {'fasal_bima': fasal.isNotEmpty ? fasal.first : {}};
+        return {
+          'fasal_bima': await _loadSchemeWithMembers(
+            phoneNumber: phoneNumber,
+            summaryTable: 'fasal_bima',
+            membersTable: 'fasal_bima_members',
+            beneficiaryKeys: const ['has_insurance', 'is_beneficiary'],
+          )
+        };
       case 30: // Bank Account
         final bank = await _databaseService.getData('bank_accounts', phoneNumber);
         final grouped = <String, Map<String, dynamic>>{};
@@ -1182,6 +1241,9 @@ class SurveyNotifier extends Notifier<SurveyState> {
         'tribal_scheme_members': 'tribal_scheme_members',
         'pension_scheme_members': 'pension_scheme_members',
         'widow_scheme_members': 'widow_scheme_members',
+        'vb_gram_members': 'vb_gram_members',
+        'pm_kisan_members': 'pm_kisan_members',
+        'pm_kisan_samman_members': 'pm_kisan_samman_members',
       };
 
       String _yesNoFromMembers(List list, {String key = 'have_card'}) {
@@ -1259,6 +1321,18 @@ class SurveyNotifier extends Notifier<SurveyState> {
         'widow_allowance': {
           'has_allowance': _yesNoFromMembers(map['widow_scheme_members'] is List ? map['widow_scheme_members'] : const []),
           'total_members': map['widow_scheme_members'] is List ? (map['widow_scheme_members'] as List).length : 0,
+        },
+        'vb_gram': {
+          'is_member': _yesNoFromMembers(map['vb_gram_members'] is List ? map['vb_gram_members'] : const [], key: 'is_member'),
+          'total_members': map['vb_gram_members'] is List ? (map['vb_gram_members'] as List).length : 0,
+        },
+        'pm_kisan_nidhi': {
+          'is_beneficiary': _yesNoFromMembers(map['pm_kisan_members'] is List ? map['pm_kisan_members'] : const [], key: 'is_beneficiary'),
+          'total_members': map['pm_kisan_members'] is List ? (map['pm_kisan_members'] as List).length : 0,
+        },
+        'pm_kisan_samman_nidhi': {
+          'is_beneficiary': _yesNoFromMembers(map['pm_kisan_samman_members'] is List ? map['pm_kisan_samman_members'] : const [], key: 'is_beneficiary'),
+          'total_members': map['pm_kisan_samman_members'] is List ? (map['pm_kisan_samman_members'] as List).length : 0,
         },
       };
 
@@ -1458,40 +1532,178 @@ class SurveyNotifier extends Notifier<SurveyState> {
     }
   }
 
-  Future<void> _saveVbGRamGBeneficiary(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('vb_gram', data, phoneNumber);
+  Future<Map<String, dynamic>> _loadSchemeWithMembers({
+    required String phoneNumber,
+    required String summaryTable,
+    required String membersTable,
+    required List<String> beneficiaryKeys,
+  }) async {
+    final summaryRows = await _databaseService.getData(summaryTable, phoneNumber);
+    final memberRows = await _databaseService.getData(membersTable, phoneNumber);
+
+    final members = memberRows.map((raw) {
+      final row = _asMap(raw);
+      return <String, dynamic>{
+        'sr_no': row['sr_no'],
+        'name': row['name'] ?? row['member_name'] ?? row['family_member_name'],
+        'name_included': row['name_included'],
+        'details_correct': row['details_correct'],
+        'incorrect_details': row['incorrect_details'],
+        'received': row['received'],
+        'days': row['days'],
+      };
+    }).toList();
+
+    bool isBeneficiary = members.isNotEmpty;
+    if (summaryRows.isNotEmpty) {
+      final summary = _asMap(summaryRows.first);
+      for (final key in beneficiaryKeys) {
+        if (summary.containsKey(key)) {
+          isBeneficiary = _isTruthy(summary[key]);
+          break;
+        }
+      }
     }
+
+    return {
+      'is_beneficiary': isBeneficiary,
+      'members': members,
+    };
+  }
+
+  Future<void> _saveSchemeMembers({
+    required String membersTable,
+    required String phoneNumber,
+    required List<Map<String, dynamic>> members,
+  }) async {
+    await _databaseService.deleteByPhone(membersTable, phoneNumber);
+    for (int i = 0; i < members.length; i++) {
+      final row = _asMap(members[i]);
+      await _databaseService.insertOrUpdate(membersTable, {
+        'sr_no': row['sr_no'] is String
+            ? int.tryParse(row['sr_no']) ?? (i + 1)
+            : (row['sr_no'] ?? (i + 1)),
+        'member_name': row['member_name'] ?? row['name'] ?? row['family_member_name'],
+        'name_included': row['name_included'],
+        'details_correct': row['details_correct'],
+        'incorrect_details': row['incorrect_details'],
+        'received': row['received'],
+        'days': row['days'],
+        'benefits_received': row['benefits_received'],
+        'account_number': row['account_number'],
+        'membership_details': row['membership_details'],
+        'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+      }, phoneNumber);
+    }
+  }
+
+  Future<void> _saveVbGRamGBeneficiary(dynamic data, String phoneNumber) async {
+    if (data is! Map) return;
+    final payload = _asMap(data);
+    final members = _asMapList(payload['members']);
+    await _saveSchemeMembers(
+      membersTable: 'vb_gram_members',
+      phoneNumber: phoneNumber,
+      members: members,
+    );
+
+    await _databaseService.insertOrUpdate('vb_gram', {
+      'is_member': _toYesNo(payload['is_beneficiary'] ?? payload['is_member'] ?? members.isNotEmpty),
+      'total_members': members.length,
+      'created_at': payload['created_at'] ?? DateTime.now().toIso8601String(),
+    }, phoneNumber);
   }
 
   Future<void> _savePmKisanNidhi(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('pm_kisan_nidhi', data, phoneNumber);
-    }
+    if (data is! Map) return;
+    final payload = _asMap(data);
+    final members = _asMapList(payload['members']);
+    await _saveSchemeMembers(
+      membersTable: 'pm_kisan_members',
+      phoneNumber: phoneNumber,
+      members: members,
+    );
+
+    await _databaseService.insertOrUpdate('pm_kisan_nidhi', {
+      'is_beneficiary': _toYesNo(payload['is_beneficiary'] ?? members.isNotEmpty),
+      'total_members': members.length,
+      'created_at': payload['created_at'] ?? DateTime.now().toIso8601String(),
+    }, phoneNumber);
   }
 
   Future<void> _savePmKisanSammanNidhi(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('pm_kisan_samman_nidhi', data, phoneNumber);
-    }
+    if (data is! Map) return;
+    final payload = _asMap(data);
+    final members = _asMapList(payload['members']);
+    await _saveSchemeMembers(
+      membersTable: 'pm_kisan_samman_members',
+      phoneNumber: phoneNumber,
+      members: members,
+    );
+
+    await _databaseService.insertOrUpdate('pm_kisan_samman_nidhi', {
+      'is_beneficiary': _toYesNo(payload['is_beneficiary'] ?? members.isNotEmpty),
+      'total_members': members.length,
+      'created_at': payload['created_at'] ?? DateTime.now().toIso8601String(),
+    }, phoneNumber);
   }
 
   Future<void> _saveKisanCreditCard(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('kisan_credit_card', data, phoneNumber);
-    }
+    if (data is! Map) return;
+    final payload = _asMap(data);
+    final members = _asMapList(payload['members']);
+    await _saveSchemeMembers(
+      membersTable: 'kisan_credit_card_members',
+      phoneNumber: phoneNumber,
+      members: members,
+    );
+
+    await _databaseService.insertOrUpdate('kisan_credit_card', {
+      'has_card': _toYesNo(payload['is_beneficiary'] ?? payload['has_card'] ?? members.isNotEmpty),
+      'card_number': payload['card_number'],
+      'credit_limit': payload['credit_limit'],
+      'outstanding_amount': payload['outstanding_amount'],
+      'created_at': payload['created_at'] ?? DateTime.now().toIso8601String(),
+    }, phoneNumber);
   }
 
   Future<void> _saveSwachhBharatMission(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('swachh_bharat_mission', data, phoneNumber);
-    }
+    if (data is! Map) return;
+    final payload = _asMap(data);
+    final members = _asMapList(payload['members']);
+    await _saveSchemeMembers(
+      membersTable: 'swachh_bharat_mission_members',
+      phoneNumber: phoneNumber,
+      members: members,
+    );
+
+    await _databaseService.insertOrUpdate('swachh_bharat_mission', {
+      'has_toilet': _toYesNo(payload['is_beneficiary'] ?? payload['has_toilet'] ?? members.isNotEmpty),
+      'toilet_type': payload['toilet_type'],
+      'construction_year': payload['construction_year'],
+      'subsidy_received': payload['subsidy_received'],
+      'created_at': payload['created_at'] ?? DateTime.now().toIso8601String(),
+    }, phoneNumber);
   }
 
   Future<void> _saveFasalBima(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('fasal_bima', data, phoneNumber);
-    }
+    if (data is! Map) return;
+    final payload = _asMap(data);
+    final members = _asMapList(payload['members']);
+    await _saveSchemeMembers(
+      membersTable: 'fasal_bima_members',
+      phoneNumber: phoneNumber,
+      members: members,
+    );
+
+    await _databaseService.insertOrUpdate('fasal_bima', {
+      'has_insurance': _toYesNo(payload['is_beneficiary'] ?? payload['has_insurance'] ?? members.isNotEmpty),
+      'insurance_type': payload['insurance_type'],
+      'crop_insured': payload['crop_insured'],
+      'premium_amount': payload['premium_amount'],
+      'claim_received': payload['claim_received'],
+      'created_at': payload['created_at'] ?? DateTime.now().toIso8601String(),
+    }, phoneNumber);
   }
 
   Future<void> _saveBankAccount(dynamic data, String phoneNumber) async {

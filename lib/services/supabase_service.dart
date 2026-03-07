@@ -365,6 +365,8 @@ class SupabaseService {
     const aliases = <String, String>{
       'government_schemes': 'merged_govt_schemes',
       'government_scheme': 'merged_govt_schemes',
+      'vb_g_ram_g_beneficiary': 'vb_gram',
+      'swachh_bharat': 'swachh_bharat_mission',
     };
     return aliases[table] ?? table;
   }
@@ -929,6 +931,12 @@ class SupabaseService {
     syncTasks.add(syncWithTracking('pm_kisan_members', () => _syncPmKisanMembers(phoneNumber, surveyData['pm_kisan_members'])));
     syncTasks.add(syncWithTracking('pm_kisan_samman_nidhi', () => _syncPmKisanSammanNidhi(phoneNumber, surveyData['pm_kisan_samman_nidhi'])));
     syncTasks.add(syncWithTracking('pm_kisan_samman_members', () => _syncPmKisanSammanMembers(phoneNumber, surveyData['pm_kisan_samman_members'])));
+    syncTasks.add(syncWithTracking('kisan_credit_card', () => _syncKisanCreditCard(phoneNumber, surveyData['kisan_credit_card'])));
+    syncTasks.add(syncWithTracking('kisan_credit_card_members', () => _syncKisanCreditCardMembers(phoneNumber, surveyData['kisan_credit_card_members'] ?? surveyData['kisan_credit_card']?['members'])));
+    syncTasks.add(syncWithTracking('swachh_bharat_mission', () => _syncSwachhBharatMission(phoneNumber, surveyData['swachh_bharat_mission'] ?? surveyData['swachh_bharat'])));
+    syncTasks.add(syncWithTracking('swachh_bharat_mission_members', () => _syncSwachhBharatMissionMembers(phoneNumber, surveyData['swachh_bharat_mission_members'] ?? surveyData['swachh_bharat_mission']?['members'] ?? surveyData['swachh_bharat']?['members'])));
+    syncTasks.add(syncWithTracking('fasal_bima', () => _syncFasalBima(phoneNumber, surveyData['fasal_bima'])));
+    syncTasks.add(syncWithTracking('fasal_bima_members', () => _syncFasalBimaMembers(phoneNumber, surveyData['fasal_bima_members'] ?? surveyData['fasal_bima']?['members'])));
     syncTasks.add(syncWithTracking('merged_govt_schemes', () => _syncMergedGovtSchemes(phoneNumber, surveyData['merged_govt_schemes'])));
 
     // Execute all in parallel
@@ -1258,6 +1266,106 @@ class SupabaseService {
     );
   }
 
+  Future<void> _syncKisanCreditCard(String phoneNumber, Map<String, dynamic>? data) async {
+    if (data == null || data.isEmpty) return;
+    final payload = <String, dynamic>{
+      'phone_number': phoneNumber,
+      'has_card': data['has_card'] ?? data['is_beneficiary'],
+      'card_number': data['card_number'],
+      'credit_limit': data['credit_limit'],
+      'outstanding_amount': data['outstanding_amount'],
+    };
+    await _upsertWithRetry('kisan_credit_card', _normalizeMap(payload));
+  }
+
+  Future<void> _syncKisanCreditCardMembers(String phoneNumber, dynamic data) async {
+    final rowsInput = data is List ? data : const [];
+    if (rowsInput.isEmpty) return;
+    final rows = _normalizeList(
+      rowsInput.map((item) {
+        final memberName = item['member_name'] ?? item['name'] ?? item['family_member_name'];
+        return {
+          'phone_number': phoneNumber,
+          'sr_no': item['sr_no'],
+          'member_name': memberName,
+          'name_included': item['name_included'],
+          'details_correct': item['details_correct'],
+          'incorrect_details': item['incorrect_details'],
+          'received': item['received'],
+          'days': item['days'],
+        };
+      }).toList(),
+    );
+    await _upsertWithRetry('kisan_credit_card_members', rows);
+  }
+
+  Future<void> _syncSwachhBharatMission(String phoneNumber, Map<String, dynamic>? data) async {
+    if (data == null || data.isEmpty) return;
+    final payload = <String, dynamic>{
+      'phone_number': phoneNumber,
+      'has_toilet': data['has_toilet'] ?? data['is_beneficiary'],
+      'toilet_type': data['toilet_type'],
+      'construction_year': data['construction_year'],
+      'subsidy_received': data['subsidy_received'],
+    };
+    await _upsertWithRetry('swachh_bharat_mission', _normalizeMap(payload));
+  }
+
+  Future<void> _syncSwachhBharatMissionMembers(String phoneNumber, dynamic data) async {
+    final rowsInput = data is List ? data : const [];
+    if (rowsInput.isEmpty) return;
+    final rows = _normalizeList(
+      rowsInput.map((item) {
+        final memberName = item['member_name'] ?? item['name'] ?? item['family_member_name'];
+        return {
+          'phone_number': phoneNumber,
+          'sr_no': item['sr_no'],
+          'member_name': memberName,
+          'name_included': item['name_included'],
+          'details_correct': item['details_correct'],
+          'incorrect_details': item['incorrect_details'],
+          'received': item['received'],
+          'days': item['days'],
+        };
+      }).toList(),
+    );
+    await _upsertWithRetry('swachh_bharat_mission_members', rows);
+  }
+
+  Future<void> _syncFasalBima(String phoneNumber, Map<String, dynamic>? data) async {
+    if (data == null || data.isEmpty) return;
+    final payload = <String, dynamic>{
+      'phone_number': phoneNumber,
+      'has_insurance': data['has_insurance'] ?? data['is_beneficiary'],
+      'insurance_type': data['insurance_type'],
+      'crop_insured': data['crop_insured'],
+      'premium_amount': data['premium_amount'],
+      'claim_received': data['claim_received'],
+    };
+    await _upsertWithRetry('fasal_bima', _normalizeMap(payload));
+  }
+
+  Future<void> _syncFasalBimaMembers(String phoneNumber, dynamic data) async {
+    final rowsInput = data is List ? data : const [];
+    if (rowsInput.isEmpty) return;
+    final rows = _normalizeList(
+      rowsInput.map((item) {
+        final memberName = item['member_name'] ?? item['name'] ?? item['family_member_name'];
+        return {
+          'phone_number': phoneNumber,
+          'sr_no': item['sr_no'],
+          'member_name': memberName,
+          'name_included': item['name_included'],
+          'details_correct': item['details_correct'],
+          'incorrect_details': item['incorrect_details'],
+          'received': item['received'],
+          'days': item['days'],
+        };
+      }).toList(),
+    );
+    await _upsertWithRetry('fasal_bima_members', rows);
+  }
+
   // Extract and sync tulsi_plants from house_facilities
   Future<void> _syncTulsiPlants(String phoneNumber, dynamic data) async {
     if (data == null) return;
@@ -1475,6 +1583,12 @@ class SupabaseService {
       'shg_members',
       'fpo_members',
       'bank_accounts',
+      'kisan_credit_card',
+      'kisan_credit_card_members',
+      'swachh_bharat_mission',
+      'swachh_bharat_mission_members',
+      'fasal_bima',
+      'fasal_bima_members',
       'social_consciousness',
       'tribal_questions',
       'tulsi_plants',

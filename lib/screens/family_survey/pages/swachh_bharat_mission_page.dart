@@ -21,7 +21,7 @@ class SwachhBharatMissionPage extends ConsumerStatefulWidget {
 class _SwachhBharatMissionPageState extends ConsumerState<SwachhBharatMissionPage> {
   Map<String, dynamic> _schemeData = {};
   List<String> _familyMemberNames = [];
-  final String _schemeKey = 'swachh_bharat';
+  final String _schemeKey = 'swachh_bharat_mission';
 
   @override
   void initState() {
@@ -39,6 +39,7 @@ class _SwachhBharatMissionPageState extends ConsumerState<SwachhBharatMissionPag
 
   void _initData() {
     var existing = widget.pageData[_schemeKey];
+    existing ??= widget.pageData['swachh_bharat'];
     if (existing != null && existing is Map) {
        _schemeData = Map<String, dynamic>.from(existing);
     } else {

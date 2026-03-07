@@ -55,7 +55,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 47, // v47 aligns auxiliary family-survey tables used by preview/history with the current schema
+      version: 48, // v48 adds missing member tables for KCC/SBM/Fasal beneficiary pages
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -106,6 +106,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 47) {
       await _migrateFamilyAuxiliaryTablesV47(db);
+    }
+    if (oldVersion < 48) {
+      await _ensureSchemeMemberTables(db);
     }
   }
 
@@ -177,6 +180,9 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS vb_gram_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, membership_details TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
     await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, account_number TEXT, benefits_received TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
     await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_samman_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, account_number TEXT, benefits_received TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
+    await db.execute('CREATE TABLE IF NOT EXISTS kisan_credit_card_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
+    await db.execute('CREATE TABLE IF NOT EXISTS swachh_bharat_mission_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
+    await db.execute('CREATE TABLE IF NOT EXISTS fasal_bima_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
     await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_samman_nidhi (phone_number INTEGER PRIMARY KEY, is_beneficiary TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
   }
 
@@ -855,8 +861,11 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS training (phone_number INTEGER PRIMARY KEY, has_training TEXT, training_type TEXT, training_duration TEXT, training_provider TEXT, training_benefits TEXT, created_at TEXT)');
     await db.execute('CREATE TABLE IF NOT EXISTS vb_g_ram_g_beneficiary (phone_number INTEGER PRIMARY KEY, is_beneficiary TEXT, beneficiary_details TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
     await db.execute('CREATE TABLE IF NOT EXISTS kisan_credit_card (phone_number INTEGER PRIMARY KEY, has_card TEXT, card_number TEXT, credit_limit REAL, outstanding_amount REAL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
+    await db.execute('CREATE TABLE IF NOT EXISTS kisan_credit_card_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
     await db.execute('CREATE TABLE IF NOT EXISTS swachh_bharat_mission (phone_number INTEGER PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_toilet TEXT, toilet_type TEXT, construction_year INTEGER, subsidy_received TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
+    await db.execute('CREATE TABLE IF NOT EXISTS swachh_bharat_mission_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
     await db.execute('CREATE TABLE IF NOT EXISTS fasal_bima (phone_number INTEGER PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_insurance TEXT, insurance_type TEXT, crop_insured TEXT, premium_amount REAL, claim_received TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
+    await db.execute('CREATE TABLE IF NOT EXISTS fasal_bima_members (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, name_included INTEGER, details_correct INTEGER, incorrect_details TEXT, received INTEGER, days TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
     await db.execute('CREATE TABLE IF NOT EXISTS bank_account (phone_number INTEGER PRIMARY KEY, has_account TEXT, bank_name TEXT, account_number TEXT, account_type TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
   }
 

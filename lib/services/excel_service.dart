@@ -992,7 +992,7 @@ class ExcelService {
       ['PM Kisan Nidhi', _getBeneficiaryStatus(data, 'pm_kisan_nidhi')],
       ['PM Kisan Samman Nidhi', _getBeneficiaryStatus(data, 'pm_kisan_samman_nidhi')],
       ['Kisan Credit Card', _getBeneficiaryStatus(data, 'kisan_credit_card')],
-      ['Swachh Bharat Mission', _getBeneficiaryStatus(data, 'swachh_bharat')],
+      ['Swachh Bharat Mission', _getBeneficiaryStatus(data, 'swachh_bharat_mission')],
       ['Fasal Bima Yojana', _getBeneficiaryStatus(data, 'fasal_bima')],
       ['VB Gram G', _getBeneficiaryStatus(data, 'vb_gram')],
       ['Ujjwala Yojana', _getBeneficiaryStatus(data, 'ujjwala_yojana')],
