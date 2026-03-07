@@ -2,112 +2,238 @@ import 'package:equatable/equatable.dart';
 
 // Main Survey Model
 class Survey extends Equatable {
-  final int? id;
-  final String surveyDate;
+  final String? surveyorEmail;
+  final String? createdAt;
+  final String? updatedAt;
   final String? villageName;
+  final String? villageNumber;
   final String? panchayat;
   final String? block;
   final String? tehsil;
   final String? district;
   final String? postalAddress;
   final String? pinCode;
-  final String createdAt;
-  final String updatedAt;
-  final bool synced;
+  final String? shineCode;
+  final double? latitude;
+  final double? longitude;
+  final String? locationTimestamp;
+  final String? surveyDate;
+  final String? surveyorName;
+  final String? status;
+  final String? deviceInfo;
+  final String? appVersion;
+  final String? createdBy;
+  final String? updatedBy;
+  final int? isDeleted;
+  final String? lastSyncedAt;
+  final int? currentVersion;
+  final String? lastEditedAt;
+  final String? pageCompletionStatus;
+  final int? syncPending;
+  final int phoneNumber;
+  final String? state;
 
   const Survey({
-    this.id,
-    required this.surveyDate,
+    this.surveyorEmail,
+    this.createdAt,
+    this.updatedAt,
     this.villageName,
+    this.villageNumber,
     this.panchayat,
     this.block,
     this.tehsil,
     this.district,
     this.postalAddress,
     this.pinCode,
-    required this.createdAt,
-    required this.updatedAt,
-    required this.synced,
+    this.shineCode,
+    this.latitude,
+    this.longitude,
+    this.locationTimestamp,
+    this.surveyDate,
+    this.surveyorName,
+    this.status,
+    this.deviceInfo,
+    this.appVersion,
+    this.createdBy,
+    this.updatedBy,
+    this.isDeleted,
+    this.lastSyncedAt,
+    this.currentVersion,
+    this.lastEditedAt,
+    this.pageCompletionStatus,
+    this.syncPending,
+    required this.phoneNumber,
+    this.state,
   });
 
   factory Survey.fromMap(Map<String, dynamic> map) {
     return Survey(
-      id: map['id'],
-      surveyDate: map['survey_date'],
+      surveyorEmail: map['surveyor_email'],
+      createdAt: map['created_at'],
+      updatedAt: map['updated_at'],
       villageName: map['village_name'],
+      villageNumber: map['village_number'],
       panchayat: map['panchayat'],
       block: map['block'],
       tehsil: map['tehsil'],
       district: map['district'],
       postalAddress: map['postal_address'],
       pinCode: map['pin_code'],
-      createdAt: map['created_at'],
-      updatedAt: map['updated_at'],
-      synced: map['synced'] == 1,
+      shineCode: map['shine_code'],
+      latitude: map['latitude']?.toDouble(),
+      longitude: map['longitude']?.toDouble(),
+      locationTimestamp: map['location_timestamp'],
+      surveyDate: map['survey_date'],
+      surveyorName: map['surveyor_name'],
+      status: map['status'],
+      deviceInfo: map['device_info'],
+      appVersion: map['app_version'],
+      createdBy: map['created_by'],
+      updatedBy: map['updated_by'],
+      isDeleted: map['is_deleted'],
+      lastSyncedAt: map['last_synced_at'],
+      currentVersion: map['current_version'],
+      lastEditedAt: map['last_edited_at'],
+      pageCompletionStatus: map['page_completion_status'],
+      syncPending: map['sync_pending'],
+      phoneNumber: map['phone_number'],
+      state: map['state'],
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'survey_date': surveyDate,
+      'surveyor_email': surveyorEmail,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
       'village_name': villageName,
+      'village_number': villageNumber,
       'panchayat': panchayat,
       'block': block,
       'tehsil': tehsil,
       'district': district,
       'postal_address': postalAddress,
       'pin_code': pinCode,
-      'created_at': createdAt,
-      'updated_at': updatedAt,
-      'synced': synced ? 1 : 0,
+      'shine_code': shineCode,
+      'latitude': latitude,
+      'longitude': longitude,
+      'location_timestamp': locationTimestamp,
+      'survey_date': surveyDate,
+      'surveyor_name': surveyorName,
+      'status': status,
+      'device_info': deviceInfo,
+      'app_version': appVersion,
+      'created_by': createdBy,
+      'updated_by': updatedBy,
+      'is_deleted': isDeleted,
+      'last_synced_at': lastSyncedAt,
+      'current_version': currentVersion,
+      'last_edited_at': lastEditedAt,
+      'page_completion_status': pageCompletionStatus,
+      'sync_pending': syncPending,
+      'phone_number': phoneNumber,
+      'state': state,
     };
   }
 
   Survey copyWith({
-    int? id,
-    String? surveyDate,
+    String? surveyorEmail,
+    String? createdAt,
+    String? updatedAt,
     String? villageName,
+    String? villageNumber,
     String? panchayat,
     String? block,
     String? tehsil,
     String? district,
     String? postalAddress,
     String? pinCode,
-    String? createdAt,
-    String? updatedAt,
-    bool? synced,
+    String? shineCode,
+    double? latitude,
+    double? longitude,
+    String? locationTimestamp,
+    String? surveyDate,
+    String? surveyorName,
+    String? status,
+    String? deviceInfo,
+    String? appVersion,
+    String? createdBy,
+    String? updatedBy,
+    int? isDeleted,
+    String? lastSyncedAt,
+    int? currentVersion,
+    String? lastEditedAt,
+    String? pageCompletionStatus,
+    int? syncPending,
+    int? phoneNumber,
+    String? state,
   }) {
     return Survey(
-      id: id ?? this.id,
-      surveyDate: surveyDate ?? this.surveyDate,
+      surveyorEmail: surveyorEmail ?? this.surveyorEmail,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       villageName: villageName ?? this.villageName,
+      villageNumber: villageNumber ?? this.villageNumber,
       panchayat: panchayat ?? this.panchayat,
       block: block ?? this.block,
       tehsil: tehsil ?? this.tehsil,
       district: district ?? this.district,
       postalAddress: postalAddress ?? this.postalAddress,
       pinCode: pinCode ?? this.pinCode,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      synced: synced ?? this.synced,
+      shineCode: shineCode ?? this.shineCode,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      locationTimestamp: locationTimestamp ?? this.locationTimestamp,
+      surveyDate: surveyDate ?? this.surveyDate,
+      surveyorName: surveyorName ?? this.surveyorName,
+      status: status ?? this.status,
+      deviceInfo: deviceInfo ?? this.deviceInfo,
+      appVersion: appVersion ?? this.appVersion,
+      createdBy: createdBy ?? this.createdBy,
+      updatedBy: updatedBy ?? this.updatedBy,
+      isDeleted: isDeleted ?? this.isDeleted,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      currentVersion: currentVersion ?? this.currentVersion,
+      lastEditedAt: lastEditedAt ?? this.lastEditedAt,
+      pageCompletionStatus: pageCompletionStatus ?? this.pageCompletionStatus,
+      syncPending: syncPending ?? this.syncPending,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      state: state ?? this.state,
     );
   }
 
   @override
   List<Object?> get props => [
-        id,
-        surveyDate,
+        surveyorEmail,
+        createdAt,
+        updatedAt,
         villageName,
+        villageNumber,
         panchayat,
         block,
         tehsil,
         district,
         postalAddress,
         pinCode,
-        createdAt,
-        updatedAt,
-        synced,
+        shineCode,
+        latitude,
+        longitude,
+        locationTimestamp,
+        surveyDate,
+        surveyorName,
+        status,
+        deviceInfo,
+        appVersion,
+        createdBy,
+        updatedBy,
+        isDeleted,
+        lastSyncedAt,
+        currentVersion,
+        lastEditedAt,
+        pageCompletionStatus,
+        syncPending,
+        phoneNumber,
+        state,
       ];
 }
 

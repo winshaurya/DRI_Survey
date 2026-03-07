@@ -39,9 +39,10 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   Future<void> _loadAllSurveyData() async {
     setState(() => _isLoading = true);
 
-    // If preview is embedded in the active survey flow, prefer the in-memory surveyData
-    // passed by the caller so freshly-entered (unsaved) values are visible immediately.
-    if (widget.embedInSurveyFlow && widget.surveyData != null && widget.surveyData!.isNotEmpty) {
+    // Use DB-backed data for both history and in-flow preview so page 32 matches
+    // history preview semantics. Keep an in-memory fallback only when we do not
+    // have a valid session identifier yet.
+    if (widget.phoneNumber.trim().isEmpty && widget.surveyData != null && widget.surveyData!.isNotEmpty) {
       setState(() {
         _surveyData = _normalizeSurveyDataForPreview(widget.surveyData!);
         _isLoading = false;
@@ -72,7 +73,6 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
         'house': db.getData('house_conditions', widget.phoneNumber),
         'facilities': db.getData('house_facilities', widget.phoneNumber),
         'diseases': db.getData('diseases', widget.phoneNumber),
-        'merged_govt_schemes': db.getData('merged_govt_schemes', widget.phoneNumber),
         'aadhaar_info': db.getData('aadhaar_info', widget.phoneNumber),
         'ayushman_card': db.getData('ayushman_card', widget.phoneNumber),
         'family_id': db.getData('family_id', widget.phoneNumber),
@@ -88,6 +88,7 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
         'children_data': db.getData('children_data', widget.phoneNumber),
         'migration_data': db.getData('migration_data', widget.phoneNumber),
         'training_data': db.getData('training_data', widget.phoneNumber),
+        'training_needs': db.getData('training_needs', widget.phoneNumber),
         'bank_accounts': db.getData('bank_accounts', widget.phoneNumber),
         'health_programmes': db.getData('health_programmes', widget.phoneNumber),
         'folklore_medicine': db.getData('folklore_medicine', widget.phoneNumber),
@@ -149,7 +150,14 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
       if ((results['disputes'] as List?)?.isNotEmpty ?? false) allData['disputes'] = _normRow((results['disputes'] as List).first);
       if ((results['house'] as List?)?.isNotEmpty ?? false) allData['house'] = _normRow((results['house'] as List).first);
       if ((results['facilities'] as List?)?.isNotEmpty ?? false) allData['facilities'] = _normRow((results['facilities'] as List).first);
-      if ((results['merged_govt_schemes'] as List?)?.isNotEmpty ?? false) allData['merged_govt_schemes'] = _normRow((results['merged_govt_schemes'] as List).first);
+
+      final trainingRows = _normList(results['training_data']);
+      final trainingNeedRows = _normList(results['training_needs']).map((row) => {
+            ...row,
+            'status': row['status'] ?? 'needed',
+            'training_topic': row['training_topic'] ?? row['preferred_training'],
+            'training_type': row['training_type'] ?? row['preferred_training'],
+          }).toList();
 
       // Map lists
       final listKeys = {
@@ -159,7 +167,6 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
         'equipment': 'equipment',
         'diseases': 'diseases',
         'children_data': 'children',
-        'training_data': 'training',
         'bank_accounts': 'bank_accounts',
         'vb_gram_members': 'vb_gram_members',
         'pm_kisan_members': 'pm_kisan_members',
@@ -186,6 +193,26 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
         }
       }
 
+      if (trainingRows.isNotEmpty || trainingNeedRows.isNotEmpty) {
+        allData['training'] = [
+          ...trainingRows.map((row) => {
+                ...row,
+                'status': row['status'] ?? 'taken',
+                'training_type': row['training_type'] ?? row['training_topic'],
+              }),
+          ...trainingNeedRows,
+        ];
+      }
+
+      if ((results['migration_data'] as List?)?.isNotEmpty ?? false) {
+        allData['migration'] = _normRow((results['migration_data'] as List).first);
+      }
+
+      final folkloreRows = _normList(results['folklore_medicine']);
+      if (folkloreRows.isNotEmpty) {
+        allData['folklore_medicine'] = folkloreRows;
+      }
+
       // Map single-value tables that should be objects
       final singleAsFirst = {
         'aadhaar_info': 'aadhaar_info',
@@ -201,7 +228,6 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
         'pm_kisan_nidhi': 'pm_kisan_nidhi',
         'pm_kisan_samman_nidhi': 'pm_kisan_samman_nidhi',
         'health_programmes': 'health_programmes',
-        'folklore_medicine': 'folklore_medicine',
       };
 
       for (final e in singleAsFirst.entries) {
@@ -407,6 +433,10 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
       'tulsi_plants_available',
     ]);
 
+    if (data['folklore_medicine'] is Map) {
+      data['folklore_medicine'] = [mapify(data['folklore_medicine'])];
+    }
+
     if (data['folklore_medicine'] is! List) {
       final folklore = listify(data['folklore_medicines']);
       if (folklore.isNotEmpty) {
@@ -491,6 +521,20 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
       }
     }
 
+    if (data['training'] is Map) {
+      final trainingMap = mapify(data['training']);
+      final trainingMembers = listify(trainingMap['training_members']);
+      if (trainingMembers.isNotEmpty) {
+        data['training'] = trainingMembers;
+      }
+      if (data['shg_members'] is! List && trainingMap['shg_members'] is List) {
+        data['shg_members'] = listify(trainingMap['shg_members']);
+      }
+      if (data['fpo_members'] is! List && trainingMap['fpo_members'] is List) {
+        data['fpo_members'] = listify(trainingMap['fpo_members']);
+      }
+    }
+
     if (data['training'] is! List) {
       final trainingMembers = listify(data['training_members']);
       if (trainingMembers.isNotEmpty) {
@@ -517,6 +561,39 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
         });
         if (looksLikeDisease) {
           data['diseases'] = members.map((m) => _mapDiseaseMember(mapify(m))).toList();
+        }
+      }
+    }
+
+    if (data['bank_accounts'] is Map) {
+      final bankMap = mapify(data['bank_accounts']);
+      final members = listify(bankMap['members']);
+      if (members.isNotEmpty) {
+        final accounts = <Map<String, dynamic>>[];
+        int srNo = 0;
+        for (final m in members) {
+          final member = mapify(m);
+          final memberName = member['name'] ?? member['member_name'];
+          final bankList = listify(member['bank_accounts']);
+          for (final account in bankList) {
+            final a = mapify(account);
+            srNo++;
+            accounts.add({
+              'sr_no': a['sr_no'] ?? srNo,
+              'member_name': memberName,
+              'account_number': a['account_number'],
+              'bank_name': a['bank_name'],
+              'ifsc_code': a['ifsc_code'],
+              'branch_name': a['branch_name'],
+              'account_type': a['account_type'],
+              'has_account': a['has_account'],
+              'details_correct': a['details_correct'],
+              'incorrect_details': a['incorrect_details'],
+            });
+          }
+        }
+        if (accounts.isNotEmpty) {
+          data['bank_accounts'] = accounts;
         }
       }
     }
@@ -1170,7 +1247,12 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildWaterSources() {
-    final water = _surveyData['water_sources'] as Map<String, dynamic>? ?? {};
+    final waterRaw = _surveyData['water_sources'];
+    final water = waterRaw is Map<String, dynamic>
+        ? waterRaw
+        : (waterRaw is List && waterRaw.isNotEmpty && waterRaw.first is Map<String, dynamic>
+            ? waterRaw.first as Map<String, dynamic>
+            : {});
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1193,7 +1275,12 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildMedical() {
-    final medical = _surveyData['medical'] as Map<String, dynamic>? ?? {};
+    final medicalRaw = _surveyData['medical'];
+    final medical = medicalRaw is Map<String, dynamic>
+        ? medicalRaw
+        : (medicalRaw is List && medicalRaw.isNotEmpty && medicalRaw.first is Map<String, dynamic>
+            ? medicalRaw.first as Map<String, dynamic>
+            : {});
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1362,23 +1449,6 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
     );
   }
 
-  Map<String, dynamic> _decodeSchemeData(dynamic row) {
-    if (row is Map<String, dynamic>) {
-      final raw = row['scheme_data'];
-      if (raw is Map<String, dynamic>) return raw;
-      if (raw is String && raw.trim().isNotEmpty) {
-        try {
-          final decoded = jsonDecode(raw);
-          if (decoded is Map) {
-            return decoded.map((k, v) => MapEntry(k.toString(), v));
-          }
-        } catch (_) {
-          return {};
-        }
-      }
-    }
-    return {};
-  }
 
   String _yesNo(dynamic value) {
     if (value == null) return '-';
@@ -1394,32 +1464,24 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildSchemes() {
-    final merged = _decodeSchemeData(_surveyData['merged_govt_schemes']);
-
-    String mergedYesNo(String key) {
-      final val = merged[key];
-      if (val is Map) return _yesNo(val['is_beneficiary']);
-      return _yesNo(val);
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildDataRow('Aadhaar Card', _yesNo(_surveyData['aadhaar_info']?['has_aadhaar'])),
         _buildDataRow('Ration Card', _yesNo(_surveyData['ration_card']?['has_card'])),
         _buildDataRow('Tribal Card', _yesNo(_surveyData['tribal_card']?['has_card'])),
-        _buildDataRow('Pension', _yesNo(_surveyData['pension_allowance']?['is_beneficiary'])),
-        _buildDataRow('Widow Allowance', _yesNo(_surveyData['widow_allowance']?['is_beneficiary'])),
+        _buildDataRow('Pension', _yesNo(_surveyData['pension_allowance']?['has_pension'])),
+        _buildDataRow('Widow Allowance', _yesNo(_surveyData['widow_allowance']?['has_allowance'])),
         _buildDataRow('Ayushman Card', _yesNo(_surveyData['ayushman_card']?['has_card'])),
         _buildDataRow('Family ID', _yesNo(_surveyData['family_id']?['has_id'])),
         _buildDataRow('Samagra ID', _yesNo(_surveyData['samagra_id']?['has_id'])),
-        _buildDataRow('Handicapped Allowance', _yesNo(_surveyData['handicapped_allowance']?['is_beneficiary'])),
+        _buildDataRow('Handicapped Allowance', _yesNo(_surveyData['handicapped_allowance']?['has_allowance'])),
         _buildDataRow('PM Kisan Nidhi', _yesNo(_surveyData['pm_kisan_nidhi']?['is_beneficiary'])),
         _buildDataRow('PM Kisan Samman Nidhi', _yesNo(_surveyData['pm_kisan_samman_nidhi']?['is_beneficiary'])),
         _buildDataRow('VB Gram', _yesNo(_surveyData['vb_gram']?['is_member'])),
-        _buildDataRow('Kisan Credit Card', mergedYesNo('kisan_credit_card')),
-        _buildDataRow('Swachh Bharat', mergedYesNo('swachh_bharat')),
-        _buildDataRow('Fasal Bima', mergedYesNo('fasal_bima')),
+        _buildDataRow('Kisan Credit Card', _yesNo(_surveyData['kisan_credit_card']?['has_card'])),
+        _buildDataRow('Swachh Bharat', _yesNo(_surveyData['swachh_bharat_mission']?['has_toilet'])),
+        _buildDataRow('Fasal Bima', _yesNo(_surveyData['fasal_bima']?['has_insurance'])),
       ],
     );
   }
@@ -1670,7 +1732,9 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
 
   Widget _buildMigration() {
     final migration = _surveyData['migration'] as Map<String, dynamic>? ?? {};
-    final members = _decodeJsonList(migration['migrated_members_json']);
+    final members = migration['migrated_members'] is List
+        ? migration['migrated_members'] as List<dynamic>
+        : _decodeJsonList(migration['migrated_members_json']);
 
     if ((migration['no_migration'] == 1 || migration['no_migration'] == true) && members.isEmpty) {
       return const Text('No family migration reported', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic));
@@ -1680,17 +1744,39 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildDataRow('Family Members Migrated', migration['family_members_migrated']),
+        _buildDataRow('No Migration', migration['no_migration']),
         _buildDataRow('Reason', migration['reason']),
         _buildDataRow('Duration', migration['duration']),
         _buildDataRow('Destination', migration['destination']),
         if (members.isNotEmpty) ...[
           const Divider(height: 16),
           const Text('Migrated Members:', style: TextStyle(fontWeight: FontWeight.bold)),
-          ...members.map((m) {
-            final member = m as Map<String, dynamic>;
-            return Padding(
-              padding: const EdgeInsets.only(left: 12, top: 6),
-              child: Text('• ${member['member_name'] ?? ''}'),
+          ...members.asMap().entries.map((entry) {
+            final member = entry.value as Map<String, dynamic>;
+            final visibleEntries = member.entries
+                .where((e) => e.value != null && e.value.toString().trim().isNotEmpty)
+                .toList();
+
+            return Card(
+              color: Colors.orange[50],
+              margin: const EdgeInsets.only(top: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Member ${entry.key + 1}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    ...visibleEntries.map((e) => _buildDataRow(
+                          e.key.replaceAll('_', ' ').toUpperCase(),
+                          e.value,
+                        )),
+                  ],
+                ),
+              ),
             );
           }),
         ],
@@ -1710,15 +1796,27 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
   }
 
   Widget _buildTraining() {
-    final training = _surveyData['training'] as List<dynamic>? ?? [];
-    
-    if (training.isEmpty) {
+    // combine taken and needed records into a single list for preview
+    final taken = (_surveyData['training'] as List<dynamic>? ?? []).cast<Map<String,dynamic>>();
+    final need = (_surveyData['training_needs'] as List<dynamic>? ?? []).cast<Map<String,dynamic>>();
+    final all = <Map<String, dynamic>>[];
+    all.addAll(taken);
+    for (var n in need) {
+      final copy = Map<String, dynamic>.from(n);
+      copy['status'] = 'needed';
+      all.add(copy);
+    }
+
+    if (all.isEmpty) {
       return const Text('No training data recorded', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic));
     }
 
     return Column(
-      children: training.map((t) {
-        final train = t as Map<String, dynamic>;
+      children: all.map((train) {
+        final visible = train.entries
+            .where((e) => e.value != null && e.value.toString().trim().isNotEmpty)
+            .toList();
+
         return Card(
           color: Colors.indigo[50],
           margin: const EdgeInsets.only(bottom: 12),
@@ -1728,11 +1826,30 @@ class _FamilySurveyPreviewPageState extends ConsumerState<FamilySurveyPreviewPag
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildDataRow('Sr. No', train['sr_no']),
                 _buildDataRow('Member Name', train['member_name']),
-                _buildDataRow('Training Topic', train['training_topic']),
+                _buildDataRow('Training Topic', train['training_topic'] ?? train['training_type'] ?? train['preferred_training']),
                 _buildDataRow('Training Duration', train['training_duration']),
-                _buildDataRow('Training Date', train['training_date']),
+                _buildDataRow('Training Date', train['training_date'] ?? train['pass_out_year']),
+                _buildDataRow('Wants Training', train['wants_training']),
                 _buildDataRow('Status', train['status']),
+                ...visible
+                    .where((e) => ![
+                          'sr_no',
+                          'member_name',
+                          'training_topic',
+                          'training_type',
+                          'preferred_training',
+                          'training_duration',
+                          'training_date',
+                          'pass_out_year',
+                          'wants_training',
+                          'status',
+                        ].contains(e.key))
+                    .map((e) => _buildDataRow(
+                          e.key.replaceAll('_', ' ').toUpperCase(),
+                          e.value,
+                        )),
               ],
             ),
           ),

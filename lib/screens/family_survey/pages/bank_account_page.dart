@@ -61,7 +61,11 @@ class _BankAccountPageState extends ConsumerState<BankAccountPage> {
   }
 
   void _loadData() {
-    _bankData = Map<String, dynamic>.from(widget.pageData);
+    if (widget.pageData['bank_accounts'] is Map<String, dynamic>) {
+      _bankData = Map<String, dynamic>.from(widget.pageData['bank_accounts'] as Map<String, dynamic>);
+    } else {
+      _bankData = Map<String, dynamic>.from(widget.pageData);
+    }
     if (_bankData.isEmpty) {
         _bankData = {
           'is_beneficiary': false,
@@ -82,7 +86,7 @@ class _BankAccountPageState extends ConsumerState<BankAccountPage> {
         setState(() {
           _bankData = data;
         });
-        widget.onDataChanged(_bankData);
+        widget.onDataChanged({'bank_accounts': _bankData});
       },
     );
   }

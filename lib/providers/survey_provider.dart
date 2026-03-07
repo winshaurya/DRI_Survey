@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -49,12 +50,8 @@ class SurveyState {
 class SurveyNotifier extends Notifier<SurveyState> {
   final DatabaseService _databaseService = DatabaseService();
 
-  int? _lastSavedPage;
-  String? _lastSavedDataSignature;
   final SupabaseService _supabaseService = SupabaseService.instance;
   final SyncService _syncService = SyncService.instance;
-
-  DateTime? _lastSaveTimestamp;
 
   @override
   SurveyState build() {
@@ -105,7 +102,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
           sessionPayload['surveyor_email'] = 'unknown';
         }
 
-        await _databaseService.saveData('family_survey_sessions', sessionPayload);
+        await _databaseService.insertOrUpdate('family_survey_sessions', sessionPayload, effectivePhone);
         await _syncService.syncFamilyPageData(effectivePhone, 0, pageData);
         await _updatePageCompletionStatus(0, true);
         debugPrint('Started family session upsert for page 0 (phone: $effectivePhone) — result will be reported by SyncService');
@@ -167,10 +164,10 @@ class SurveyNotifier extends Notifier<SurveyState> {
                 else if (hk == 'tulsi_plants_available') flattened['tulsi_plants'] = hv;
                 else flattened[hk] = hv;
               });
-            } else if (key == 'folklore_medicine' && value is Map) {
-              // some DB entries are stored as map but UI expects list under 'folklore_medicines'
-              // keep the DB shape under the original key and also expose possible list under page key
-              flattened.addAll(value);
+            } else if (key == 'folklore_medicine') {
+              // pages expect a list called 'folklore_medicines'; turn map/list into list
+              // `value` is guaranteed to be a Map<String, dynamic> because of outer if
+              flattened['folklore_medicines'] = [Map<String, dynamic>.from(value)];
             } else {
               // Most nested page tables use the same keys as the UI — merge them directly
               flattened.addAll(value);
@@ -193,6 +190,19 @@ class SurveyNotifier extends Notifier<SurveyState> {
   // Update survey data map (called by pages when data changes)
   void updateSurveyDataMap(Map<String, dynamic> pageData) {
     state = state.copyWith(surveyData: {...state.surveyData, ...pageData});
+  }
+
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return Map<String, dynamic>.from(value);
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _asMapList(dynamic value) {
+    if (value is! List) return <Map<String, dynamic>>[];
+    return value.map<Map<String, dynamic>>((item) => _asMap(item)).toList();
   }
 
   // Extract data for a specific page from survey data
@@ -314,7 +324,22 @@ class SurveyNotifier extends Notifier<SurveyState> {
         return {'animals': state.surveyData['animals']};
 
       case 10: // Equipment
-        return {'agricultural_equipment': state.surveyData['agricultural_equipment']};
+        final equipmentMap = <String, dynamic>{};
+        if (state.surveyData['agricultural_equipment'] is Map) {
+          equipmentMap.addAll(state.surveyData['agricultural_equipment']);
+        }
+        for (final k in [
+          'tractor', 'tractor_condition',
+          'thresher', 'thresher_condition',
+          'seed_drill', 'seed_drill_condition',
+          'sprayer', 'sprayer_condition',
+          'duster', 'duster_condition',
+          'diesel_engine', 'diesel_engine_condition',
+          'other_equipment',
+        ]) {
+          if (state.surveyData.containsKey(k)) equipmentMap[k] = state.surveyData[k];
+        }
+        return {'agricultural_equipment': equipmentMap};
 
       case 11: // Entertainment
         if (state.surveyData['entertainment_facilities'] is Map<String, dynamic>) return {'entertainment_facilities': state.surveyData['entertainment_facilities']};
@@ -345,10 +370,30 @@ class SurveyNotifier extends Notifier<SurveyState> {
         };
 
       case 13: // Water Sources
-        return {'drinking_water_sources': state.surveyData['drinking_water_sources']};
+        final sources = <String, dynamic>{};
+        if (state.surveyData['drinking_water_sources'] is Map) {
+          sources.addAll(state.surveyData['drinking_water_sources']);
+        }
+        for (final k in [
+          'hand_pumps','hand_pumps_distance','hand_pumps_quality',
+          'well','well_distance','well_quality',
+          'tubewell','tubewell_distance','tubewell_quality',
+          'nal_jaal','nal_jaal_quality',
+          'other_source','other_distance','other_sources_quality',
+        ]) {
+          if (state.surveyData.containsKey(k)) sources[k] = state.surveyData[k];
+        }
+        return {'drinking_water_sources': sources};
 
       case 14: // Medical
-        return {'medical_treatment': state.surveyData['medical_treatment']};
+        final medMap = <String, dynamic>{};
+        if (state.surveyData['medical_treatment'] is Map) {
+          medMap.addAll(state.surveyData['medical_treatment']);
+        }
+        for (final k in ['allopathic','ayurvedic','homeopathy','traditional','other_treatment','preferred_treatment']) {
+          if (state.surveyData.containsKey(k)) medMap[k] = state.surveyData[k];
+        }
+        return {'medical_treatment': medMap};
 
       case 15: // Disputes
         return {'disputes': state.surveyData['disputes']};
@@ -388,12 +433,26 @@ class SurveyNotifier extends Notifier<SurveyState> {
         return {'diseases': state.surveyData['diseases']};
 
       case 18: // Government Schemes
-        return {'government_schemes': state.surveyData['government_schemes']};
+        if (state.surveyData['government_schemes'] is Map<String, dynamic>) {
+          return {'government_schemes': state.surveyData['government_schemes']};
+        }
+        return {
+          'government_schemes': {
+            'aadhaar_scheme_members': state.surveyData['aadhaar_scheme_members'] ?? [],
+            'ayushman_scheme_members': state.surveyData['ayushman_scheme_members'] ?? [],
+            'ration_scheme_members': state.surveyData['ration_scheme_members'] ?? [],
+            'family_id_scheme_members': state.surveyData['family_id_scheme_members'] ?? [],
+            'samagra_scheme_members': state.surveyData['samagra_scheme_members'] ?? [],
+            'handicapped_scheme_members': state.surveyData['handicapped_scheme_members'] ?? [],
+            'tribal_scheme_members': state.surveyData['tribal_scheme_members'] ?? [],
+            'pension_scheme_members': state.surveyData['pension_scheme_members'] ?? [],
+            'widow_scheme_members': state.surveyData['widow_scheme_members'] ?? [],
+          }
+        };
 
       case 19: // Folklore Medicine
-        // pages emit 'folklore_medicines' list but DB expects 'folklore_medicine'
         return {
-          'folklore_medicine': state.surveyData['folklore_medicine'] ?? state.surveyData['folklore_medicines'] ?? []
+          'folklore_medicines': state.surveyData['folklore_medicines'] ?? state.surveyData['folklore_medicine'] ?? []
         };
 
       case 20: // Health Programme
@@ -410,13 +469,57 @@ class SurveyNotifier extends Notifier<SurveyState> {
         };
 
       case 21: // Children
-        return {'children': state.surveyData['children']};
+        if (state.surveyData['children'] is Map<String, dynamic>) {
+          return {
+            'children': state.surveyData['children'],
+            'malnourished_children_data': state.surveyData['malnourished_children_data'],
+          };
+        }
+        final children = pick([
+          'births_last_3_years',
+          'infant_deaths_last_3_years',
+          'malnourished_children',
+        ]);
+        final childrenResult = <String, dynamic>{};
+        if (children.isNotEmpty) {
+          childrenResult['children'] = children;
+        }
+        if (state.surveyData['malnourished_children_data'] != null) {
+          childrenResult['malnourished_children_data'] = state.surveyData['malnourished_children_data'];
+        }
+        return childrenResult;
 
       case 22: // Migration
-        return {'migration': state.surveyData['migration']};
+        if (state.surveyData['migration'] is Map<String, dynamic>) {
+          return {'migration': state.surveyData['migration']};
+        }
+        return {
+          'migration': {
+            ...pick([
+              'family_members_migrated',
+              'reason',
+              'duration',
+              'destination',
+              'no_migration',
+              'migrated_members_json',
+            ]),
+            if (state.surveyData['migrated_members'] != null)
+              'migrated_members': state.surveyData['migrated_members'],
+          }
+        };
 
       case 23: // Training
-        return {'training': state.surveyData['training']};
+        if (state.surveyData['training'] is Map<String, dynamic>) {
+          return {'training': state.surveyData['training']};
+        }
+        return {
+          'training': {
+            'training_members': state.surveyData['training_members'] ?? [],
+            'want_training': state.surveyData['want_training'] ?? false,
+            'shg_members': state.surveyData['shg_members'] ?? [],
+            'fpo_members': state.surveyData['fpo_members'] ?? [],
+          }
+        };
 
       case 24: // VB-G RAM-G
         return {'vb_g_ram_g_beneficiary': state.surveyData['vb_g_ram_g_beneficiary']};
@@ -437,7 +540,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
         return {'fasal_bima': state.surveyData['fasal_bima']};
 
       case 30: // Bank Account
-        return {'bank_accounts': state.surveyData['bank_accounts']};
+        final ba = <String, dynamic>{};
+        if (state.surveyData['bank_accounts'] is Map) {
+          ba.addAll(state.surveyData['bank_accounts']);
+        }
+        if (state.surveyData.containsKey('members')) ba['members'] = state.surveyData['members'];
+        if (state.surveyData.containsKey('is_beneficiary')) ba['is_beneficiary'] = state.surveyData['is_beneficiary'];
+        return {'bank_accounts': ba};
 
       default:
         return {};
@@ -465,7 +574,9 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _saveIrrigationFacilities(pageData['irrigation_facilities'], phoneNumber);
         break;
       case 7: // Crop Productivity
-        await _saveCropProductivity(pageData['crop_productivity'], phoneNumber);
+        // UI always sends a list under "crop_productivity" but we tolerate flat payloads
+        final cropData = pageData['crop_productivity'] ?? pageData;
+        await _saveCropProductivity(cropData, phoneNumber);
         break;
       case 8: // Fertilizer
         await _saveFertilizerUsage(pageData['fertilizer_usage'], phoneNumber);
@@ -474,7 +585,9 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _saveAnimals(pageData['animals'], phoneNumber);
         break;
       case 10: // Equipment
-        await _saveAgriculturalEquipment(pageData['agricultural_equipment'], phoneNumber);
+        // equipment page returns flat keys rather than a nested map
+        final equipData = pageData['agricultural_equipment'] ?? pageData;
+        await _saveAgriculturalEquipment(equipData, phoneNumber);
         break;
       case 11: // Entertainment
         await _saveEntertainmentFacilities(pageData['entertainment_facilities'], phoneNumber);
@@ -483,10 +596,12 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _saveTransportFacilities(pageData['transport_facilities'], phoneNumber);
         break;
       case 13: // Water Sources
-        await _saveDrinkingWaterSources(pageData['drinking_water_sources'], phoneNumber);
+        final waterData = pageData['drinking_water_sources'] ?? pageData;
+        await _saveDrinkingWaterSources(waterData, phoneNumber);
         break;
       case 14: // Medical
-        await _saveMedicalTreatment(pageData['medical_treatment'], phoneNumber);
+        final medData = pageData['medical_treatment'] ?? pageData;
+        await _saveMedicalTreatment(medData, phoneNumber);
         break;
       case 15: // Disputes
         await _saveDisputes(pageData['disputes'], phoneNumber);
@@ -499,23 +614,29 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _saveDiseases(pageData['diseases'], phoneNumber);
         break;
       case 18: // Government Schemes
-        await _saveGovernmentSchemes(pageData['government_schemes'], phoneNumber);
+        await _saveGovernmentSchemes(pageData['government_schemes'] ?? pageData, phoneNumber);
         break;
       case 19: // Folklore Medicine
-        await _saveFolkloreMedicine(pageData['folklore_medicine'], phoneNumber);
+        // pages currently emit list under 'folklore_medicines'
+        final folData = pageData['folklore_medicine'] ?? pageData['folklore_medicines'] ?? pageData;
+        await _saveFolkloreMedicine(folData, phoneNumber);
         break;
       case 20: // Health Programme
         await _saveHealthProgramme(pageData['health_programme'], phoneNumber);
         break;
       case 21: // Children
-        await _saveChildren(pageData['children'], phoneNumber);
-        await _saveMalnourishedChildrenData(pageData['malnourished_children_data'], phoneNumber);
+        // top‑level keys are used rather than a nested 'children' map
+        final childrenMap = pageData['children'] ?? pageData['children_data'] ?? pageData;
+        if (childrenMap is Map) {
+          await _databaseService.insertOrUpdate('children_data', _asMap(childrenMap), phoneNumber);
+        }
+        await _saveMalnourishedChildrenData(pageData['malnourished_children_data'] ?? [], phoneNumber);
         break;
       case 22: // Migration
         await _saveMigration(pageData['migration'], phoneNumber);
         break;
       case 23: // Training
-        await _saveTraining(pageData['training'], phoneNumber);
+        await _saveTraining(pageData['training'] ?? pageData, phoneNumber);
         break;
       case 24: // VB-G RAM-G
         await _saveVbGRamGBeneficiary(pageData['vb_g_ram_g_beneficiary'], phoneNumber);
@@ -536,7 +657,8 @@ class SurveyNotifier extends Notifier<SurveyState> {
         await _saveFasalBima(pageData['fasal_bima'], phoneNumber);
         break;
       case 30: // Bank Account
-        await _saveBankAccount(pageData['bank_accounts'], phoneNumber);
+        final bankData = pageData['bank_accounts'] ?? pageData;
+        await _saveBankAccount(bankData, phoneNumber);
         break;
     }
   }
@@ -572,7 +694,11 @@ class SurveyNotifier extends Notifier<SurveyState> {
         return {'animals': animals};
       case 10: // Equipment
         final equipment = await _databaseService.getData('agricultural_equipment', phoneNumber);
-        return {'agricultural_equipment': equipment};
+        // UI expects flat keys, not a nested list
+        if (equipment.isNotEmpty) {
+          return Map<String, dynamic>.from(equipment.first);
+        }
+        return {}; 
       case 11: // Entertainment
         final entertainment = await _databaseService.getData('entertainment_facilities', phoneNumber);
         return {'entertainment_facilities': entertainment.isNotEmpty ? entertainment.first : {}};
@@ -581,10 +707,10 @@ class SurveyNotifier extends Notifier<SurveyState> {
         return {'transport_facilities': transport.isNotEmpty ? transport.first : {}};
       case 13: // Water Sources
         final water = await _databaseService.getData('drinking_water_sources', phoneNumber);
-        return {'drinking_water_sources': water};
+        return water.isNotEmpty ? Map<String, dynamic>.from(water.first) : {};
       case 14: // Medical
         final medical = await _databaseService.getData('medical_treatment', phoneNumber);
-        return {'medical_treatment': medical.isNotEmpty ? medical.first : {}};
+        return medical.isNotEmpty ? Map<String, dynamic>.from(medical.first) : {}; 
       case 15: // Disputes
         final disputes = await _databaseService.getData('disputes', phoneNumber);
         return {'disputes': disputes.isNotEmpty ? disputes.first : {}};
@@ -597,25 +723,127 @@ class SurveyNotifier extends Notifier<SurveyState> {
         };
       case 17: // Diseases
         final diseases = await _databaseService.getData('diseases', phoneNumber);
-        return {'diseases': diseases.isNotEmpty ? diseases.first : {}};
+        return {
+          'diseases': {
+            'is_beneficiary': diseases.isNotEmpty,
+            'members': diseases,
+          }
+        };
       case 18: // Government Schemes
-        final schemes = await _databaseService.getData('government_schemes', phoneNumber);
-        return {'government_schemes': schemes.isNotEmpty ? schemes.first : {}};
+        // load each scheme member list separately
+        final aadhaar = await _databaseService.getData('aadhaar_scheme_members', phoneNumber);
+        final ayushman = await _databaseService.getData('ayushman_scheme_members', phoneNumber);
+        final ration = await _databaseService.getData('ration_scheme_members', phoneNumber);
+        final familyId = await _databaseService.getData('family_id_scheme_members', phoneNumber);
+        final samagra = await _databaseService.getData('samagra_scheme_members', phoneNumber);
+        final handicapped = await _databaseService.getData('handicapped_scheme_members', phoneNumber);
+        final tribal = await _databaseService.getData('tribal_scheme_members', phoneNumber);
+        final pension = await _databaseService.getData('pension_scheme_members', phoneNumber);
+        final widow = await _databaseService.getData('widow_scheme_members', phoneNumber);
+        return {
+          'aadhaar_scheme_members': aadhaar,
+          'ayushman_scheme_members': ayushman,
+          'ration_scheme_members': ration,
+          'family_id_scheme_members': familyId,
+          'samagra_scheme_members': samagra,
+          'handicapped_scheme_members': handicapped,
+          'tribal_scheme_members': tribal,
+          'pension_scheme_members': pension,
+          'widow_scheme_members': widow,
+        };
       case 19: // Folklore Medicine
         final medicine = await _databaseService.getData('folklore_medicine', phoneNumber);
-        return {'folklore_medicine': medicine.isNotEmpty ? medicine.first : {}};
+        // page wants a list under folklore_medicines
+        return {'folklore_medicines': medicine};
       case 20: // Health Programme
         final health = await _databaseService.getData('health_programmes', phoneNumber);
         return {'health_programme': health.isNotEmpty ? health.first : {}};
       case 21: // Children
         final children = await _databaseService.getData('children_data', phoneNumber);
-        return {'children': children};
+        final mal = await _databaseService.getData('malnourished_children_data', phoneNumber);
+        final childDiseases = await _databaseService.getData('child_diseases', phoneNumber);
+        final familyMembers = await _databaseService.getData('family_members', phoneNumber);
+        final familyNameByKey = <String, String>{};
+        for (final raw in familyMembers) {
+          final member = _asMap(raw);
+          final name = member['name']?.toString().trim();
+          if (name == null || name.isEmpty) continue;
+          familyNameByKey[name] = name;
+          final srNo = member['sr_no']?.toString();
+          if (srNo != null && srNo.isNotEmpty) {
+            familyNameByKey[srNo] = name;
+          }
+        }
+        final groupedDiseases = <String, List<Map<String, dynamic>>>{};
+        for (final raw in childDiseases) {
+          final row = _asMap(raw);
+          final childId = row['child_id']?.toString();
+          if (childId == null || childId.isEmpty) continue;
+          groupedDiseases.putIfAbsent(childId, () => <Map<String, dynamic>>[]).add({
+            'name': row['disease_name'],
+            'disease_name': row['disease_name'],
+          });
+        }
+        final enrichedMalnourished = mal.map((raw) {
+          final row = _asMap(raw);
+          final childId = row['child_id']?.toString();
+          return {
+            ...row,
+            'child_name': row['child_name'] ?? (childId == null ? null : familyNameByKey[childId] ?? childId),
+            'diseases': childId == null ? <Map<String, dynamic>>[] : (groupedDiseases[childId] ?? <Map<String, dynamic>>[]),
+          };
+        }).toList();
+        if (children.isNotEmpty) {
+          final row = Map<String, dynamic>.from(children.first);
+          row['malnourished_children_data'] = enrichedMalnourished;
+          // translate to page's expected flat structure
+          return {
+            'births_last_3_years': row['births_last_3_years'],
+            'infant_deaths_last_3_years': row['infant_deaths_last_3_years'],
+            'malnourished_children': row['malnourished_children'],
+            'malnourished_children_data': enrichedMalnourished,
+          };
+        }
+        return {}; 
       case 22: // Migration
         final migration = await _databaseService.getData('migration_data', phoneNumber);
-        return {'migration': migration.isNotEmpty ? migration.first : {}};
+        final migrationRow = migration.isNotEmpty ? _asMap(migration.first) : <String, dynamic>{};
+        if (migrationRow['migrated_members_json'] is String) {
+          try {
+            final decoded = jsonDecode(migrationRow['migrated_members_json'] as String);
+            if (decoded is List) {
+              migrationRow['migrated_members'] = decoded;
+            }
+          } catch (_) {}
+        }
+        return {'migration': migrationRow};
       case 23: // Training
-        final training = await _databaseService.getData('training_data', phoneNumber);
-        return {'training': training.isNotEmpty ? training.first : {}};
+        final trainingRows = await _databaseService.getData('training_data', phoneNumber);
+        final needRows = await _databaseService.getData('training_needs', phoneNumber);
+        final shgRows = await _databaseService.getData('shg_members', phoneNumber);
+        final fpoRows = await _databaseService.getData('fpo_members', phoneNumber);
+        final allMembers = <Map<String, dynamic>>[];
+        for (final r in trainingRows) {
+          final row = Map<String, dynamic>.from(r);
+          row['status'] = 'taken';
+          row['training_type'] = row['training_type'] ?? row['training_topic'];
+          row['pass_out_year'] = row['pass_out_year'] ?? row['training_date'];
+          allMembers.add(row);
+        }
+        for (final r in needRows) {
+          final row = Map<String, dynamic>.from(r);
+          row['status'] = 'needed';
+          row['training_type'] = row['training_type'] ?? row['preferred_training'];
+          allMembers.add(row);
+        }
+        return {
+          'training': {
+            'training_members': allMembers,
+            'want_training': needRows.isNotEmpty,
+            'shg_members': shgRows,
+            'fpo_members': fpoRows,
+          }
+        };
       case 24: // VB-G RAM-G
         final vbG = await _databaseService.getData('vb_gram', phoneNumber);
         return {'vb_g_ram_g_beneficiary': vbG.isNotEmpty ? vbG.first : {}};
@@ -636,7 +864,32 @@ class SurveyNotifier extends Notifier<SurveyState> {
         return {'fasal_bima': fasal.isNotEmpty ? fasal.first : {}};
       case 30: // Bank Account
         final bank = await _databaseService.getData('bank_accounts', phoneNumber);
-        return {'bank_accounts': bank};
+        final grouped = <String, Map<String, dynamic>>{};
+        for (final raw in bank) {
+          final row = _asMap(raw);
+          final memberName = row['member_name']?.toString() ?? '';
+          final key = memberName.isEmpty ? (row['sr_no']?.toString() ?? 'member_${grouped.length + 1}') : memberName;
+          grouped.putIfAbsent(key, () => {
+            'sr_no': grouped.length + 1,
+            'name': memberName,
+            'bank_accounts': <Map<String, dynamic>>[],
+          });
+          (grouped[key]!['bank_accounts'] as List<Map<String, dynamic>>).add({
+            'sr_no': row['sr_no'],
+            'bank_name': row['bank_name'],
+            'account_number': row['account_number'],
+            'ifsc_code': row['ifsc_code'],
+            'branch_name': row['branch_name'],
+            'account_type': row['account_type'],
+            'has_account': row['has_account'],
+            'details_correct': row['details_correct'],
+            'incorrect_details': row['incorrect_details'],
+          });
+        }
+        return {
+          'is_beneficiary': bank.isNotEmpty,
+          'members': grouped.values.toList(),
+        };
       default:
         return {};
     }
@@ -725,6 +978,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
   Future<void> _saveCropProductivity(dynamic crops, String phoneNumber) async {
     if (crops is! List) return;
+    await _databaseService.deleteByPhone('crop_productivity', phoneNumber);
     for (var i = 0; i < crops.length; i++) {
       final crop = crops[i];
       if (crop is! Map<String, dynamic>) continue;
@@ -781,6 +1035,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
   Future<void> _saveAnimals(dynamic animals, String phoneNumber) async {
     if (animals is! List) return;
+    await _databaseService.deleteByPhone('animals', phoneNumber);
     for (int i = 0; i < animals.length; i++) {
       final animal = animals[i];
       if (animal is Map<String, dynamic>) {
@@ -806,13 +1061,13 @@ class SurveyNotifier extends Notifier<SurveyState> {
     // So distinct rows by equipment type are NOT supported anymore unless migrated back.
     // Assuming UI sends one combined object or list of ONE object.
     
-    if (equipment is Map<String, dynamic>) {
-        await _databaseService.insertOrUpdate('agricultural_equipment', equipment, phoneNumber);
+    if (equipment is Map) {
+        await _databaseService.insertOrUpdate('agricultural_equipment', _asMap(equipment), phoneNumber);
     } else if (equipment is List && equipment.isNotEmpty) {
       // Take first item if list
       final item = equipment.first;
-      if (item is Map<String, dynamic>) {
-        await _databaseService.insertOrUpdate('agricultural_equipment', item, phoneNumber);
+      if (item is Map) {
+        await _databaseService.insertOrUpdate('agricultural_equipment', _asMap(item), phoneNumber);
       }
     }
   }
@@ -831,19 +1086,19 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
   Future<void> _saveDrinkingWaterSources(dynamic sources, String phoneNumber) async {
     // drinking_water_sources was migrated to single-row
-    if (sources is Map<String, dynamic>) {
-        await _databaseService.insertOrUpdate('drinking_water_sources', sources, phoneNumber);
+    if (sources is Map) {
+        await _databaseService.insertOrUpdate('drinking_water_sources', _asMap(sources), phoneNumber);
     } else if (sources is List && sources.isNotEmpty) {
       final item = sources.first;
-      if (item is Map<String, dynamic>) {
-        await _databaseService.insertOrUpdate('drinking_water_sources', item, phoneNumber);
+      if (item is Map) {
+        await _databaseService.insertOrUpdate('drinking_water_sources', _asMap(item), phoneNumber);
       }
     }
   }
 
   Future<void> _saveMedicalTreatment(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('medical_treatment', data, phoneNumber);
+    if (data is Map) {
+      await _databaseService.insertOrUpdate('medical_treatment', _asMap(data), phoneNumber);
     }
   }
 
@@ -866,21 +1121,181 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> _saveDiseases(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('diseases', data, phoneNumber);
+    final rows = <Map<String, dynamic>>[];
+
+    if (data is List) {
+      rows.addAll(_asMapList(data));
+    } else if (data is Map) {
+      final diseaseMap = _asMap(data);
+      final members = _asMapList(diseaseMap['members']);
+      if (members.isNotEmpty) {
+        rows.addAll(members);
+      } else {
+        rows.add(diseaseMap);
+      }
+    }
+
+    await _databaseService.deleteByPhone('diseases', phoneNumber);
+
+    for (int i = 0; i < rows.length; i++) {
+      final row = _asMap(rows[i]);
+      final payload = <String, dynamic>{
+        'sr_no': row['sr_no'] is String
+            ? int.tryParse(row['sr_no']) ?? (i + 1)
+            : (row['sr_no'] ?? (i + 1)),
+        'family_member_name': row['family_member_name'] ?? row['member_name'] ?? row['name'],
+        'disease_name': row['disease_name'],
+        'suffering_since': row['suffering_since'],
+        'treatment_taken': row['treatment_taken'],
+        'treatment_from_when': row['treatment_from_when'],
+        'treatment_from_where': row['treatment_from_where'],
+        'treatment_taken_from': row['treatment_taken_from'],
+        'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+      };
+
+      final isMeaningful =
+          (payload['family_member_name']?.toString().trim().isNotEmpty ?? false) ||
+          (payload['disease_name']?.toString().trim().isNotEmpty ?? false) ||
+          (payload['suffering_since']?.toString().trim().isNotEmpty ?? false) ||
+          (payload['treatment_taken']?.toString().trim().isNotEmpty ?? false) ||
+          (payload['treatment_from_when']?.toString().trim().isNotEmpty ?? false) ||
+          (payload['treatment_from_where']?.toString().trim().isNotEmpty ?? false) ||
+          (payload['treatment_taken_from']?.toString().trim().isNotEmpty ?? false);
+
+      if (!isMeaningful) continue;
+      await _databaseService.insertOrUpdate('diseases', payload, phoneNumber);
     }
   }
 
   Future<void> _saveGovernmentSchemes(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('government_schemes', data, phoneNumber);
+    if (data is Map) {
+      final source = _asMap(data);
+      final map = source['government_schemes'] is Map ? _asMap(source['government_schemes']) : source;
+      // save each scheme member list to its dedicated table
+      final tableMap = {
+        'aadhaar_scheme_members': 'aadhaar_scheme_members',
+        'ayushman_scheme_members': 'ayushman_scheme_members',
+        'ration_scheme_members': 'ration_scheme_members',
+        'family_id_scheme_members': 'family_id_scheme_members',
+        'samagra_scheme_members': 'samagra_scheme_members',
+        'handicapped_scheme_members': 'handicapped_scheme_members',
+        'tribal_scheme_members': 'tribal_scheme_members',
+        'pension_scheme_members': 'pension_scheme_members',
+        'widow_scheme_members': 'widow_scheme_members',
+      };
+
+      String _yesNoFromMembers(List list, {String key = 'have_card'}) {
+        for (final item in list) {
+          if (item is! Map) continue;
+          final value = item[key];
+          if (value == true || value == 1 || value == '1') return 'yes';
+          if (value is String) {
+            final normalized = value.toLowerCase().trim();
+            if (normalized == 'yes' || normalized == 'true') return 'yes';
+          }
+        }
+        return list.isNotEmpty ? 'yes' : 'no';
+      }
+
+      for (final entry in tableMap.entries) {
+        final list = map[entry.key];
+        if (list is List) {
+          await _databaseService.deleteByPhone(entry.value, phoneNumber);
+          for (int i = 0; i < list.length; i++) {
+            final item = list[i];
+            if (item is Map) {
+              final row = _asMap(item);
+              // ensure sr_no exists
+              final sr = row['sr_no'];
+              if (sr == null) {
+                row['sr_no'] = i + 1;
+              } else if (sr is String) {
+                row['sr_no'] = int.tryParse(sr) ?? (i + 1);
+              } else if (sr is num) {
+                row['sr_no'] = sr.toInt();
+              } else {
+                row['sr_no'] = i + 1;
+              }
+
+              await _databaseService.insertOrUpdate(entry.value, row, phoneNumber);
+            }
+          }
+        }
+      }
+
+      final summaryTables = <String, Map<String, dynamic>>{
+        'aadhaar_info': {
+          'has_aadhaar': _yesNoFromMembers(map['aadhaar_scheme_members'] is List ? map['aadhaar_scheme_members'] : const []),
+          'total_members': map['aadhaar_scheme_members'] is List ? (map['aadhaar_scheme_members'] as List).length : 0,
+        },
+        'ayushman_card': {
+          'has_card': _yesNoFromMembers(map['ayushman_scheme_members'] is List ? map['ayushman_scheme_members'] : const []),
+          'total_members': map['ayushman_scheme_members'] is List ? (map['ayushman_scheme_members'] as List).length : 0,
+        },
+        'family_id': {
+          'has_id': _yesNoFromMembers(map['family_id_scheme_members'] is List ? map['family_id_scheme_members'] : const []),
+          'total_members': map['family_id_scheme_members'] is List ? (map['family_id_scheme_members'] as List).length : 0,
+        },
+        'ration_card': {
+          'has_card': _yesNoFromMembers(map['ration_scheme_members'] is List ? map['ration_scheme_members'] : const []),
+          'total_members': map['ration_scheme_members'] is List ? (map['ration_scheme_members'] as List).length : 0,
+        },
+        'samagra_id': {
+          'has_id': _yesNoFromMembers(map['samagra_scheme_members'] is List ? map['samagra_scheme_members'] : const []),
+          'total_children': map['samagra_scheme_members'] is List ? (map['samagra_scheme_members'] as List).length : 0,
+        },
+        'tribal_card': {
+          'has_card': _yesNoFromMembers(map['tribal_scheme_members'] is List ? map['tribal_scheme_members'] : const []),
+          'total_members': map['tribal_scheme_members'] is List ? (map['tribal_scheme_members'] as List).length : 0,
+        },
+        'handicapped_allowance': {
+          'has_allowance': _yesNoFromMembers(map['handicapped_scheme_members'] is List ? map['handicapped_scheme_members'] : const []),
+          'total_members': map['handicapped_scheme_members'] is List ? (map['handicapped_scheme_members'] as List).length : 0,
+        },
+        'pension_allowance': {
+          'has_pension': _yesNoFromMembers(map['pension_scheme_members'] is List ? map['pension_scheme_members'] : const []),
+          'total_members': map['pension_scheme_members'] is List ? (map['pension_scheme_members'] as List).length : 0,
+        },
+        'widow_allowance': {
+          'has_allowance': _yesNoFromMembers(map['widow_scheme_members'] is List ? map['widow_scheme_members'] : const []),
+          'total_members': map['widow_scheme_members'] is List ? (map['widow_scheme_members'] as List).length : 0,
+        },
+      };
+
+      for (final entry in summaryTables.entries) {
+        await _databaseService.insertOrUpdate(entry.key, entry.value, phoneNumber);
+      }
     }
   }
 
   Future<void> _saveFolkloreMedicine(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      await _databaseService.insertOrUpdate('folklore_medicine', data, phoneNumber);
+    final entries = data is List
+        ? _asMapList(data)
+        : (data is Map<String, dynamic> ? <Map<String, dynamic>>[_asMap(data)] : <Map<String, dynamic>>[]);
+
+    final normalized = entries
+        .map((row) => <String, dynamic>{
+              'person_name': row['person_name'] ?? row['member_name'] ?? row['name'],
+              'plant_local_name': row['plant_local_name'],
+              'plant_botanical_name': row['plant_botanical_name'],
+              'uses': row['uses'],
+            })
+        .where((payload) =>
+            !((payload['person_name']?.toString().trim().isEmpty ?? true) &&
+                (payload['plant_local_name']?.toString().trim().isEmpty ?? true) &&
+                (payload['plant_botanical_name']?.toString().trim().isEmpty ?? true) &&
+                (payload['uses']?.toString().trim().isEmpty ?? true)))
+        .toList();
+
+    if (normalized.isEmpty) {
+      await _databaseService.deleteByPhone('folklore_medicine', phoneNumber);
+      return;
     }
+
+    // Source-of-truth PK for folklore_medicine is phone_number.
+    // Persist the latest meaningful row for this family.
+    await _databaseService.deleteByPhone('folklore_medicine', phoneNumber);
+    await _databaseService.insertOrUpdate('folklore_medicine', normalized.last, phoneNumber);
   }
 
   Future<void> _saveHealthProgramme(dynamic data, String phoneNumber) async {
@@ -889,79 +1304,154 @@ class SurveyNotifier extends Notifier<SurveyState> {
     }
   }
 
-  Future<void> _saveChildren(dynamic children, String phoneNumber) async {
-    // Only process lists
-    if (children is! List) return;
-    
-    for (int i = 0; i < children.length; i++) {
-        final child = children[i];
-        if (child is Map<String, dynamic>) {
-            final sr = child['sr_no'];
-            if (sr is String) {
-               child['sr_no'] = int.tryParse(sr) ?? (i + 1);
-            } else if (sr is num) {
-               child['sr_no'] = sr.toInt();
-            } else {
-               child['sr_no'] = i + 1;
-            }
-            await _databaseService.insertOrUpdate('children_data', child, phoneNumber);
-        }
+
+  String? _resolveChildName(String? childId, List<Map<String, dynamic>> familyMembers) {
+    if (childId == null || childId.isEmpty) return null;
+    for (final member in familyMembers) {
+      final name = member['name']?.toString();
+      if (name != null && name == childId) return name;
+      final srNo = member['sr_no']?.toString();
+      if (srNo != null && srNo == childId) return name;
     }
+    return childId;
   }
 
   Future<void> _saveMalnourishedChildrenData(dynamic data, String phoneNumber) async {
     if (data is! List) return;
+    final familyMembers = (await _databaseService.getData('family_members', phoneNumber))
+        .map((row) => _asMap(row))
+        .toList();
+
+    await _databaseService.deleteByPhone('malnourished_children_data', phoneNumber);
+    await _databaseService.deleteByPhone('child_diseases', phoneNumber);
+
+    int diseaseSrNo = 0;
     for (int i = 0; i < data.length; i++) {
-        final item = data[i];
-        if (item is Map<String, dynamic>) {
-            item['sr_no'] = i + 1;
-            await _databaseService.insertOrUpdate('malnourished_children_data', item, phoneNumber);
-        }
+      final item = data[i];
+      if (item is! Map<String, dynamic>) continue;
+
+      final row = _asMap(item);
+      final childId = row['child_id']?.toString();
+      await _databaseService.insertOrUpdate('malnourished_children_data', {
+        'sr_no': i + 1,
+        'child_id': childId,
+        'child_name': row['child_name'] ?? _resolveChildName(childId, familyMembers),
+        'height': row['height'],
+        'weight': row['weight'],
+        'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+      }, phoneNumber);
+
+      for (final disease in _asMapList(row['diseases'])) {
+        final diseaseName = disease['name'] ?? disease['disease_name'];
+        if (diseaseName == null || diseaseName.toString().trim().isEmpty) continue;
+        diseaseSrNo++;
+        await _databaseService.insertOrUpdate('child_diseases', {
+          'child_id': childId,
+          'disease_name': diseaseName,
+          'sr_no': diseaseSrNo,
+          'created_at': DateTime.now().toIso8601String(),
+        }, phoneNumber);
+      }
     }
   }
 
   Future<void> _saveMigration(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
-      if (data.containsKey('migrated_members')) {
-        data['migrated_members_json'] = data['migrated_members'];
+    if (data is Map) {
+      final payload = _asMap(data);
+      if (payload.containsKey('migrated_members') && payload['migrated_members'] is List) {
+        payload['migrated_members_json'] = jsonEncode(payload['migrated_members']);
       }
-      data['sr_no'] = 1;
-      await _databaseService.insertOrUpdate('migration_data', data, phoneNumber);
+      payload['sr_no'] = 1;
+      await _databaseService.insertOrUpdate('migration_data', payload, phoneNumber);
     }
   }
 
   Future<void> _saveTraining(dynamic data, String phoneNumber) async {
-    if (data is Map<String, dynamic>) {
+    if (data is Map) {
+      final trainingData = _asMap(data);
+      await _databaseService.deleteByPhone('training_data', phoneNumber);
+      await _databaseService.deleteByPhone('training_needs', phoneNumber);
+      await _databaseService.deleteByPhone('shg_members', phoneNumber);
+      await _databaseService.deleteByPhone('fpo_members', phoneNumber);
+
       // Save training members (both taken and needed separately)
-      if (data['training_members'] is List) {
-        for (final item in data['training_members']) {
-          if (item is Map<String, dynamic>) {
-            final status = item['status'];
+      if (trainingData['training_members'] is List) {
+        for (int i = 0; i < (trainingData['training_members'] as List).length; i++) {
+          final item = trainingData['training_members'][i];
+          if (item is Map) {
+            final row = _asMap(item);
+            // ensure sr_no exists and is numeric, fallback to index+1
+            if (row['sr_no'] == null) {
+              row['sr_no'] = i + 1;
+            } else if (row['sr_no'] is String) {
+              row['sr_no'] = int.tryParse(row['sr_no']) ?? (i + 1);
+            }
+            final status = row['status'];
             if (status == 'taken') {
-              // Save to training_data table
-              await _databaseService.insertOrUpdate('training_data', item, phoneNumber);
+              await _databaseService.insertOrUpdate('training_data', {
+                'sr_no': row['sr_no'],
+                'member_name': row['member_name'],
+                'training_topic': row['training_topic'] ?? row['training_type'],
+                'training_duration': row['training_duration'],
+                'training_date': row['training_date'] ?? row['pass_out_year'],
+                'status': 'taken',
+                'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+              }, phoneNumber);
             } else if (status == 'needed') {
-              // Save to training_needs table
-              await _databaseService.insertOrUpdate('training_needs', item, phoneNumber);
+              await _databaseService.insertOrUpdate('training_needs', {
+                'sr_no': row['sr_no'],
+                'wants_training': 1,
+                'preferred_training': row['preferred_training'] ?? row['training_type'],
+                'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+              }, phoneNumber);
             }
           }
         }
       }
       
       // Save SHG members
-      if (data['shg_members'] is List) {
-        for (final item in data['shg_members']) {
-          if (item is Map<String, dynamic>) {
-            await _databaseService.insertOrUpdate('shg_members', item, phoneNumber);
+      if (trainingData['shg_members'] is List) {
+        final shgMembers = trainingData['shg_members'] as List;
+        for (int i = 0; i < shgMembers.length; i++) {
+          final item = shgMembers[i];
+          if (item is Map) {
+            final row = _asMap(item);
+            final srNo = row['sr_no'] is String
+                ? int.tryParse(row['sr_no']) ?? (i + 1)
+                : (row['sr_no'] ?? (i + 1));
+            await _databaseService.insertOrUpdate('shg_members', {
+              'sr_no': srNo,
+              'member_name': row['member_name'],
+              'shg_name': row['shg_name'],
+              'purpose': row['purpose'],
+              'agency': row['agency'],
+              'position': row['position'],
+              'monthly_saving': row['monthly_saving'],
+              'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+            }, phoneNumber);
           }
         }
       }
       
       // Save FPO members
-      if (data['fpo_members'] is List) {
-        for (final item in data['fpo_members']) {
-          if (item is Map<String, dynamic>) {
-            await _databaseService.insertOrUpdate('fpo_members', item, phoneNumber);
+      if (trainingData['fpo_members'] is List) {
+        final fpoMembers = trainingData['fpo_members'] as List;
+        for (int i = 0; i < fpoMembers.length; i++) {
+          final item = fpoMembers[i];
+          if (item is Map) {
+            final row = _asMap(item);
+            final srNo = row['sr_no'] is String
+                ? int.tryParse(row['sr_no']) ?? (i + 1)
+                : (row['sr_no'] ?? (i + 1));
+            await _databaseService.insertOrUpdate('fpo_members', {
+              'sr_no': srNo,
+              'member_name': row['member_name'],
+              'fpo_name': row['fpo_name'],
+              'purpose': row['purpose'],
+              'agency': row['agency'],
+              'share_capital': row['share_capital'],
+              'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+            }, phoneNumber);
           }
         }
       }
@@ -1005,22 +1495,57 @@ class SurveyNotifier extends Notifier<SurveyState> {
   }
 
   Future<void> _saveBankAccount(dynamic data, String phoneNumber) async {
+    final rows = <Map<String, dynamic>>[];
+
     if (data is List) {
-      for (final item in data) {
-        if (item is Map<String, dynamic>) {
-          try {
-            await _databaseService.insertOrUpdate('bank_accounts', item, phoneNumber);
-          } catch (e, st) {
-            debugPrint('Failed to save bank_account item for $phoneNumber: $e');
-            debugPrint(st.toString());
+      rows.addAll(_asMapList(data));
+    } else if (data is Map<String, dynamic>) {
+      if (data['members'] is List) {
+        int srNo = 0;
+        for (final memberRaw in data['members'] as List) {
+          final member = _asMap(memberRaw);
+          final memberName = member['member_name'] ?? member['name'];
+          final accounts = _asMapList(member['bank_accounts']);
+          for (final account in accounts) {
+            srNo++;
+            rows.add({
+              'sr_no': account['sr_no'] ?? srNo,
+              'member_name': memberName,
+              'account_number': account['account_number'],
+              'bank_name': account['bank_name'],
+              'ifsc_code': account['ifsc_code'],
+              'branch_name': account['branch_name'],
+              'account_type': account['account_type'],
+              'has_account': account['has_account'],
+              'details_correct': account['details_correct'],
+              'incorrect_details': account['incorrect_details'],
+            });
           }
         }
+      } else {
+        rows.add(_asMap(data));
       }
-    } else if (data is Map<String, dynamic>) {
+    }
+
+    await _databaseService.deleteByPhone('bank_accounts', phoneNumber);
+    for (int i = 0; i < rows.length; i++) {
+      final row = rows[i];
       try {
-        await _databaseService.insertOrUpdate('bank_accounts', data, phoneNumber);
+        await _databaseService.insertOrUpdate('bank_accounts', {
+          'sr_no': row['sr_no'] ?? (i + 1),
+          'member_name': row['member_name'],
+          'account_number': row['account_number'],
+          'bank_name': row['bank_name'],
+          'ifsc_code': row['ifsc_code'],
+          'branch_name': row['branch_name'],
+          'account_type': row['account_type'],
+          'has_account': row['has_account'],
+          'details_correct': row['details_correct'],
+          'incorrect_details': row['incorrect_details'],
+          'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+        }, phoneNumber);
       } catch (e, st) {
-        debugPrint('Failed to save bank_account map for $phoneNumber: $e');
+        debugPrint('Failed to save bank_account row for $phoneNumber: $e');
         debugPrint(st.toString());
       }
     }
@@ -1103,7 +1628,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
       final houseConditions = await _databaseService.getData('house_conditions', sessionId);
       final houseFacilities = await _databaseService.getData('house_facilities', sessionId);
       final diseases = await _databaseService.getData('diseases', sessionId);
-      final schemes = await _databaseService.getData('merged_govt_schemes', sessionId);
 
       // Government scheme info (only first row expected)
       final aadhaarInfo = await _databaseService.getData('aadhaar_info', sessionId);
@@ -1115,8 +1639,65 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
       // Other lists
       final children = await _databaseService.getData('children_data', sessionId);
+      final malChildren = await _databaseService.getData('malnourished_children_data', sessionId);
+      final childDiseases = await _databaseService.getData('child_diseases', sessionId);
+      final migration = await _databaseService.getData('migration_data', sessionId);
       final training = await _databaseService.getData('training_data', sessionId);
+      final trainingNeeds = await _databaseService.getData('training_needs', sessionId);
+      final shg = await _databaseService.getData('shg_members', sessionId);
+      final fpo = await _databaseService.getData('fpo_members', sessionId);
       final bank = await _databaseService.getData('bank_accounts', sessionId);
+      final folklore = await _databaseService.getData('folklore_medicine', sessionId);
+
+      final groupedDiseases = <String, List<Map<String, dynamic>>>{};
+      for (final raw in childDiseases) {
+        final row = _asMap(raw);
+        final childId = row['child_id']?.toString();
+        if (childId == null || childId.isEmpty) continue;
+        groupedDiseases.putIfAbsent(childId, () => <Map<String, dynamic>>[]).add({
+          'name': row['disease_name'],
+          'disease_name': row['disease_name'],
+        });
+      }
+
+      final enrichedMalChildren = malChildren.map((raw) {
+        final row = _asMap(raw);
+        final childId = row['child_id']?.toString();
+        return {
+          ...row,
+          'child_name': row['child_name'] ?? childId,
+          'diseases': childId == null ? <Map<String, dynamic>>[] : (groupedDiseases[childId] ?? <Map<String, dynamic>>[]),
+        };
+      }).toList();
+
+      final mergedTraining = <Map<String, dynamic>>[];
+      for (final raw in training) {
+        final row = _asMap(raw);
+        mergedTraining.add({
+          ...row,
+          'status': 'taken',
+          'training_type': row['training_topic'] ?? row['training_type'],
+          'pass_out_year': row['training_date'] ?? row['pass_out_year'],
+        });
+      }
+      for (final raw in trainingNeeds) {
+        final row = _asMap(raw);
+        mergedTraining.add({
+          ...row,
+          'status': 'needed',
+          'training_type': row['preferred_training'] ?? row['training_type'],
+        });
+      }
+
+      final migrationRow = migration.isNotEmpty ? _asMap(migration.first) : <String, dynamic>{};
+      if (migrationRow['migrated_members_json'] is String) {
+        try {
+          final decoded = jsonDecode(migrationRow['migrated_members_json'] as String);
+          if (decoded is List) {
+            migrationRow['migrated_members'] = decoded;
+          }
+        } catch (_) {}
+      }
 
       final aggregated = <String, dynamic>{
         ...session,
@@ -1137,16 +1718,30 @@ class SurveyNotifier extends Notifier<SurveyState> {
         'house_conditions': houseConditions.isNotEmpty ? houseConditions.first : {},
         'house_facilities': houseFacilities.isNotEmpty ? houseFacilities.first : {},
         'diseases': diseases,
-        'merged_govt_schemes': schemes.isNotEmpty ? schemes.first : {},
         'aadhaar_info': aadhaarInfo.isNotEmpty ? aadhaarInfo.first : {},
         'ayushman_card': ayushmanCard.isNotEmpty ? ayushmanCard.first : {},
         'family_id': familyId.isNotEmpty ? familyId.first : {},
         'ration_card': rationCard.isNotEmpty ? rationCard.first : {},
         'samagra_id': samagraId.isNotEmpty ? samagraId.first : {},
         'tribal_card': tribalCard.isNotEmpty ? tribalCard.first : {},
+        'children': children,
         'children_data': children,
+        'malnourished_children_data': enrichedMalChildren,
+        'child_diseases': childDiseases,
+        'migration': migrationRow,
+        'training': {
+          'training_members': mergedTraining,
+          'want_training': trainingNeeds.isNotEmpty,
+          'shg_members': shg,
+          'fpo_members': fpo,
+        },
         'training_data': training,
+        'training_needs': trainingNeeds,
+        'shg_members': shg,
+        'fpo_members': fpo,
         'bank_accounts': bank,
+        'folklore_medicine': folklore,
+        'folklore_medicines': folklore,
       };
 
       // Update provider state (phoneNumber kept as the session identifier)
@@ -1243,7 +1838,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
     if (phoneNumber == null) return;
 
     // Create or update survey session (include surveyor_email to satisfy DB NOT NULL)
-    await _databaseService.saveData('family_survey_sessions', {
+    await _databaseService.insertOrUpdate('family_survey_sessions', {
       'phone_number': phoneNumber,
       'surveyor_email': _supabaseService.currentUser?.email ?? 'unknown',
       'surveyor_name': surveyorName,
@@ -1258,7 +1853,7 @@ class SurveyNotifier extends Notifier<SurveyState> {
       'status': 'in_progress',
       'created_at': DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
-    });
+    }, phoneNumber);
 
     // Update state
     state = state.copyWith(
@@ -1280,10 +1875,6 @@ class SurveyNotifier extends Notifier<SurveyState> {
 
     debugPrint('Survey initialized for phone number: $phoneNumber');
 
-    // NOTE: previous versions attempted a background sync here.  The high‑level
-    // network logic is now handled explicitly by SurveyScreen.onNext so that we
-    // can perform step‑by‑step uploads (phone-only then full payload) and avoid
-    // RLS recursion issues.
   }
 }
 

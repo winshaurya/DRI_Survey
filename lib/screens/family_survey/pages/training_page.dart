@@ -129,6 +129,7 @@ class _TrainingPageState extends ConsumerState<TrainingPage> {
   void _addTrainingTaken() {
     setState(() {
       _trainingsTaken.add({
+        'sr_no': _trainingsTaken.length + 1,
         'member_name': '',
         'training_type': '',
         'pass_out_year': '',

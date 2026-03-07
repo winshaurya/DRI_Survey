@@ -55,7 +55,7 @@ class DatabaseHelper {
     String path = join(documentsDirectory.path, 'family_survey.db');
     return await openDatabase(
       path,
-      version: 46, // v46 relaxes surveyor_email nullability and aligns family_survey_sessions with remote schema
+      version: 47, // v47 aligns auxiliary family-survey tables used by preview/history with the current schema
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -103,6 +103,33 @@ class DatabaseHelper {
     }
     if (oldVersion < 46) {
       await _migrateFamilySurveySessionsV46(db);
+    }
+    if (oldVersion < 47) {
+      await _migrateFamilyAuxiliaryTablesV47(db);
+    }
+  }
+
+  Future<void> _migrateFamilyAuxiliaryTablesV47(Database db) async {
+    final trainingCols = await db.rawQuery('PRAGMA table_info(training_data)');
+    final hasTrainingSrNo = trainingCols.any((row) => row['name'] == 'sr_no');
+    if (!hasTrainingSrNo) {
+      final existingRows = await db.query('training_data', orderBy: 'created_at ASC');
+      await db.execute('ALTER TABLE training_data RENAME TO training_data_old_v47');
+      await db.execute('CREATE TABLE IF NOT EXISTS training_data (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, training_topic TEXT, training_duration TEXT, training_date TEXT, status TEXT DEFAULT "taken", created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
+      for (int i = 0; i < existingRows.length; i++) {
+        final row = existingRows[i];
+        await db.insert('training_data', {
+          'phone_number': row['phone_number'],
+          'sr_no': i + 1,
+          'member_name': row['member_name'],
+          'training_topic': row['training_topic'] ?? row['training_type'],
+          'training_duration': row['training_duration'],
+          'training_date': row['training_date'] ?? row['pass_out_year'],
+          'status': row['status'] ?? 'taken',
+          'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      await db.execute('DROP TABLE training_data_old_v47');
     }
   }
 
@@ -154,7 +181,7 @@ class DatabaseHelper {
   }
 
   Future<void> _ensureTrainingNeedsTable(Database db) async {
-    await db.execute('CREATE TABLE IF NOT EXISTS training_needs (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, wants_training int, preferred_training TEXT, DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (phone_number, sr_no))');
+    await db.execute('CREATE TABLE IF NOT EXISTS training_needs (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, wants_training INTEGER, preferred_training TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (phone_number, sr_no))');
   }
 
   Future<void> _migrateFamilySurveySessionsPrimaryKey(Database db) async {
@@ -279,7 +306,7 @@ class DatabaseHelper {
       }
 
       // --- single-row tables: convert id PK -> phone_number PK (keep phone_number column values)
-      final singleTables = ['fertilizer_usage','agricultural_equipment','entertainment_facilities','transport_facilities','drinking_water_sources','family_id','bank_account','tulsi_plants','nutritional_garden','aadhaar_info','ayushman_card','samagra_id','tribal_card','handicapped_allowance','pension_allowance','widow_allowance','vb_gram','pm_kisan_nidhi','pm_kisan_samman_nidhi','merged_govt_schemes'];
+      final singleTables = ['fertilizer_usage','agricultural_equipment','entertainment_facilities','transport_facilities','drinking_water_sources','family_id','bank_account','tulsi_plants','nutritional_garden','aadhaar_info','ayushman_card','samagra_id','tribal_card','handicapped_allowance','pension_allowance','widow_allowance','vb_gram','pm_kisan_nidhi','pm_kisan_samman_nidhi'];
       for (final t in singleTables) {
         final cols = await db.rawQuery('PRAGMA table_info($t)');
         final hasId = cols.any((r) => r['name'] == 'id');
@@ -772,7 +799,7 @@ class DatabaseHelper {
     ''');
 
     // Training Data
-    await db.execute('CREATE TABLE IF NOT EXISTS training_data (phone_number INTEGER NOT NULL, member_name TEXT, training_topic TEXT, training_duration TEXT, training_date TEXT, status TEXT DEFAULT "taken", created_at TEXT, PRIMARY KEY (phone_number, created_at))');
+    await db.execute('CREATE TABLE IF NOT EXISTS training_data (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, member_name TEXT, training_topic TEXT, training_duration TEXT, training_date TEXT, status TEXT DEFAULT "taken", created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
 
     // Training needs (Do you want training?) - new table to track per-family-member training requests
     await db.execute('CREATE TABLE IF NOT EXISTS training_needs (phone_number INTEGER NOT NULL, sr_no INTEGER NOT NULL, wants_training INTEGER, preferred_training TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (phone_number, sr_no))');
@@ -821,8 +848,6 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_nidhi (phone_number INTEGER PRIMARY KEY, is_beneficiary TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
     await db.execute('CREATE TABLE IF NOT EXISTS pm_kisan_samman_nidhi (phone_number INTEGER PRIMARY KEY, is_beneficiary TEXT, total_members INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
 
-    // Merged Government Schemes (for small schemes)
-    await db.execute('CREATE TABLE IF NOT EXISTS merged_govt_schemes (phone_number INTEGER PRIMARY KEY, scheme_data TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
 
     // Additional missing tables for survey pages
     await db.execute('CREATE TABLE IF NOT EXISTS children (phone_number INTEGER NOT NULL, sr_no INTEGER, name TEXT, age INTEGER, sex TEXT, education TEXT, health_status TEXT, vaccination_status TEXT, created_at TEXT, PRIMARY KEY (phone_number, sr_no))');
@@ -833,7 +858,6 @@ class DatabaseHelper {
     await db.execute('CREATE TABLE IF NOT EXISTS swachh_bharat_mission (phone_number INTEGER PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_toilet TEXT, toilet_type TEXT, construction_year INTEGER, subsidy_received TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
     await db.execute('CREATE TABLE IF NOT EXISTS fasal_bima (phone_number INTEGER PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, has_insurance TEXT, insurance_type TEXT, crop_insured TEXT, premium_amount REAL, claim_received TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
     await db.execute('CREATE TABLE IF NOT EXISTS bank_account (phone_number INTEGER PRIMARY KEY, has_account TEXT, bank_name TEXT, account_number TEXT, account_type TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
-    await db.execute('CREATE TABLE IF NOT EXISTS government_schemes (phone_number INTEGER PRIMARY KEY REFERENCES family_survey_sessions(phone_number) ON DELETE CASCADE, schemes_data TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
   }
 
   /*

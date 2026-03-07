@@ -31,6 +31,19 @@ static Database? _database;
     }
   }
 
+  Future<String> _resolveReferenceKeyColumn(Database db, String tableName) async {
+    final pkCols = kHardcodedRemotePrimaryKeys[tableName] ?? const <String>[];
+    if (pkCols.contains('phone_number')) return 'phone_number';
+    if (pkCols.contains('session_id')) return 'session_id';
+
+    final columns = await _getTableColumns(db, tableName);
+    if (columns.contains('phone_number')) return 'phone_number';
+    if (columns.contains('session_id')) return 'session_id';
+
+    // Last-resort fallback for legacy/auxiliary tables.
+    return 'phone_number';
+  }
+
 
   Future<void> saveVillageDrainageWaste(String sessionId, Map<String, dynamic> drainageData) async {
     final db = await database;
@@ -48,15 +61,6 @@ static Database? _database;
       'family_survey_sessions',
       where: 'phone_number = ?',
       whereArgs: [pk],
-    );
-  }
-
-  Future<int> createNewSurveyRecord(Map<String, dynamic> surveyData) async {
-    final db = await database;
-    return await db.insert(
-      'family_survey_sessions',
-      surveyData,
-      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
@@ -249,22 +253,28 @@ static Database? _database;
 
   Future<void> deleteByPhone(String tableName, String phoneNumber) async {
     final db = await database;
-    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
+    final keyColumn = await _resolveReferenceKeyColumn(db, tableName);
+    final keyValue = keyColumn == 'phone_number'
+        ? (int.tryParse(phoneNumber) ?? phoneNumber)
+        : phoneNumber;
     await db.delete(
       tableName,
-      where: 'phone_number = ?',
-      whereArgs: [pk],
+      where: '$keyColumn = ?',
+      whereArgs: [keyValue],
     );
   }
 
   Future<List<Map<String, dynamic>>> getData(String tableName, String phoneNumber) async {
     final db = await database;
-    final pk = int.tryParse(phoneNumber) ?? phoneNumber;
+    final keyColumn = await _resolveReferenceKeyColumn(db, tableName);
+    final keyValue = keyColumn == 'phone_number'
+        ? (int.tryParse(phoneNumber) ?? phoneNumber)
+        : phoneNumber;
     try {
       return await db.query(
         tableName,
-        where: 'phone_number = ?',
-        whereArgs: [pk],
+        where: '$keyColumn = ?',
+        whereArgs: [keyValue],
       );
     } catch (e) {
       // Table might not exist (migration pending) - log and return empty
@@ -407,9 +417,6 @@ static Database? _database;
         if (completed && !synced) {
           return true;
         }
-      } else if (value == 1) {
-        // Legacy format: completed but no sync flag means pending
-        return true;
       }
     }
     return false;
@@ -508,40 +515,107 @@ static Database? _database;
       throw Exception('key value is required for $tableName');
     }
 
-    // Determine primary lookup columns for this table using authoritative PK map when available
-    final pkCols = kHardcodedRemotePrimaryKeys[tableName];
+    final parsedPhone = int.tryParse(keyValue) ?? keyValue;
+    final hasPhone = columns.contains('phone_number');
+    final hasSession = columns.contains('session_id');
+    final String? referenceColumn = hasPhone
+        ? 'phone_number'
+        : (hasSession ? 'session_id' : null);
+    final dynamic referenceValue = hasPhone ? parsedPhone : keyValue;
+
+    final normalizedData = <String, dynamic>{...data};
+    if (hasPhone) {
+      normalizedData['phone_number'] = parsedPhone;
+    } else if (hasSession) {
+      normalizedData['session_id'] = keyValue;
+    }
+
+    // Determine primary lookup columns using source-of-truth PK map,
+    // but only keep PK columns that actually exist in local SQLite schema.
+    final hardcodedPkCols = kHardcodedRemotePrimaryKeys[tableName] ?? const <String>[];
+    final effectivePkCols = hardcodedPkCols
+        .where((c) => columns.contains(c))
+        .toList(growable: true);
+
+    if (hardcodedPkCols.isNotEmpty && effectivePkCols.length != hardcodedPkCols.length) {
+      final missingPk = hardcodedPkCols.where((c) => !columns.contains(c)).toList();
+      debugPrint('insertOrUpdate($tableName): local schema missing PK columns $missingPk; using $effectivePkCols');
+    }
+
+    // If table PK includes sr_no and caller omitted it, allocate next sr_no for the same family/session.
+    if (effectivePkCols.contains('sr_no')) {
+      final srRaw = normalizedData['sr_no'];
+      final srMissing = srRaw == null || (srRaw is String && srRaw.trim().isEmpty);
+      if (srMissing) {
+        int nextSr = 1;
+        if (referenceColumn != null) {
+          final maxRows = await db.rawQuery(
+            'SELECT MAX(sr_no) AS max_sr FROM $tableName WHERE $referenceColumn = ?',
+            [referenceValue],
+          );
+          final maxSr = (maxRows.isNotEmpty ? maxRows.first['max_sr'] : null) as num?;
+          nextSr = (maxSr?.toInt() ?? 0) + 1;
+        } else {
+          final maxRows = await db.rawQuery('SELECT MAX(sr_no) AS max_sr FROM $tableName');
+          final maxSr = (maxRows.isNotEmpty ? maxRows.first['max_sr'] : null) as num?;
+          nextSr = (maxSr?.toInt() ?? 0) + 1;
+        }
+        normalizedData['sr_no'] = nextSr;
+      } else if (srRaw is String) {
+        normalizedData['sr_no'] = int.tryParse(srRaw) ?? srRaw;
+      } else if (srRaw is num) {
+        normalizedData['sr_no'] = srRaw.toInt();
+      }
+    }
+
     String existenceWhere;
     List<dynamic> existenceArgs = [];
 
-    if (pkCols != null && pkCols.isNotEmpty) {
-      existenceWhere = pkCols.map((c) => '$c = ?').join(' AND ');
-      for (final c in pkCols) {
-        if (c == 'phone_number' || c == 'session_id') {
-          // keyValue represents the primary session/phone identifier passed by caller
-          final parsed = int.tryParse(keyValue) ?? keyValue;
-          existenceArgs.add(parsed);
+    if (effectivePkCols.isNotEmpty) {
+      final args = <dynamic>[];
+      bool canUseAllPk = true;
+      for (final c in effectivePkCols) {
+        dynamic value;
+        if (c == 'phone_number') {
+          value = parsedPhone;
+        } else if (c == 'session_id') {
+          value = keyValue;
         } else {
-          // Prefer explicit value from data (e.g., sr_no), fall back to null
-          existenceArgs.add(data[c] ?? data[c.toString()]);
+          value = normalizedData[c];
+        }
+
+        if (value == null) {
+          canUseAllPk = false;
+          break;
+        }
+        args.add(value);
+      }
+
+      if (canUseAllPk) {
+        existenceWhere = effectivePkCols.map((c) => '$c = ?').join(' AND ');
+        existenceArgs = args;
+      } else {
+        if (referenceColumn == null) {
+          throw Exception('Missing PK values for $tableName and no phone_number/session_id fallback available');
+        }
+        if (columns.contains('sr_no') && normalizedData['sr_no'] != null) {
+          existenceWhere = '$referenceColumn = ? AND sr_no = ?';
+          existenceArgs = [referenceValue, normalizedData['sr_no']];
+        } else {
+          existenceWhere = '$referenceColumn = ?';
+          existenceArgs = [referenceValue];
         }
       }
     } else {
-      // Fallback to legacy behaviour
-      String keyColumn;
-      if (columns.contains('phone_number')) {
-        keyColumn = 'phone_number';
-      } else if (columns.contains('session_id')) {
-        keyColumn = 'session_id';
-      } else {
+      if (referenceColumn == null) {
         throw Exception('No recognized key column for $tableName (expected phone_number or session_id)');
       }
 
-      // Use composite key when table has sr_no and caller provided it
       final bool hasSr = columns.contains('sr_no');
-      final bool dataHasSr = data is Map<String, dynamic> && data.containsKey('sr_no');
+      final bool dataHasSr = normalizedData.containsKey('sr_no') && normalizedData['sr_no'] != null;
 
-      existenceWhere = hasSr && dataHasSr ? '$keyColumn = ? AND sr_no = ?' : '$keyColumn = ?';
-      existenceArgs = hasSr && dataHasSr ? [keyValue, data['sr_no']] : [keyValue];
+      existenceWhere = hasSr && dataHasSr ? '$referenceColumn = ? AND sr_no = ?' : '$referenceColumn = ?';
+      existenceArgs = hasSr && dataHasSr ? [referenceValue, normalizedData['sr_no']] : [referenceValue];
     }
 
     // Check if record exists using computed where-clause
@@ -554,20 +628,19 @@ static Database? _database;
 
     final now = DateTime.now().toIso8601String();
     final dataWithTimestamp = <String, dynamic>{
-      ...data,
+      ...normalizedData,
     };
-    // ensure primary id is present in payload when available
-    if (pkCols != null && pkCols.isNotEmpty) {
-      for (final c in pkCols) {
+    // Ensure primary id columns are present in payload when local table contains them.
+    if (effectivePkCols.isNotEmpty) {
+      for (final c in effectivePkCols) {
         if (c == 'phone_number' || c == 'session_id') {
-          final parsed = int.tryParse(keyValue) ?? keyValue;
+          final parsed = c == 'phone_number' ? (int.tryParse(keyValue) ?? keyValue) : keyValue;
           dataWithTimestamp[c] = parsed;
-        } else if (!dataWithTimestamp.containsKey(c) && data[c] != null) {
-          dataWithTimestamp[c] = data[c];
+        } else if (!dataWithTimestamp.containsKey(c) && normalizedData[c] != null) {
+          dataWithTimestamp[c] = normalizedData[c];
         }
       }
     } else {
-      // legacy single key
       if (columns.contains('phone_number')) {
         dataWithTimestamp['phone_number'] = int.tryParse(keyValue) ?? keyValue;
       } else if (columns.contains('session_id')) {
@@ -639,21 +712,6 @@ static Database? _database;
       rethrow;
     }
   }
-
-  // =========================================================
-  // LEGACY PAGE-SYNC STATUS REMOVED
-  // =========================================================
-  // The application now uploads an entire family survey in a single operation.
-  // Previous implementations tracked sync status and timestamps for each page in
-  // the family survey, which required additional columns (`page_sync_status` and
-  // `page_last_synced_at`) that were later dropped from the schema. All of the
-  // methods and helpers that manipulated those columns have been deleted to avoid
-  // runtime errors. Any remaining page-related functionality (completion status,
-  // etc.) is handled by other parts of this class.
-  //
-  // This comment replaces the old methods and ensures the class closes properly.
-
-  // --- SYNC TRACKING METHODS ADDED FOR NEW SYNC LOGIC ---
 
   Future<void> ensureSyncTable() async {
     final db = await database;

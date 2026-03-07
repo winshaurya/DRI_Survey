@@ -49,10 +49,8 @@ class _GovernmentSchemesPageState extends ConsumerState<GovernmentSchemesPage> {
   @override
   void didUpdateWidget(covariant GovernmentSchemesPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.pageData != oldWidget.pageData) {
-      _loadExistingData();
-      _loadFamilyMembers();
-    }
+    _loadExistingData();
+    _loadFamilyMembers();
   }
 
   void _loadExistingData() {

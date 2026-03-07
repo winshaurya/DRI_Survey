@@ -2,6 +2,7 @@
 // Map of remote table -> primary key column list in order
 
 const Map<String, List<String>> kHardcodedRemotePrimaryKeys = {
+  // All keys confirmed against schema at supbase.sql
   'aadhaar_info': ['phone_number'],
   'aadhaar_scheme_members': ['phone_number', 'sr_no'],
   'agricultural_equipment': ['phone_number'],
@@ -32,7 +33,7 @@ const Map<String, List<String>> kHardcodedRemotePrimaryKeys = {
   'land_holding': ['phone_number'],
   'malnourished_children_data': ['phone_number', 'sr_no'],
   'medical_treatment': ['phone_number'],
-  'merged_govt_schemes': ['phone_number'],
+
   'migration_data': ['phone_number', 'sr_no'],
   'nutritional_garden': ['phone_number'],
   'pension_allowance': ['phone_number'],
@@ -46,8 +47,9 @@ const Map<String, List<String>> kHardcodedRemotePrimaryKeys = {
   'samagra_id': ['phone_number'],
   'samagra_scheme_members': ['phone_number', 'sr_no'],
   'shg_members': ['phone_number', 'sr_no'],
+  'social_consciousness': ['phone_number'],
   'spatial_ref_sys': ['srid'],
-  'training_data': ['phone_number', 'created_at'],
+  'training_data': ['phone_number', 'sr_no'],
   'training_needs': ['phone_number', 'sr_no'],
   'transport_facilities': ['phone_number'],
   'tribal_card': ['phone_number'],

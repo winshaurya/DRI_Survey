@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../components/logo_widget.dart';
 import '../../l10n/app_localizations.dart';
+import '../../components/logo_widget.dart';
 import '../../providers/survey_provider.dart';
 import '../../services/sync_service.dart';
 import '../../services/supabase_service.dart';
@@ -90,7 +90,6 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final surveyState = ref.watch(surveyProvider);
     final surveyNotifier = ref.read(surveyProvider.notifier);
 
@@ -345,16 +344,10 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     final total = ref.read(surveyProvider).totalPages;
     if (pageIndex < 0 || pageIndex >= total) return;
 
-    // Before moving off the current page we save its contents. Keep page-0
-    // behavior unchanged (await the full flow). For other pages we start the
-    // save but do not await the remote upsert so navigation is instant.
-    final current = ref.read(surveyProvider).currentPage;
-    if (current == 0) {
-      await surveyNotifier.saveCurrentPageData();
-    } else {
-      // fire-and-forget: provider will persist locally and begin background sync
-      surveyNotifier.saveCurrentPageData();
-    }
+    // Before moving off the current page we save its contents exactly once.
+    // saveCurrentPageData awaits local DB persistence and starts cloud sync in
+    // background, so awaiting here keeps navigation consistent and safe.
+    await surveyNotifier.saveCurrentPageData();
 
     // Jump the PageView (instant) and keep provider state in sync
     _pageController.jumpToPage(pageIndex);
@@ -413,250 +406,4 @@ class _SurveyScreenState extends ConsumerState<SurveyScreen> {
     );
   }
 
-  bool _validatePageConstraints(int pageIndex, [Map<String, dynamic>? pageData]) {
-    final surveyData = ref.read(surveyProvider).surveyData;
-    final dataToCheck = pageData ?? surveyData;
-
-    switch (pageIndex) {
-      case 0: // Location - phone number is optional
-        return true;
-
-      case 1: // Family Details - optional
-        return true;
-
-      case 2: // Social Consciousness 3a - at least one question answered
-        return (surveyData['clothes_frequency']?.isNotEmpty ?? false) ||
-               (surveyData['food_waste']?.isNotEmpty ?? false) ||
-               (surveyData['waste_segregation']?.isNotEmpty ?? false);
-
-      case 3: // Social Consciousness 3b - optional for now
-        return true;
-
-      case 4: // Social Consciousness 3c - optional for now
-        return true;
-
-      case 5: // Land Holding - at least one field should be filled
-        return (surveyData['irrigated_area']?.isNotEmpty ?? false) ||
-               (surveyData['cultivable_area']?.isNotEmpty ?? false);
-
-      case 6: // Irrigation - at least one source selected
-        return (surveyData['canal'] == true) ||
-               (surveyData['tube_well'] == true) ||
-               (surveyData['ponds'] == true) ||
-               (surveyData['other_facilities'] == true);
-
-      case 7: // Crop Productivity - at least one crop defined
-        return surveyData['crop_1_name']?.isNotEmpty ?? false;
-
-      case 8: // Fertilizer - at least one type selected
-        return (surveyData['urea_fertilizer'] == true) ||
-               (surveyData['organic_fertilizer'] == true);
-
-      case 9: // Animals - at least one animal if any livestock
-        return surveyData['animal_1_type']?.isNotEmpty ?? true; // Optional
-
-      case 10: // Equipment - at least one equipment selected
-        return (surveyData['tractor'] == true) ||
-               (surveyData['thresher'] == true) ||
-               (surveyData['seed_drill'] == true) ||
-               (surveyData['sprayer'] == true) ||
-               (surveyData['duster'] == true) ||
-               (surveyData['diesel_engine'] == true);
-
-      case 11: // Entertainment - at least one facility
-        return (surveyData['smart_mobile'] == true) ||
-               (surveyData['analog_mobile'] == true) ||
-               (surveyData['television'] == true) ||
-               (surveyData['radio'] == true) ||
-               (surveyData['games'] == true);
-
-      case 12: // Transport - at least one facility
-        return (surveyData['car_jeep'] == true) ||
-               (surveyData['motorcycle_scooter'] == true) ||
-               (surveyData['e_rickshaw'] == true) ||
-               (surveyData['cycle'] == true) ||
-               (surveyData['pickup_truck'] == true) ||
-               (surveyData['bullock_cart'] == true);
-
-      case 13: // Water Sources - at least one source
-        return (surveyData['hand_pumps'] == true) ||
-               (surveyData['well'] == true) ||
-               (surveyData['tubewell'] == true) ||
-               (surveyData['nal_jaal'] == true);
-
-      case 14: // Medical - at least one treatment type
-        return (surveyData['allopathic'] == true) ||
-               (surveyData['ayurvedic'] == true) ||
-               (surveyData['homeopathy'] == true) ||
-               (surveyData['traditional'] == true) ||
-               (surveyData['jhad_phook'] == true);
-
-      case 15: // Disputes - optional
-        return true;
-
-      case 16: // House Conditions - at least one house type
-        return (surveyData['katcha_house'] == true) ||
-               (surveyData['pakka_house'] == true) ||
-               (surveyData['katcha_pakka_house'] == true) ||
-               (surveyData['hut_house'] == true);
-
-      case 17: // Diseases - optional
-        return true;
-
-      case 18: // Government Schemes - at least Aadhaar checked
-        return surveyData['aadhaar_have_card'] != null;
-
-      case 19: // Children - basic info provided
-        return surveyData['births_last_3_years'] != null ||
-               surveyData['infant_deaths_last_3_years'] != null;
-
-      case 20: // Migration - optional
-        return true;
-
-      case 21: // Training - optional
-        return true;
-
-      case 22: // Final page - always valid
-        return true;
-
-      default:
-        return true;
-    }
-  }
-
-  String _getCurrentPageTitle(int pageIndex) {
-    final l10n = AppLocalizations.of(context)!;
-
-    switch (pageIndex) {
-      case 0:
-        return 'Location Information';
-      case 1:
-        return 'Family Details';
-      case 2:
-        return 'Social Consciousness (Part 1)';
-      case 3:
-        return 'Social Consciousness (Part 2)';
-      case 4:
-        return 'Social Consciousness (Part 3)';
-      case 5:
-        return 'Land Holding';
-      case 6:
-        return 'Irrigation Facilities';
-      case 7:
-        return 'Crop Productivity';
-      case 8:
-        return 'Fertilizer Usage';
-      case 9:
-        return 'Livestock & Animals';
-      case 10:
-        return 'Agricultural Equipment';
-      case 11:
-        return 'Entertainment Facilities';
-      case 12:
-        return 'Transport Facilities';
-      case 13:
-        return 'Drinking Water Sources';
-      case 14:
-        return 'Medical Treatment';
-      case 15:
-        return 'Disputes & Legal Issues';
-      case 16:
-        return 'House Conditions';
-      case 17:
-        return 'Health & Diseases';
-      case 18:
-        return 'Government Schemes';
-      case 19:
-        return 'Children & Education';
-      case 20:
-        return 'Migration';
-      case 21:
-        return 'Training & Skills';
-      case 22:
-        return 'Survey Summary';
-      default:
-        return 'Survey Page ${pageIndex + 1}';
-    }
-  }
-
-  Future<void> _navigateToPage(int pageIndex) async {
-    final surveyNotifier = ref.read(surveyProvider.notifier);
-    final currentPage = ref.read(surveyProvider).currentPage;
-
-    if (pageIndex == currentPage) return;
-
-    // Save current page data and wait for completion before navigating
-    await surveyNotifier.saveCurrentPageData();
-
-    // Animate the PageView to the target page and ensure provider state stays in sync
-    await _pageController.animateToPage(
-      pageIndex,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
-
-    // Update provider to reflect the new page index (single authoritative call)
-    surveyNotifier.jumpToPage(pageIndex);
-
-    // Load data for the new page
-    await surveyNotifier.loadPageData(pageIndex);
-  }
-
-  void _showConstraintError(int pageIndex) {
-    final l10n = AppLocalizations.of(context)!;
-    String errorMessage = 'Please complete the required fields before proceeding.';
-
-    switch (pageIndex) {
-      case 0:
-        errorMessage = 'Please enter the phone number to continue.';
-        break;
-      case 1:
-        errorMessage = 'Please provide head of family details (name, age, and gender).';
-        break;
-      case 2:
-        errorMessage = 'Please answer at least one social consciousness question.';
-        break;
-      case 3:
-        errorMessage = 'Please provide land holding information.';
-        break;
-      case 4:
-        errorMessage = 'Please select at least one irrigation facility.';
-        break;
-      case 5:
-        errorMessage = 'Please provide crop productivity information.';
-        break;
-      case 6:
-        errorMessage = 'Please select fertilizer usage type.';
-        break;
-      case 8:
-        errorMessage = 'Please select agricultural equipment owned.';
-        break;
-      case 9:
-        errorMessage = 'Please select entertainment facilities available.';
-        break;
-      case 10:
-        errorMessage = 'Please select transport facilities available.';
-        break;
-      case 11:
-        errorMessage = 'Please select drinking water sources.';
-        break;
-      case 12:
-        errorMessage = 'Please select medical treatment options.';
-        break;
-      case 14:
-        errorMessage = 'Please select house type.';
-        break;
-      case 16:
-        errorMessage = 'Please check Aadhaar card status.';
-        break;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(errorMessage),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
 }
