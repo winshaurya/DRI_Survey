@@ -175,16 +175,16 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
         const SizedBox(height: 24),
 
         // Crop entries - Mobile-friendly card layout
-        ..._crops.asMap().entries.map((entry) {
-          final index = entry.key;
-          final crop = entry.value;
-          return Column(
-            children: [
-              _buildCropCard(crop['id'], l10n, _crops.length > 1 ? () => _removeCrop(index) : null),
-              const SizedBox(height: 16),
-            ],
-          );
-        }),
+       ..._crops.asMap().entries.map((entry) {
+  final index = entry.key;
+  final crop = entry.value;
+  return Column(
+    children: [
+      _buildCropCard(index, l10n, _crops.length > 1 ? () => _removeCrop(index) : null),
+      const SizedBox(height: 16),
+    ],
+  );
+}),
 
         const SizedBox(height: 16),
 
@@ -250,11 +250,9 @@ class _CropProductivityPageState extends State<CropProductivityPage> {
       ],
     );
   }
-
-  Widget _buildCropCard(int cropId, AppLocalizations l10n, VoidCallback? onRemove) {
-     final index = _crops.indexWhere((c) => c['id'] == cropId);
-     if (index == -1) return const SizedBox.shrink();
-     final crop = _crops[index];
+Widget _buildCropCard(int index, AppLocalizations l10n, VoidCallback? onRemove) {
+   if (index < 0 || index >= _crops.length) return const SizedBox.shrink();
+   final crop = _crops[index];
 
     return Card(
       elevation: 3,

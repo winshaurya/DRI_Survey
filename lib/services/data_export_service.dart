@@ -1,4 +1,8 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:archive/archive.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:excel/excel.dart';
 
@@ -99,6 +103,68 @@ class DataExportService {
       }
     } catch (e) {
       throw Exception('Failed to save Excel file: $e');
+    }
+  }
+
+  /// Export the entire SQLite database (+ any pre-migration backups) as a ZIP.
+  /// Opens the Android/iOS SAF "Save to…" folder dialog so the user picks where to save.
+  Future<void> exportDatabaseAsZip() async {
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final archive = Archive();
+
+      // Add the live DB file.
+      final liveDb = File(p.join(docsDir.path, 'family_survey.db'));
+      if (await liveDb.exists()) {
+        final bytes = await liveDb.readAsBytes();
+        archive.addFile(ArchiveFile('family_survey.db', bytes.length, bytes));
+      } else {
+        throw Exception('Database file not found. No data has been saved yet.');
+      }
+
+      // Add any pre-migration backup files so old data is bundled too.
+      final docsDirList = docsDir.listSync();
+      for (final entity in docsDirList) {
+        if (entity is File) {
+          final name = p.basename(entity.path);
+          if (name.startsWith('family_survey_backup_v') && name.endsWith('.db')) {
+            final bytes = await entity.readAsBytes();
+            archive.addFile(ArchiveFile(name, bytes.length, bytes));
+          }
+        }
+      }
+
+      // Encode to ZIP bytes.
+      final zipBytes = ZipEncoder().encode(archive);
+      if (zipBytes == null) throw Exception('Failed to encode ZIP.');
+
+      final today = DateTime.now();
+      final dateStr =
+          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      final fileName = 'survey_data_$dateStr.zip';
+
+      // Open the system Save-As dialog.
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Survey Database',
+        fileName: fileName,
+        bytes: Uint8List.fromList(zipBytes),
+      );
+
+      if (result == null) {
+        // User cancelled.
+        throw Exception('Save cancelled by user.');
+      }
+
+      // On desktop/some Android versions FilePicker returns the path but doesn't
+      // write bytes itself — write manually as a fallback.
+      if (!result.endsWith('.zip') || !await File(result).exists()) {
+        final outPath = result.endsWith('.zip') ? result : '$result.zip';
+        await File(outPath)
+          ..createSync(recursive: true)
+          ..writeAsBytesSync(Uint8List.fromList(zipBytes));
+      }
+    } catch (e) {
+      rethrow;
     }
   }
 }

@@ -79,6 +79,21 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // Auto-backup: save a copy of the DB before any migration runs.
+    // This is a safety net so data is never lost by a migration.
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final srcPath = join(docsDir.path, 'family_survey.db');
+      final backupPath = join(docsDir.path, 'family_survey_backup_v$oldVersion.db');
+      final src = File(srcPath);
+      final backup = File(backupPath);
+      if (await src.exists() && !await backup.exists()) {
+        await src.copy(backupPath);
+      }
+    } catch (_) {
+      // Backup failure must never block the migration itself.
+    }
+
     // Ensure newer columns exist for upgrades.
     await _ensurePageTrackingColumns(db);
     await _ensureSocialConsciousnessColumns(db);

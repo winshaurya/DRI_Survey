@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/font_size_provider.dart';
 import '../../../providers/locale_provider.dart';
+import '../../../services/data_export_service.dart';
 import '../../../services/database_service.dart';
 import '../../../services/supabase_service.dart';
 
@@ -139,6 +140,16 @@ class SideNavigation extends ConsumerWidget {
 
                       _buildMenuItem(
                         context,
+                        icon: Icons.download,
+                        title: 'Export All Data',
+                        onTap: () => _exportAllData(context),
+                        color: Colors.blue[700],
+                      ),
+
+                      const Divider(height: 1),
+
+                      _buildMenuItem(
+                        context,
                         icon: Icons.logout,
                         title: l10n.logout,
                         onTap: () => _showLogoutDialog(context, l10n),
@@ -195,6 +206,44 @@ class SideNavigation extends ConsumerWidget {
         borderRadius: BorderRadius.circular(8),
       ),
     );
+  }
+
+  void _exportAllData(BuildContext context) async {
+    // Show progress dialog.
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Expanded(child: Text('Preparing database export…')),
+          ],
+        ),
+      ),
+    );
+    try {
+      await DataExportService().exportDatabaseAsZip();
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Export Failed'),
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 
   void _navigateHome(BuildContext context) {
