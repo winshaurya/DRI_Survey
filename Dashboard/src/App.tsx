@@ -244,12 +244,6 @@ export default function App() {
             </DialogTitle>
             <DialogContent dividers>
               <Box sx={{ display: "flex", gap: 2, flexDirection: "column" }}>
-                <Paper sx={{ p: 2, background: "var(--card)" }}>
-                  <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>
-                    {activeRow ? JSON.stringify(stripPageCompletion(activeRow), null, 2) : "No row selected"}
-                  </pre>
-                </Paper>
-
                 {activeRow ? (
                   <RelatedTables
                     tab={section as "village" | "family"}

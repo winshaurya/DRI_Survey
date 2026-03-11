@@ -487,6 +487,73 @@ CREATE TABLE public.pm_kisan_samman_nidhi (
   CONSTRAINT pm_kisan_samman_nidhi_pkey PRIMARY KEY (phone_number),
   CONSTRAINT pm_kisan_samman_nidhi_phone_number_fkey FOREIGN KEY (phone_number) REFERENCES public.family_survey_sessions(phone_number)
 );
+CREATE TABLE public.kisan_credit_card (
+  has_card text,
+  card_number text,
+  credit_limit numeric,
+  outstanding_amount numeric,
+  created_at text DEFAULT (now())::text,
+  phone_number bigint NOT NULL,
+  CONSTRAINT kisan_credit_card_pkey PRIMARY KEY (phone_number),
+  CONSTRAINT kisan_credit_card_phone_number_fkey FOREIGN KEY (phone_number) REFERENCES public.family_survey_sessions(phone_number)
+);
+CREATE TABLE public.kisan_credit_card_members (
+  sr_no integer NOT NULL,
+  member_name text,
+  name_included integer,
+  details_correct integer,
+  incorrect_details text,
+  received integer,
+  days text,
+  created_at text DEFAULT (now())::text,
+  phone_number bigint NOT NULL,
+  CONSTRAINT kisan_credit_card_members_pkey PRIMARY KEY (phone_number, sr_no)
+);
+CREATE TABLE public.swachh_bharat_mission (
+  has_toilet text,
+  toilet_type text,
+  construction_year integer,
+  subsidy_received text,
+  created_at text DEFAULT (now())::text,
+  phone_number bigint NOT NULL,
+  CONSTRAINT swachh_bharat_mission_pkey PRIMARY KEY (phone_number),
+  CONSTRAINT swachh_bharat_mission_phone_number_fkey FOREIGN KEY (phone_number) REFERENCES public.family_survey_sessions(phone_number)
+);
+CREATE TABLE public.swachh_bharat_mission_members (
+  sr_no integer NOT NULL,
+  member_name text,
+  name_included integer,
+  details_correct integer,
+  incorrect_details text,
+  received integer,
+  days text,
+  created_at text DEFAULT (now())::text,
+  phone_number bigint NOT NULL,
+  CONSTRAINT swachh_bharat_mission_members_pkey PRIMARY KEY (phone_number, sr_no)
+);
+CREATE TABLE public.fasal_bima (
+  has_insurance text,
+  insurance_type text,
+  crop_insured text,
+  premium_amount numeric,
+  claim_received text,
+  created_at text DEFAULT (now())::text,
+  phone_number bigint NOT NULL,
+  CONSTRAINT fasal_bima_pkey PRIMARY KEY (phone_number),
+  CONSTRAINT fasal_bima_phone_number_fkey FOREIGN KEY (phone_number) REFERENCES public.family_survey_sessions(phone_number)
+);
+CREATE TABLE public.fasal_bima_members (
+  sr_no integer NOT NULL,
+  member_name text,
+  name_included integer,
+  details_correct integer,
+  incorrect_details text,
+  received integer,
+  days text,
+  created_at text DEFAULT (now())::text,
+  phone_number bigint NOT NULL,
+  CONSTRAINT fasal_bima_members_pkey PRIMARY KEY (phone_number, sr_no)
+);
 CREATE TABLE public.ration_card (
   phone_number bigint NOT NULL UNIQUE,
   has_card text,
