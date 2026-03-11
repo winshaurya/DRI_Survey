@@ -23,6 +23,24 @@ export default function RelatedTables({ tab, pk, keyField, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Record<string, any[] | { error: string }>>({});
 
+  // Regex to match page completion status keys (handles variants)
+  const stripKeyRegex = /page[_ ]*completion[_ ]*status/i;
+
+  const stripPageCompletionFromRow = (value: any): any => {
+    if (value === null || value === undefined) return value;
+    if (Array.isArray(value)) return value.map(stripPageCompletionFromRow);
+    if (typeof value === "object") {
+      const out: Record<string, any> = {};
+      for (const k of Object.keys(value)) {
+        if (!stripKeyRegex.test(k)) {
+          out[k] = value[k];
+        }
+      }
+      return out;
+    }
+    return value;
+  };
+
   useEffect(() => {
     let mounted = true;
     async function fetchAll() {
@@ -292,9 +310,11 @@ export default function RelatedTables({ tab, pk, keyField, onClose }: Props) {
             continue;
           }
 
-          // Collect headers (union)
+          // Collect headers (union), excluding page completion keys
           const keySet = new Set<string>();
-          for (const r of rows) Object.keys(r || {}).forEach((k) => keySet.add(k));
+          for (const r of rows) Object.keys(r || {}).forEach((k) => {
+            if (!stripKeyRegex.test(k)) keySet.add(k);
+          });
           const headers = Array.from(keySet);
           aoa.push(headers);
 
@@ -303,7 +323,8 @@ export default function RelatedTables({ tab, pk, keyField, onClose }: Props) {
               headers.map((h) => {
                 const v = r[h];
                 if (v === null || v === undefined) return "";
-                return typeof v === "object" ? JSON.stringify(v) : v;
+                if (typeof v === "object") return JSON.stringify(stripPageCompletionFromRow(v));
+                return v;
               })
             );
           }
@@ -375,6 +396,7 @@ export default function RelatedTables({ tab, pk, keyField, onClose }: Props) {
         const isError = !Array.isArray(rowsOrErr);
         const rows = Array.isArray(rowsOrErr) ? rowsOrErr : [];
         const columns = rows[0] ? Object.keys(rows[0]) : [];
+        const displayColumns = columns.filter((c) => !stripKeyRegex.test(c));
 
         return (
           <Accordion key={table} defaultExpanded={false} sx={{ mb: 1 }}>
@@ -394,7 +416,7 @@ export default function RelatedTables({ tab, pk, keyField, onClose }: Props) {
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr>
-                        {columns.map((c) => (
+                        {displayColumns.map((c) => (
                           <th
                             key={c}
                             style={{
@@ -412,7 +434,7 @@ export default function RelatedTables({ tab, pk, keyField, onClose }: Props) {
                     <tbody>
                       {rows.map((r: any, idx: number) => (
                         <tr key={r.id ?? r.sr_no ?? idx}>
-                          {columns.map((c) => (
+                          {displayColumns.map((c) => (
                             <td key={c} style={{ padding: "8px 10px", verticalAlign: "top" }}>
                               {r[c] === null || r[c] === undefined ? "" : String(r[c])}
                             </td>

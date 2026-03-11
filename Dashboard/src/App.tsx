@@ -66,11 +66,30 @@ export default function App() {
     !search ? true : Object.values(r).join(" ").toLowerCase().includes(search.toLowerCase())
   );
 
-  const columns = filtered[0]
+  const rawColumns = filtered[0]
     ? Object.keys(filtered[0])
     : section === "village"
     ? ["session_id", "village_name", "state", "district", "status", "created_at"]
     : ["phone_number", "village_name", "district", "status", "survey_date", "created_at"];
+
+  // Hide the Page Completion Status column (and similar variants)
+  const columns = rawColumns.filter((c) => !/page[_ ]*completion[_ ]*status/i.test(c));
+
+  // Helper: return a shallow copy of an object/array with any page completion status keys removed
+  const stripPageCompletion = (value: any): any => {
+    if (value === null || value === undefined) return value;
+    if (Array.isArray(value)) return value.map(stripPageCompletion);
+    if (typeof value === "object") {
+      const out: Record<string, any> = {};
+      for (const k of Object.keys(value)) {
+        if (!/page[_ ]*completion[_ ]*status/i.test(k)) {
+          out[k] = value[k];
+        }
+      }
+      return out;
+    }
+    return value;
+  };
 
   return (
     <Box sx={{ minHeight: "100vh", p: { xs: 1, md: 4 }, background: "var(--bg-body)" }}>
@@ -194,15 +213,16 @@ export default function App() {
                             <Button
                               size="small"
                               onClick={(e) => {
-                                e.stopPropagation();
-                                const blob = new Blob([JSON.stringify(row, null, 2)], { type: "application/json" });
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement("a");
-                                a.href = url;
-                                a.download = `session_${section}_${section === "village" ? row?.session_id : row?.phone_number}.json`;
-                                a.click();
-                                URL.revokeObjectURL(url);
-                              }}
+                                  e.stopPropagation();
+                                  const exported = stripPageCompletion(row);
+                                  const blob = new Blob([JSON.stringify(exported, null, 2)], { type: "application/json" });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = url;
+                                  a.download = `session_${section}_${section === "village" ? row?.session_id : row?.phone_number}.json`;
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                }}
                             >
                               Export
                             </Button>
@@ -226,7 +246,7 @@ export default function App() {
               <Box sx={{ display: "flex", gap: 2, flexDirection: "column" }}>
                 <Paper sx={{ p: 2, background: "var(--card)" }}>
                   <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>
-                    {activeRow ? JSON.stringify(activeRow, null, 2) : "No row selected"}
+                    {activeRow ? JSON.stringify(stripPageCompletion(activeRow), null, 2) : "No row selected"}
                   </pre>
                 </Paper>
 

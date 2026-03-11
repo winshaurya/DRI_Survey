@@ -1,11 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:excel/excel.dart';
 
+import '../database/database_helper.dart';
 import '../services/database_service.dart';
 import '../services/excel_service.dart';
 import '../services/xlsx_export_service.dart';
@@ -106,65 +107,99 @@ class DataExportService {
     }
   }
 
-  /// Export the entire SQLite database (+ any pre-migration backups) as a ZIP.
-  /// Opens the Android/iOS SAF "Save to…" folder dialog so the user picks where to save.
-  Future<void> exportDatabaseAsZip() async {
-    try {
-      final docsDir = await getApplicationDocumentsDirectory();
-      final archive = Archive();
+  /// Build a ZIP containing:
+  ///   • all_data.json  — every table as structured JSON
+  ///   • <table>.csv    — one CSV file per table
+  Future<Uint8List> buildJsonBytes() async {
+    final db = await DatabaseHelper().database;
 
-      // Add the live DB file.
-      final liveDb = File(p.join(docsDir.path, 'family_survey.db'));
-      if (await liveDb.exists()) {
-        final bytes = await liveDb.readAsBytes();
-        archive.addFile(ArchiveFile('family_survey.db', bytes.length, bytes));
-      } else {
-        throw Exception('Database file not found. No data has been saved yet.');
-      }
+    // Discover all user tables.
+    final tableResult = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' "
+      "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%' "
+      "ORDER BY name",
+    );
 
-      // Add any pre-migration backup files so old data is bundled too.
-      final docsDirList = docsDir.listSync();
-      for (final entity in docsDirList) {
-        if (entity is File) {
-          final name = p.basename(entity.path);
-          if (name.startsWith('family_survey_backup_v') && name.endsWith('.db')) {
-            final bytes = await entity.readAsBytes();
-            archive.addFile(ArchiveFile(name, bytes.length, bytes));
+    final Map<String, dynamic> jsonExport = {
+      'exported_at': DateTime.now().toIso8601String(),
+      'tables': <String, dynamic>{},
+    };
+
+    final archive = Archive();
+
+    for (final row in tableResult) {
+      final tableName = row['name'] as String;
+      try {
+        final rows = await db.query(tableName);
+        (jsonExport['tables'] as Map<String, dynamic>)[tableName] = rows;
+
+        // Build CSV for this table.
+        if (rows.isNotEmpty) {
+          final buf = StringBuffer();
+          final headers = rows.first.keys.toList();
+          buf.writeln(_csvRow(headers));
+          for (final r in rows) {
+            buf.writeln(_csvRow(headers.map((h) => r[h]).toList()));
           }
+          final csvBytes = utf8.encode(buf.toString());
+          archive.addFile(
+            ArchiveFile('csv/$tableName.csv', csvBytes.length, csvBytes),
+          );
         }
+      } catch (_) {
+        // Skip any table that fails to read.
       }
+    }
 
-      // Encode to ZIP bytes.
-      final zipBytes = ZipEncoder().encode(archive);
-      if (zipBytes == null) throw Exception('Failed to encode ZIP.');
+    // Add the combined JSON.
+    final jsonBytes =
+        utf8.encode(const JsonEncoder.withIndent('  ').convert(jsonExport));
+    archive.addFile(
+      ArchiveFile('all_data.json', jsonBytes.length, jsonBytes),
+    );
 
-      final today = DateTime.now();
-      final dateStr =
-          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-      final fileName = 'survey_data_$dateStr.zip';
+    final zipBytes = ZipEncoder().encode(archive);
+    if (zipBytes == null) throw Exception('Failed to encode ZIP.');
+    return Uint8List.fromList(zipBytes);
+  }
 
-      // Open the system Save-As dialog.
-      final result = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save Survey Database',
-        fileName: fileName,
-        bytes: Uint8List.fromList(zipBytes),
-      );
+  /// Escape a single CSV field value.
+  String _csvField(dynamic value) {
+    if (value == null) return '';
+    final s = value.toString();
+    if (s.contains(',') || s.contains('"') || s.contains('\n')) {
+      return '"${s.replaceAll('"', '""')}"';
+    }
+    return s;
+  }
 
-      if (result == null) {
-        // User cancelled.
-        throw Exception('Save cancelled by user.');
-      }
+  /// Build one CSV row from a list of values.
+  String _csvRow(List<dynamic> values) =>
+      values.map(_csvField).join(',');
 
-      // On desktop/some Android versions FilePicker returns the path but doesn't
-      // write bytes itself — write manually as a fallback.
-      if (!result.endsWith('.zip') || !await File(result).exists()) {
-        final outPath = result.endsWith('.zip') ? result : '$result.zip';
-        await File(outPath)
-          ..createSync(recursive: true)
-          ..writeAsBytesSync(Uint8List.fromList(zipBytes));
-      }
-    } catch (e) {
-      rethrow;
+  /// Open the system Save-As dialog and write the ZIP file.
+  /// Call this AFTER dismissing any progress spinner.
+  Future<void> saveJsonFile(Uint8List zipData) async {
+    final today = DateTime.now();
+    final dateStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final fileName = 'survey_data_$dateStr.zip';
+
+    final result = await FilePicker.platform.saveFile(
+      dialogTitle: 'Save Survey Data',
+      fileName: fileName,
+      bytes: zipData,
+    );
+
+    if (result == null) return; // user cancelled
+
+    // Desktop: FilePicker returns a path but does not write — write manually.
+    // Android SAF returns a content:// URI and writes itself.
+    if (!result.startsWith('content://')) {
+      final outPath = result.endsWith('.zip') ? result : '$result.zip';
+      File(outPath)
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(zipData);
     }
   }
 }

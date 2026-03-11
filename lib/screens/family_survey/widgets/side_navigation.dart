@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -209,40 +209,65 @@ class SideNavigation extends ConsumerWidget {
   }
 
   void _exportAllData(BuildContext context) async {
-    // Show progress dialog.
+    // Capture root nav BEFORE the drawer is removed from the tree.
+    final rootNav = Navigator.of(context, rootNavigator: true);
+
+    // dialogCtx is set inside the builder - using it to pop the exact dialog
+    // route is the most reliable way to dismiss it regardless of context lifecycle.
+    BuildContext? dialogCtx;
+
     showDialog(
-      context: context,
+      context: rootNav.overlay!.context,
       barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Expanded(child: Text('Preparing database export…')),
-          ],
-        ),
-      ),
-    );
-    try {
-      await DataExportService().exportDatabaseAsZip();
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-    } catch (e) {
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Export Failed'),
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
+      useRootNavigator: true,
+      builder: (ctx) {
+        dialogCtx = ctx;
+        return const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Expanded(child: Text('Preparing database export...')),
             ],
           ),
         );
+      },
+    );
+
+    void dismissSpinner() {
+      if (dialogCtx != null && dialogCtx!.mounted) {
+        Navigator.of(dialogCtx!).pop();
+        dialogCtx = null;
       }
+    }
+
+    try {
+      // Phase 1: dump all tables to JSON bytes.
+      final jsonData = await DataExportService().buildJsonBytes();
+
+      // Dismiss spinner BEFORE opening the SAF file-picker so the system
+      // dialog is not blocked behind the Flutter overlay.
+      dismissSpinner();
+
+      // Phase 2: open Android SAF "Save to..." dialog.
+      await DataExportService().saveJsonFile(jsonData);
+    } catch (e) {
+      dismissSpinner();
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      showDialog(
+        context: rootNav.overlay!.context,
+        useRootNavigator: true,
+        builder: (_) => AlertDialog(
+          title: const Text('Export Failed'),
+          content: Text(msg),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(rootNav.overlay!.context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
